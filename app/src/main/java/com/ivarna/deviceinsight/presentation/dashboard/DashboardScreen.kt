@@ -76,14 +76,7 @@ fun DashboardScreen(
         ) {
             // Header
             item {
-                Column(modifier = Modifier.padding(vertical = 16.dp)) {
-                    Text(
-                        text = "DeviceInsight",
-                        style = MaterialTheme.typography.headlineMedium.copy(
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onBackground
-                        )
-                    )
+                Column(modifier = Modifier.padding(vertical = 8.dp)) {
                     Text(
                         text = uiState?.let { "Uptime: ${it.uptime}" } ?: "Loading...",
                         style = MaterialTheme.typography.bodyMedium.copy(

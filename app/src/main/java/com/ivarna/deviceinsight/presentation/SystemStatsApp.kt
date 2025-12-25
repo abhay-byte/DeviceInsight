@@ -75,7 +75,7 @@ fun SystemStatsApp() {
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
-                                painter = painterResource(id = R.mipmap.ic_launcher),
+                                painter = painterResource(id = R.drawable.logo),
                                 contentDescription = "App Icon",
                                 modifier = Modifier.size(32.dp)
                             )
@@ -85,9 +85,7 @@ fun SystemStatsApp() {
                     },
                     actions = {
                         IconButton(onClick = {
-                            navController.navigate(Screen.Settings.route) {
-                                launchSingleTop = true
-                            }
+                            navController.navigate(Screen.Settings.route)
                         }) {
                             Icon(
                                 imageVector = Icons.Filled.Settings,
