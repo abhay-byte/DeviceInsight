@@ -90,6 +90,10 @@ dependencies {
     implementation("com.patrykandpatrick.vico:compose-m3:2.0.0-alpha.28")
     implementation("com.patrykandpatrick.vico:core:2.0.0-alpha.28")
 
+    // Jetpack Glance (Widgets)
+    implementation("androidx.glance:glance-appwidget:1.1.0")
+    implementation("androidx.glance:glance-material3:1.1.0")
+
     // Permissions
     implementation("com.google.accompanist:accompanist-permissions:0.36.0")
 
