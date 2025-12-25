@@ -21,4 +21,20 @@ object AppModule {
     ): DashboardRepository {
         return DashboardRepositoryImpl(context)
     }
+
+    @Provides
+    @Singleton
+    fun provideHardwareRepository(
+        @ApplicationContext context: Context
+    ): com.ivarna.deviceinsight.domain.repository.HardwareRepository {
+        return com.ivarna.deviceinsight.data.repository.HardwareRepositoryImpl(context)
+    }
+
+    @Provides
+    @Singleton
+    fun provideTaskRepository(
+        @ApplicationContext context: Context
+    ): com.ivarna.deviceinsight.domain.repository.TaskRepository {
+        return com.ivarna.deviceinsight.data.repository.TaskRepositoryImpl(context)
+    }
 }
