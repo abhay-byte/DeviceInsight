@@ -1,4 +1,5 @@
 # DeviceInsight
+![DeviceInsight Logo](assets/logo.webp)
 
 **DeviceInsight** is a premium, high-performance system monitoring application for Android. It provides real-time analytics for CPU, RAM, Storage, Network, and Battery usage, presented in a stunning, futuristic "Glassmorphism" interface.
 
