@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Primary Colors -->
+    <color name="cyber_blue">#00E5FF</color>
+    <color name="cyber_blue_light">#6EFFFF</color>
+    <color name="cyber_blue_dark">#00B2CC</color>
+    
+    <color name="electric_purple">#D500F9</color>
+    <color name="electric_purple_light">#FF52FF</color>
+    <color name="electric_purple_dark">#9C00C5</color>
+    
+    <color name="amber">#FFC400</color>
+    <color name="amber_light">#FFF64F</color>
+    <color name="amber_dark">#C79400</color>
+    
+    <color name="signal_red">#FF1744</color>
+    <color name="signal_red_light">#FF616F</color>
+    <color name="signal_red_dark">#C4001D</color>
+    
+    <color name="success_green">#00E676</color>
+    <color name="success_green_light">#66FFA6</color>
+    <color name="success_green_dark">#00B248</color>
+    
+    <!-- Backgrounds -->
+    <color name="black">#000000</color>
+    <color name="dark_grey">#121212</color>
+    <color name="dark_grey_light">#1E1E1E</color>
+    
+    <!-- Text -->
+    <color name="white">#FFFFFF</color>
+    <color name="white_87">#DEFFFFFF</color>
+    <color name="white_60">#99FFFFFF</color>
+    <color name="white_38">#61FFFFFF</color>
+</resources>
