@@ -35,6 +35,11 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".presentation.settings.SettingsActivity"
+            android:exported="false"
+            android:theme="@style/Theme.SystemStats" />
+
         <service
             android:name=".service.OverlayService"
             android:enabled="true"

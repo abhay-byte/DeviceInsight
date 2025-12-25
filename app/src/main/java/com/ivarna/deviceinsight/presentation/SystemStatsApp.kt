@@ -1,5 +1,6 @@
 package com.ivarna.deviceinsight.presentation
 
+import android.content.Intent
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -17,6 +18,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavDestination.Companion.hierarchy
@@ -29,7 +31,7 @@ import com.ivarna.deviceinsight.R
 import com.ivarna.deviceinsight.presentation.dashboard.DashboardScreen
 import com.ivarna.deviceinsight.presentation.hardware.HardwareScreen
 import com.ivarna.deviceinsight.presentation.overlay.OverlayScreen
-import com.ivarna.deviceinsight.presentation.settings.SettingsScreen
+import com.ivarna.deviceinsight.presentation.settings.SettingsActivity
 import com.ivarna.deviceinsight.presentation.tasks.TasksScreen
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
@@ -49,16 +51,14 @@ sealed class Screen(val route: String, val titleRes: Int, val icon: androidx.com
     data object Tasks : Screen("tasks", R.string.nav_tasks, androidx.compose.material.icons.Icons.Filled.List)
     data object Hardware : Screen("hardware", R.string.nav_hardware, androidx.compose.material.icons.Icons.Filled.Memory)
     data object Overlay : Screen("overlay", R.string.nav_overlay, androidx.compose.material.icons.Icons.Filled.Layers)
-    data object Settings : Screen("settings", R.string.nav_settings, androidx.compose.material.icons.Icons.Filled.Settings)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SystemStatsApp() {
-    // Theme State
-    var currentTheme by remember { mutableStateOf(AppTheme.TechNoir) }
-
-    SystemStatsTheme(theme = currentTheme) {
+    val context = LocalContext.current
+    
+    SystemStatsTheme(theme = AppTheme.TechNoir) {
         val navController = rememberNavController()
         val bottomNavItems = listOf(
             Screen.Dashboard,
@@ -85,7 +85,7 @@ fun SystemStatsApp() {
                     },
                     actions = {
                         IconButton(onClick = {
-                            navController.navigate(Screen.Settings.route)
+                            context.startActivity(Intent(context, SettingsActivity::class.java))
                         }) {
                             Icon(
                                 imageVector = Icons.Filled.Settings,
@@ -128,12 +128,6 @@ fun SystemStatsApp() {
                 composable(Screen.Tasks.route) { TasksScreen() }
                 composable(Screen.Hardware.route) { HardwareScreen() }
                 composable(Screen.Overlay.route) { OverlayScreen() }
-                composable(Screen.Settings.route) { 
-                    SettingsScreen(
-                        currentTheme = currentTheme,
-                        onThemeSelected = { newTheme -> currentTheme = newTheme }
-                    ) 
-                }
             }
         }
     }
