@@ -16,6 +16,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import java.io.File
+import java.io.RandomAccessFile
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import kotlin.math.roundToInt
@@ -52,11 +53,13 @@ class DashboardRepositoryImpl @Inject constructor(
         val ram = getRamUsage()
         val ramUsed = getRamUsedBytes()
         val ramTotal = getRamTotalBytes()
+        val swapUsed = getSwapUsedBytes()
+        val swapTotal = getSwapTotalBytes()
         val power = getPowerConsumption()
-        
+         
         val now = System.currentTimeMillis()
         val x = historyCounter++
-        
+         
         addToHistory(cpuHistory, com.ivarna.deviceinsight.domain.model.CpuDataPoint(x, now, cpu * 100))
         addToHistory(ramHistory, com.ivarna.deviceinsight.domain.model.MemoryDataPoint(x, now, ram * 100))
         addToHistory(powerHistory, com.ivarna.deviceinsight.domain.model.PowerDataPoint(x, now, power))
@@ -66,7 +69,9 @@ class DashboardRepositoryImpl @Inject constructor(
             ramUsage = ram,
             ramUsedBytes = ramUsed,
             ramTotalBytes = ramTotal,
-            gpuUsage = 0.25f, 
+            swapUsedBytes = swapUsed,
+            swapTotalBytes = swapTotal,
+            gpuUsage = 0.25f,
             gpuModel = getGpuModel(),
             batteryLevel = getBatteryLevel(),
             batteryStatus = getBatteryStatus(),
@@ -133,6 +138,54 @@ class DashboardRepositoryImpl @Inject constructor(
 
     private fun getRamTotalBytes(): Long {
         return getRamInfo().totalMem
+    }
+
+    // --- Swap ---
+    private fun getSwapUsedBytes(): Long {
+        return try {
+            val reader = RandomAccessFile("/proc/meminfo", "r")
+            var line: String?
+            var swapTotal: Long = 0
+            var swapFree: Long = 0
+            while (reader.readLine().also { line = it } != null) {
+                if (line?.startsWith("SwapTotal:") == true) {
+                    val parts = line?.split("\\s+".toRegex())
+                    if (parts?.size!! > 1) {
+                        swapTotal = parts[1].toLong() * 1024 // Convert from KB to bytes
+                    }
+                } else if (line?.startsWith("SwapFree:") == true) {
+                    val parts = line?.split("\\s+".toRegex())
+                    if (parts?.size!! > 1) {
+                        swapFree = parts[1].toLong() * 1024 // Convert from KB to bytes
+                    }
+                }
+            }
+            reader.close()
+            swapTotal - swapFree
+        } catch (e: Exception) {
+            0L
+        }
+    }
+
+    private fun getSwapTotalBytes(): Long {
+        return try {
+            val reader = RandomAccessFile("/proc/meminfo", "r")
+            var line: String?
+            var swapTotal: Long = 0
+            while (reader.readLine().also { line = it } != null) {
+                if (line?.startsWith("SwapTotal:") == true) {
+                    val parts = line?.split("\\s+".toRegex())
+                    if (parts?.size!! > 1) {
+                        swapTotal = parts[1].toLong() * 1024 // Convert from KB to bytes
+                    }
+                    break
+                }
+            }
+            reader.close()
+            swapTotal
+        } catch (e: Exception) {
+            0L
+        }
     }
 
     // --- Battery ---

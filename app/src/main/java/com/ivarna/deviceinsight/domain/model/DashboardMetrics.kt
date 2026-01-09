@@ -5,6 +5,8 @@ data class DashboardMetrics(
     val ramUsage: Float,       // 0.0 - 1.0
     val ramUsedBytes: Long,
     val ramTotalBytes: Long,
+    val swapUsedBytes: Long,
+    val swapTotalBytes: Long,
     val gpuUsage: Float,       // 0.0 - 1.0
     val gpuModel: String,
     val batteryLevel: Int,     // 0 - 100

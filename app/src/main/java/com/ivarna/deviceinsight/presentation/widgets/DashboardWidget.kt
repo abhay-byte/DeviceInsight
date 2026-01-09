@@ -106,6 +106,27 @@ class DashboardWidget : GlanceAppWidget() {
                             )
                         )
                     }
+                    
+                    Spacer(modifier = GlanceModifier.height(8.dp))
+                    
+                    // Swap Row
+                    Column(modifier = GlanceModifier.fillMaxWidth()) {
+                        Text(
+                            text = "Swap",
+                            style = TextStyle(
+                                color = ColorProvider(androidx.compose.ui.graphics.Color(0xFFAAAAAA)),
+                                fontSize = 10.sp
+                            )
+                        )
+                        Text(
+                            text = "${getSwapUsedBytes() / (1024 * 1024)} / ${getSwapTotalBytes() / (1024 * 1024)} MB",
+                            style = TextStyle(
+                                color = ColorProvider(androidx.compose.ui.graphics.Color(0xFFFFD600)),
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        )
+                    }
                 }
             }
         }
@@ -137,11 +158,58 @@ class DashboardWidget : GlanceAppWidget() {
         val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
         val memInfo = ActivityManager.MemoryInfo()
         activityManager.getMemoryInfo(memInfo)
-        
+         
         val totalMB = (memInfo.totalMem / (1024 * 1024)).toInt()
         val availMB = (memInfo.availMem / (1024 * 1024)).toInt()
         val usedMB = totalMB - availMB
-        
+         
         return Pair(usedMB, totalMB)
+    }
+
+    private fun getSwapUsedBytes(): Long {
+        return try {
+            val reader = RandomAccessFile("/proc/meminfo", "r")
+            var line: String?
+            var swapTotal: Long = 0
+            var swapFree: Long = 0
+            while (reader.readLine().also { line = it } != null) {
+                if (line?.startsWith("SwapTotal:") == true) {
+                    val parts = line?.split("\\s+".toRegex())
+                    if (parts?.size!! > 1) {
+                        swapTotal = parts[1].toLong() * 1024 // Convert from KB to bytes
+                    }
+                } else if (line?.startsWith("SwapFree:") == true) {
+                    val parts = line?.split("\\s+".toRegex())
+                    if (parts?.size!! > 1) {
+                        swapFree = parts[1].toLong() * 1024 // Convert from KB to bytes
+                    }
+                }
+            }
+            reader.close()
+            swapTotal - swapFree
+        } catch (e: Exception) {
+            0L
+        }
+    }
+
+    private fun getSwapTotalBytes(): Long {
+        return try {
+            val reader = RandomAccessFile("/proc/meminfo", "r")
+            var line: String?
+            var swapTotal: Long = 0
+            while (reader.readLine().also { line = it } != null) {
+                if (line?.startsWith("SwapTotal:") == true) {
+                    val parts = line?.split("\\s+".toRegex())
+                    if (parts?.size!! > 1) {
+                        swapTotal = parts[1].toLong() * 1024 // Convert from KB to bytes
+                    }
+                    break
+                }
+            }
+            reader.close()
+            swapTotal
+        } catch (e: Exception) {
+            0L
+        }
     }
 }

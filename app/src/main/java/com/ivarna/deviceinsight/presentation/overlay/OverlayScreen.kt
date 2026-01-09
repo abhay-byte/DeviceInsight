@@ -101,6 +101,15 @@ fun OverlayScreen() {
                     )
                     Spacer(modifier = Modifier.height(24.dp))
                     
+                    Text(
+                        text = "The overlay will display CPU %, battery, RAM, and swap information.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    )
+                    
+                    Spacer(modifier = Modifier.height(24.dp))
+                    
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
@@ -116,7 +125,7 @@ fun OverlayScreen() {
                         ) {
                             Text("Start Overlay")
                         }
-                        
+                         
                         OutlinedButton(
                             onClick = {
                                 val intent = Intent(context, OverlayService::class.java)
