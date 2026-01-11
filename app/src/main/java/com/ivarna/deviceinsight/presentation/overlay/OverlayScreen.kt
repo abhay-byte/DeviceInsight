@@ -5,6 +5,8 @@ import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -24,6 +26,16 @@ fun OverlayScreen() {
     val lifecycleOwner = LocalLifecycleOwner.current
     
     var hasPermission by remember { mutableStateOf(false) }
+    var showCpu by remember { mutableStateOf(true) }
+    var showBattery by remember { mutableStateOf(true) }
+    var showRam by remember { mutableStateOf(true) }
+    var showSwap by remember { mutableStateOf(true) }
+    var showCpuTemp by remember { mutableStateOf(true) }
+    var showBatteryTemp by remember { mutableStateOf(true) }
+    var showCpuGraph by remember { mutableStateOf(true) }
+    var showPower by remember { mutableStateOf(true) }
+    var showCpuFreq by remember { mutableStateOf(true) }
+    var scaleFactor by remember { mutableStateOf(1.0f) }
     
     fun checkPermission() {
         hasPermission = Settings.canDrawOverlays(context)
@@ -45,9 +57,10 @@ fun OverlayScreen() {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp),
+            .padding(16.dp)
+            .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+        verticalArrangement = Arrangement.Top
     ) {
         if (!hasPermission) {
             GlassCard {
@@ -109,13 +122,156 @@ fun OverlayScreen() {
                     )
                     
                     Spacer(modifier = Modifier.height(24.dp))
-                    
+                   
+                    // Parameter toggles
+                    Text(
+                        text = "Select Parameters to Display:",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                   
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("CPU Usage")
+                            Switch(
+                                checked = showCpu,
+                                onCheckedChange = { showCpu = it }
+                            )
+                        }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("Battery Level")
+                            Switch(
+                                checked = showBattery,
+                                onCheckedChange = { showBattery = it }
+                            )
+                        }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("RAM Usage")
+                            Switch(
+                                checked = showRam,
+                                onCheckedChange = { showRam = it }
+                            )
+                        }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("Swap Usage")
+                            Switch(
+                                checked = showSwap,
+                                onCheckedChange = { showSwap = it }
+                            )
+                        }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("CPU Temperature")
+                            Switch(
+                                checked = showCpuTemp,
+                                onCheckedChange = { showCpuTemp = it }
+                            )
+                        }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("Battery Temperature")
+                            Switch(
+                                checked = showBatteryTemp,
+                                onCheckedChange = { showBatteryTemp = it }
+                            )
+                        }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("CPU Usage Graph")
+                            Switch(
+                                checked = showCpuGraph,
+                                onCheckedChange = { showCpuGraph = it }
+                            )
+                        }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("Power Consumption")
+                            Switch(
+                                checked = showPower,
+                                onCheckedChange = { showPower = it }
+                            )
+                        }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("CPU Core Frequencies")
+                            Switch(
+                                checked = showCpuFreq,
+                                onCheckedChange = { showCpuFreq = it }
+                            )
+                        }
+                    }
+                   
+                    Spacer(modifier = Modifier.height(16.dp))
+                   
+                    // Scale factor control
+                    Text(
+                        text = "Overlay Scale: ${String.format("%.1f", scaleFactor)}x",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Slider(
+                        value = scaleFactor,
+                        onValueChange = { scaleFactor = it },
+                        valueRange = 0.5f..2.0f,
+                        steps = 5
+                    )
+                   
+                    Spacer(modifier = Modifier.height(24.dp))
+                   
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         Button(
                             onClick = {
-                                val intent = Intent(context, OverlayService::class.java)
+                                val intent = Intent(context, OverlayService::class.java).apply {
+                                    putExtra("showCpu", showCpu)
+                                    putExtra("showBattery", showBattery)
+                                    putExtra("showRam", showRam)
+                                    putExtra("showSwap", showSwap)
+                                    putExtra("showCpuTemp", showCpuTemp)
+                                    putExtra("showBatteryTemp", showBatteryTemp)
+                                    putExtra("showCpuGraph", showCpuGraph)
+                                    putExtra("showPower", showPower)
+                                    putExtra("showCpuFreq", showCpuFreq)
+                                    putExtra("scaleFactor", scaleFactor)
+                                }
                                 if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
                                     context.startForegroundService(intent)
                                 } else {

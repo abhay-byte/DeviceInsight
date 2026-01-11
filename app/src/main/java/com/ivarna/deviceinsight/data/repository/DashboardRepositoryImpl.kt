@@ -76,6 +76,9 @@ class DashboardRepositoryImpl @Inject constructor(
             batteryLevel = getBatteryLevel(),
             batteryStatus = getBatteryStatus(),
             temperature = getBatteryTemperature(),
+            cpuTemperature = getCpuTemperature(),
+            powerConsumption = power,
+            cpuCoreFrequencies = getCpuCoreFrequencies(),
             storageUsedPerc = getStorageUsedPerc(),
             storageFreeGb = getStorageFreeGb(),
             networkSpeed = getNetworkSpeed(),
@@ -219,6 +222,68 @@ class DashboardRepositoryImpl @Inject constructor(
         val intent = getBatteryIntent() ?: return 0f
         val tempInt = intent.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, 0)
         return tempInt / 10f // Battery temp is in tenths of a degree Celsius
+    }
+
+    private fun getCpuTemperature(): Float {
+        try {
+            // Try to read CPU temperature from thermal zones
+            // Common paths for CPU thermal zones on Android
+            val thermalPaths = listOf(
+                "/sys/class/thermal/thermal_zone0/temp",
+                "/sys/class/thermal/thermal_zone1/temp",
+                "/sys/devices/virtual/thermal/thermal_zone0/temp",
+                "/sys/devices/virtual/thermal/thermal_zone1/temp"
+            )
+            
+            for (path in thermalPaths) {
+                val file = java.io.File(path)
+                if (file.exists() && file.canRead()) {
+                    val temp = file.readText().trim().toIntOrNull()
+                    if (temp != null) {
+                        // Temperature is typically in millidegrees Celsius
+                        // Convert to degrees Celsius
+                        return if (temp > 1000) {
+                            temp / 1000f
+                        } else {
+                            temp.toFloat()
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("DashboardRepository", "Error reading CPU temperature: ${e.message}")
+        }
+        return 0f // Return 0 if unable to read
+    }
+
+    private fun getCpuCoreFrequencies(): List<Int> {
+        val frequencies = mutableListOf<Int>()
+        try {
+            // Read CPU core frequencies from /sys/devices/system/cpu/cpu*/cpufreq/scaling_cur_freq
+            var coreIndex = 0
+            while (coreIndex < 16) { // Most devices have < 16 cores
+                val freqFile = File("/sys/devices/system/cpu/cpu$coreIndex/cpufreq/scaling_cur_freq")
+                if (freqFile.exists() && freqFile.canRead()) {
+                    try {
+                        val freqKhz = freqFile.readText().trim().toIntOrNull()
+                        if (freqKhz != null) {
+                            // Convert from kHz to MHz
+                            frequencies.add(freqKhz / 1000)
+                        } else {
+                            break // Invalid file, likely no more cores
+                        }
+                    } catch (e: Exception) {
+                        break // Can't read this core, assume no more cores
+                    }
+                } else {
+                    break // Core doesn't exist
+                }
+                coreIndex++
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("DashboardRepository", "Error reading CPU frequencies: ${e.message}")
+        }
+        return frequencies
     }
 
     // --- Storage ---

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    
+    <!-- Simple pin icon - solid, no overlapping parts -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M12,2C8.7,2 6,4.7 6,8C6,10 8,12 12,16C16,12 18,10 18,8C18,4.7 15.3,2 12,2Z"/>
+    
+    <!-- Pin head as path -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M12,16C13.1,16 14,15.1 14,14C14,12.9 13.1,12 12,12C10.9,12 10,12.9 10,14C10,15.1 10.9,16 12,16Z"/>
+</vector>

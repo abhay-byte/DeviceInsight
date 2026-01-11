@@ -11,7 +11,10 @@ data class DashboardMetrics(
     val gpuModel: String,
     val batteryLevel: Int,     // 0 - 100
     val batteryStatus: String, // Charging, Discharging, etc.
-    val temperature: Float,    // Celsius
+    val temperature: Float,    // Battery temperature in Celsius
+    val cpuTemperature: Float, // CPU temperature in Celsius
+    val powerConsumption: Float, // Power consumption in Watts
+    val cpuCoreFrequencies: List<Int>, // CPU core frequencies in MHz
     val storageUsedPerc: Float,// 0.0 - 1.0
     val storageFreeGb: String,
     val networkSpeed: String,  // e.g., "1.2 MB/s"
