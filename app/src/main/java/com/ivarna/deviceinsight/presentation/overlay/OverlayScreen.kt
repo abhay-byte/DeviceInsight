@@ -4,38 +4,98 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.ivarna.deviceinsight.presentation.components.GlassCard
+import com.ivarna.deviceinsight.presentation.components.ReorderableList
 import com.ivarna.deviceinsight.service.OverlayService
+
+data class OverlayMetric(
+    val id: String,
+    val name: String,
+    var enabled: Boolean,
+    var order: Int
+)
 
 @Composable
 fun OverlayScreen() {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    val prefs = remember { context.getSharedPreferences("overlay_prefs", Context.MODE_PRIVATE) }
     
     var hasPermission by remember { mutableStateOf(false) }
-    var showCpu by remember { mutableStateOf(true) }
-    var showBattery by remember { mutableStateOf(true) }
-    var showRam by remember { mutableStateOf(true) }
-    var showSwap by remember { mutableStateOf(true) }
-    var showCpuTemp by remember { mutableStateOf(true) }
-    var showBatteryTemp by remember { mutableStateOf(true) }
-    var showCpuGraph by remember { mutableStateOf(true) }
-    var showPower by remember { mutableStateOf(true) }
-    var showCpuFreq by remember { mutableStateOf(true) }
-    var scaleFactor by remember { mutableStateOf(1.0f) }
+    var scaleFactor by remember { mutableStateOf(prefs.getFloat("scaleFactor", 1.0f)) }
+    
+    // Load metric order from preferences
+    val defaultOrder = listOf("cpu", "power", "battery", "ram", "swap", "cpuTemp", "batteryTemp", "cpuGraph", "cpuFreq")
+    val savedOrder = prefs.getString("metricOrder", defaultOrder.joinToString(","))?.split(",") ?: defaultOrder
+    
+    var metrics by remember {
+        mutableStateOf(
+            savedOrder.mapIndexed { index, id ->
+                when (id) {
+                    "cpu" -> OverlayMetric("cpu", "CPU Usage", prefs.getBoolean("showCpu", true), index)
+                    "power" -> OverlayMetric("power", "Power Consumption", prefs.getBoolean("showPower", true), index)
+                    "battery" -> OverlayMetric("battery", "Battery Level", prefs.getBoolean("showBattery", true), index)
+                    "ram" -> OverlayMetric("ram", "RAM Usage", prefs.getBoolean("showRam", true), index)
+                    "swap" -> OverlayMetric("swap", "Swap Usage", prefs.getBoolean("showSwap", true), index)
+                    "cpuTemp" -> OverlayMetric("cpuTemp", "CPU Temperature", prefs.getBoolean("showCpuTemp", true), index)
+                    "batteryTemp" -> OverlayMetric("batteryTemp", "Battery Temperature", prefs.getBoolean("showBatteryTemp", true), index)
+                    "cpuGraph" -> OverlayMetric("cpuGraph", "CPU Usage Graph", prefs.getBoolean("showCpuGraph", true), index)
+                    "cpuFreq" -> OverlayMetric("cpuFreq", "CPU Core Frequencies", prefs.getBoolean("showCpuFreq", true), index)
+                    else -> OverlayMetric(id, id, true, index)
+                }
+            }
+        )
+    }
+    
+    var draggedItem by remember { mutableStateOf<OverlayMetric?>(null) }
+    var draggedOverItem by remember { mutableStateOf<OverlayMetric?>(null) }
+    
+    // Save preferences whenever they change
+    fun savePreferences() {
+        prefs.edit().apply {
+            metrics.forEach { metric ->
+                putBoolean("show${metric.id.capitalize()}", metric.enabled)
+            }
+            putFloat("scaleFactor", scaleFactor)
+            putString("metricOrder", metrics.sortedBy { it.order }.joinToString(",") { it.id })
+            apply()
+        }
+    }
+    
+    fun String.capitalize() = replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
     
     fun checkPermission() {
         hasPermission = Settings.canDrawOverlays(context)
@@ -123,120 +183,57 @@ fun OverlayScreen() {
                     
                     Spacer(modifier = Modifier.height(24.dp))
                    
-                    // Parameter toggles
+                    // Parameter toggles with drag and drop - Premium glassmorphism design
                     Text(
-                        text = "Select Parameters to Display:",
-                        style = MaterialTheme.typography.bodyMedium,
+                        text = "Customize Overlay Metrics",
+                        style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Long press and drag to reorder • Toggle to show/hide",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
                    
+                    // Reorderable list with haptic feedback
+                    val haptic = LocalHapticFeedback.current
+                    
                     Column(
                         modifier = Modifier.fillMaxWidth(),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Row(
+                        // Reorderable list of metrics
+                        val currentMetrics = metrics.sortedBy { it.order }
+                        
+                        ReorderableList(
+                            items = currentMetrics,
+                            onReorder = { fromIdx, toIdx ->
+                                val newList = currentMetrics.toMutableList()
+                                val item = newList.removeAt(fromIdx)
+                                newList.add(toIdx, item)
+                                metrics = newList.mapIndexed { i, m -> m.copy(order = i) }
+                                savePreferences()
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            },
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text("CPU Usage")
-                            Switch(
-                                checked = showCpu,
-                                onCheckedChange = { showCpu = it }
-                            )
-                        }
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text("Battery Level")
-                            Switch(
-                                checked = showBattery,
-                                onCheckedChange = { showBattery = it }
-                            )
-                        }
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text("RAM Usage")
-                            Switch(
-                                checked = showRam,
-                                onCheckedChange = { showRam = it }
-                            )
-                        }
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text("Swap Usage")
-                            Switch(
-                                checked = showSwap,
-                                onCheckedChange = { showSwap = it }
-                            )
-                        }
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text("CPU Temperature")
-                            Switch(
-                                checked = showCpuTemp,
-                                onCheckedChange = { showCpuTemp = it }
-                            )
-                        }
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text("Battery Temperature")
-                            Switch(
-                                checked = showBatteryTemp,
-                                onCheckedChange = { showBatteryTemp = it }
-                            )
-                        }
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text("CPU Usage Graph")
-                            Switch(
-                                checked = showCpuGraph,
-                                onCheckedChange = { showCpuGraph = it }
-                            )
-                        }
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text("Power Consumption")
-                            Switch(
-                                checked = showPower,
-                                onCheckedChange = { showPower = it }
-                            )
-                        }
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text("CPU Core Frequencies")
-                            Switch(
-                                checked = showCpuFreq,
-                                onCheckedChange = { showCpuFreq = it }
+                            key = { it.id }
+                        ) { metric, isDragging ->
+                            PremiumMetricCard(
+                                metric = metric,
+                                isDragging = isDragging,
+                                onToggle = { enabled ->
+                                    metrics = metrics.map {
+                                        if (it.id == metric.id) it.copy(enabled = enabled) else it
+                                    }
+                                    savePreferences()
+                                }
                             )
                         }
                     }
-                   
+                    
                     Spacer(modifier = Modifier.height(16.dp))
                    
                     // Scale factor control
@@ -249,6 +246,7 @@ fun OverlayScreen() {
                     Slider(
                         value = scaleFactor,
                         onValueChange = { scaleFactor = it },
+                        onValueChangeFinished = { savePreferences() },
                         valueRange = 0.5f..2.0f,
                         steps = 5
                     )
@@ -260,17 +258,13 @@ fun OverlayScreen() {
                     ) {
                         Button(
                             onClick = {
+                                savePreferences()
                                 val intent = Intent(context, OverlayService::class.java).apply {
-                                    putExtra("showCpu", showCpu)
-                                    putExtra("showBattery", showBattery)
-                                    putExtra("showRam", showRam)
-                                    putExtra("showSwap", showSwap)
-                                    putExtra("showCpuTemp", showCpuTemp)
-                                    putExtra("showBatteryTemp", showBatteryTemp)
-                                    putExtra("showCpuGraph", showCpuGraph)
-                                    putExtra("showPower", showPower)
-                                    putExtra("showCpuFreq", showCpuFreq)
+                                    metrics.forEach { metric ->
+                                        putExtra("show${metric.id.capitalize()}", metric.enabled)
+                                    }
                                     putExtra("scaleFactor", scaleFactor)
+                                    putExtra("metricOrder", metrics.sortedBy { it.order }.joinToString(",") { it.id })
                                 }
                                 if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
                                     context.startForegroundService(intent)
@@ -292,6 +286,77 @@ fun OverlayScreen() {
                         }
                     }
                 }
+            }
+        }
+    }
+}
+@Composable
+fun PremiumMetricCard(
+    metric: OverlayMetric,
+    isDragging: Boolean,
+    onToggle: (Boolean) -> Unit
+) {
+    val elevation by animateDpAsState(
+        targetValue = if (isDragging) 12.dp else 2.dp,
+        label = "elevation"
+    )
+    
+    // Additional alpha for the content background to make it look "lifted"
+    val containerAlpha = if (isDragging) 0.9f else 0.6f
+    
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp), // Add spacing between items
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = containerAlpha)
+        ),
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = elevation
+        )
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            Color.White.copy(alpha = 0.05f),
+                            Color.Transparent
+                        )
+                    )
+                )
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.DragHandle,
+                        contentDescription = "Reorder",
+                        tint = MaterialTheme.colorScheme.primary.copy(alpha = if (isDragging) 1f else 0.5f),
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Text(
+                        text = metric.name,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+                Switch(
+                    checked = metric.enabled,
+                    onCheckedChange = onToggle
+                )
             }
         }
     }

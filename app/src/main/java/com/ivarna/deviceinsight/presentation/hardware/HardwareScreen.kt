@@ -1,18 +1,26 @@
 package com.ivarna.deviceinsight.presentation.hardware
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.ivarna.deviceinsight.domain.model.HardwareInfo
 import com.ivarna.deviceinsight.presentation.components.GlassCard
 
 @Composable
@@ -20,6 +28,8 @@ fun HardwareScreen(
     viewModel: HardwareViewModel = hiltViewModel()
 ) {
     val hardwareInfo by viewModel.hardwareInfo.collectAsStateWithLifecycle()
+    val tabs = listOf("System", "Build", "Display", "Battery", "Sensors")
+    var selectedTabIndex by remember { mutableIntStateOf(0) }
 
     Column(
         modifier = Modifier
@@ -27,86 +37,200 @@ fun HardwareScreen(
             .padding(16.dp)
     ) {
         hardwareInfo?.let { info ->
-            // Header
-            Text(
-                text = "${info.manufacturer} ${info.model}",
-                style = MaterialTheme.typography.headlineMedium,
-                color = MaterialTheme.colorScheme.onBackground,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                text = "Codename: ${info.deviceName}",
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.primary
-            )
-            
-            Spacer(modifier = Modifier.height(16.dp))
-
-            LazyVerticalGrid(
-                columns = GridCells.Adaptive(minSize = 160.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-                contentPadding = PaddingValues(bottom = 16.dp)
+            // Curved Tab Bar
+            val surfaceColor = MaterialTheme.colorScheme.surfaceContainer
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(60.dp)
+                    .clip(shape = androidx.compose.foundation.shape.RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
             ) {
-                // OS Config
-                item {
-                    InfoCard(title = "Android System") {
-                        InfoRow("Version", info.androidVersion)
-                        InfoRow("API Level", info.apiLevel.toString())
-                        InfoRow("Security", info.securityPatch)
-                        InfoRow("Uptime", info.upTime)
+                Canvas(modifier = Modifier.matchParentSize()) {
+                    val path = Path().apply {
+                        val width = size.width
+                        val height = size.height
+                        val cornerRadius = 24.dp.toPx()
+                        
+                        // Top curve
+                        moveTo(0f, cornerRadius)
+                        quadraticBezierTo(0f, 0f, cornerRadius, 0f)
+                        lineTo(width - cornerRadius, 0f)
+                        quadraticBezierTo(width, 0f, width, cornerRadius)
+                        lineTo(width, height)
+                        lineTo(0f, height)
+                        close()
                     }
+                    drawPath(
+                        path = path,
+                        color = surfaceColor
+                    )
                 }
                 
-                // Processor / Build
-                item {
-                     InfoCard(title = "Build Info") {
-                        InfoRow("Board", info.board)
-                        InfoRow("Hardware", info.hardware)
-                        InfoRow("Kernel", info.kernelVersion.take(20) + "...")
-                        InfoRow("Build ID", info.buildId)
+                // Tab Row
+                TabRow(
+                    selectedTabIndex = selectedTabIndex,
+                    containerColor = Color.Transparent,
+                    contentColor = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(top = 8.dp)
+                ) {
+                    tabs.forEachIndexed { index, title ->
+                        Tab(
+                            selected = selectedTabIndex == index,
+                            onClick = { selectedTabIndex = index },
+                            text = { Text(text = title) }
+                        )
                     }
                 }
+            }
 
-                // Display
-                item {
-                    InfoCard(title = "Display") {
-                        InfoRow("Resolution", info.resolution)
-                        InfoRow("Density", "${info.density} (${info.densityDpi} dpi)")
-                        InfoRow("Refresh Rate", "${info.refreshRate} Hz")
-                    }
-                }
+            Spacer(modifier = Modifier.height(16.dp))
 
-                // Battery
-                item {
-                    InfoCard(title = "Battery") {
-                        InfoRow("Technology", info.batteryTechnology)
-                        InfoRow("Health", info.batteryHealth)
-                        InfoRow("Capacity", info.batteryCapacity)
-                    }
-                }
-
-                // Sensors
-                item {
-                    InfoCard(title = "Sensors") {
-                        InfoRow("Total Count", info.sensorCount.toString())
-                        if (info.availableSensors.isNotEmpty()) {
-                             Spacer(modifier = Modifier.height(8.dp))
-                             Text(
-                                 text = info.availableSensors.take(5).joinToString("\n"),
-                                 style = MaterialTheme.typography.bodySmall,
-                                 color = MaterialTheme.colorScheme.onSurfaceVariant
-                             )
-                             if(info.sensorCount > 5) {
-                                 Text("...", style = MaterialTheme.typography.bodySmall)
-                             }
-                        }
-                    }
-                }
+            // Tab Content
+            when (selectedTabIndex) {
+                0 -> SystemTab(info)
+                1 -> BuildTab(info)
+                2 -> DisplayTab(info)
+                3 -> BatteryTab(info)
+                4 -> SensorsTab(info)
             }
         } ?: run {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.Center) {
                 androidx.compose.material3.CircularProgressIndicator()
+            }
+        }
+    }
+}
+
+@Composable
+fun SystemTab(info: HardwareInfo) {
+    GlassCard(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = "Android System",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+            InfoRow("Version", info.androidVersion)
+            InfoRow("API Level", info.apiLevel.toString())
+            InfoRow("Security Patch", info.securityPatch)
+            InfoRow("Uptime", info.upTime)
+            InfoRow("Kernel Version", info.kernelVersion)
+            InfoRow("Build ID", info.buildId)
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Device Details",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)
+            )
+            InfoRow("Manufacturer", info.manufacturer)
+            InfoRow("Model", info.model)
+            InfoRow("Device Name", info.deviceName)
+            InfoRow("Brand", info.brand)
+            InfoRow("Board", info.board)
+            InfoRow("Hardware", info.hardware)
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Additional Info",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)
+            )
+            InfoRow("Resolution", info.resolution)
+            InfoRow("Density", "${info.density} (${info.densityDpi} dpi)")
+            InfoRow("Refresh Rate", "${info.refreshRate} Hz")
+        }
+    }
+}
+
+@Composable
+fun BuildTab(info: HardwareInfo) {
+    GlassCard(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = "Build Info",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+            InfoRow("Board", info.board)
+            InfoRow("Hardware", info.hardware)
+            InfoRow("Kernel Version", info.kernelVersion)
+            InfoRow("Build ID", info.buildId)
+        }
+    }
+}
+
+@Composable
+fun DisplayTab(info: HardwareInfo) {
+    GlassCard(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = "Display",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+            InfoRow("Resolution", info.resolution)
+            InfoRow("Density", "${info.density} (${info.densityDpi} dpi)")
+            InfoRow("Refresh Rate", "${info.refreshRate} Hz")
+        }
+    }
+}
+
+@Composable
+fun BatteryTab(info: HardwareInfo) {
+    GlassCard(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = "Battery",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+            InfoRow("Technology", info.batteryTechnology)
+            InfoRow("Health", info.batteryHealth)
+            InfoRow("Capacity", info.batteryCapacity)
+        }
+    }
+}
+
+@Composable
+fun SensorsTab(info: HardwareInfo) {
+    GlassCard(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = "Sensors",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+            InfoRow("Total Count", info.sensorCount.toString())
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Available Sensors",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)
+            )
+            if (info.availableSensors.isNotEmpty()) {
+                 Text(
+                     text = info.availableSensors.take(10).joinToString("\n"),
+                     style = MaterialTheme.typography.bodySmall,
+                     color = MaterialTheme.colorScheme.onSurfaceVariant
+                 )
+                 if(info.sensorCount > 10) {
+                     Text("and ${info.sensorCount - 10} more...", style = MaterialTheme.typography.bodySmall)
+                 }
             }
         }
     }

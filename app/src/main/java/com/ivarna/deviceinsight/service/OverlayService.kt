@@ -14,6 +14,8 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.WindowManager
 import android.widget.TextView
+import android.widget.ProgressBar
+import android.widget.LinearLayout
 import androidx.core.app.NotificationCompat
 import com.ivarna.deviceinsight.MainActivity
 import com.ivarna.deviceinsight.R
@@ -40,6 +42,7 @@ class OverlayService : Service() {
     private var showPower: Boolean = true
     private var showCpuFreq: Boolean = true
     private var scaleFactor: Float = 1.0f
+    private var metricOrder: List<String> = listOf("cpu", "power", "battery", "ram", "swap", "cpuTemp", "batteryTemp", "cpuGraph", "cpuFreq")
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -66,6 +69,8 @@ class OverlayService : Service() {
             showPower = it.getBooleanExtra("showPower", true)
             showCpuFreq = it.getBooleanExtra("showCpuFreq", true)
             scaleFactor = it.getFloatExtra("scaleFactor", 1.0f)
+            metricOrder = it.getStringExtra("metricOrder")?.split(",") 
+                ?: listOf("cpu", "power", "battery", "ram", "swap", "cpuTemp", "batteryTemp", "cpuGraph", "cpuFreq")
             
             // Update the overlay with new parameters
             updateOverlayWithNewParameters()
@@ -79,9 +84,13 @@ class OverlayService : Service() {
     private var initialY = 0
     private var initialTouchX = 0f
     private var initialTouchY = 0f
-    private lateinit var contentTextView: TextView
     private lateinit var collapseButton: android.widget.ImageButton
     private lateinit var expandButton: android.widget.ImageButton
+    private lateinit var contentLayout: LinearLayout
+    private lateinit var cpuProgressBar: ProgressBar
+    private lateinit var batteryProgressBar: ProgressBar
+    private lateinit var ramProgressBar: ProgressBar
+    private lateinit var swapProgressBar: ProgressBar
     
     private fun createOverlayView() {
         // Since we don't have XML layout, we'll create view programmatically or inflate if we had one.
@@ -117,21 +126,66 @@ class OverlayService : Service() {
             setPadding(16, 16, 16, 16)
         }
 
-        // Main content TextView
-        val contentTextView = TextView(this).apply {
-            text = "DeviceInsight\nCPU: --%"
-            textSize = 14f * scaleFactor
-            setTextColor(android.graphics.Color.WHITE)
-            maxLines = Int.MAX_VALUE
-            isSingleLine = false
-            ellipsize = null
+        // Create a LinearLayout for content with progress bars
+        val contentLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
             layoutParams = android.widget.FrameLayout.LayoutParams(
-                android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                android.widget.FrameLayout.LayoutParams.WRAP_CONTENT,
                 android.widget.FrameLayout.LayoutParams.WRAP_CONTENT
             ).apply {
                 setMargins(0, 0, 0, 40) // Leave space for pin button
             }
-            android.util.Log.d("OverlayService", "TextView created with textSize=${14f * scaleFactor}, maxLines=unlimited")
+        }
+        
+        // Create progress bars - they will size dynamically based on content width
+        val progressBarWidth = LinearLayout.LayoutParams.MATCH_PARENT
+        
+        cpuProgressBar = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                progressBarWidth,
+                (8 * scaleFactor).toInt()
+            ).apply {
+                setMargins(0, (4 * scaleFactor).toInt(), 0, (4 * scaleFactor).toInt())
+            }
+            max = 100
+            progress = 0
+            scaleY = 1.5f * scaleFactor
+        }
+        
+        batteryProgressBar = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                progressBarWidth,
+                (8 * scaleFactor).toInt()
+            ).apply {
+                setMargins(0, (4 * scaleFactor).toInt(), 0, (4 * scaleFactor).toInt())
+            }
+            max = 100
+            progress = 0
+            scaleY = 1.5f * scaleFactor
+        }
+        
+        ramProgressBar = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                progressBarWidth,
+                (8 * scaleFactor).toInt()
+            ).apply {
+                setMargins(0, (4 * scaleFactor).toInt(), 0, (4 * scaleFactor).toInt())
+            }
+            max = 100
+            progress = 0
+            scaleY = 1.5f * scaleFactor
+        }
+        
+        swapProgressBar = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                progressBarWidth,
+                (8 * scaleFactor).toInt()
+            ).apply {
+                setMargins(0, (4 * scaleFactor).toInt(), 0, (4 * scaleFactor).toInt())
+            }
+            max = 100
+            progress = 0
+            scaleY = 1.5f * scaleFactor
         }
         
         // Collapse button - minimize overlay
@@ -173,17 +227,21 @@ class OverlayService : Service() {
             }
         }
 
-        container.addView(contentTextView)
+        container.addView(contentLayout)
         container.addView(collapseButton)
         container.addView(expandButton)
 
         overlayView = container
-        this.contentTextView = contentTextView
+        this.contentLayout = contentLayout
         this.collapseButton = collapseButton
         this.expandButton = expandButton
+        this.cpuProgressBar = cpuProgressBar
+        this.batteryProgressBar = batteryProgressBar
+        this.ramProgressBar = ramProgressBar
+        this.swapProgressBar = swapProgressBar
         
         // Make the overlay draggable by touching the content area
-        contentTextView.setOnTouchListener { v, event ->
+        contentLayout.setOnTouchListener { v, event ->
             when (event.action) {
                 android.view.MotionEvent.ACTION_DOWN -> {
                     initialX = params.x
@@ -235,78 +293,126 @@ class OverlayService : Service() {
                 android.util.Log.d("OverlayService", "CPU Temp: ${cpuTemperature}°C, Battery Temp: ${batteryTemperature}°C, Power: ${powerConsumption}W")
                 android.util.Log.d("OverlayService", "Flags - showCpu: $showCpu, showBattery: $showBattery, showRam: $showRam, showSwap: $showSwap, showCpuGraph: $showCpuGraph")
                 
-                // Build the overlay text based on enabled parameters
-                val textBuilder = StringBuilder("DeviceInsight")
+                // Clear and rebuild layout
+                contentLayout.removeAllViews()
                 
-                if (showCpu) {
-                    textBuilder.append("\nCPU: ${cpuUsage}%")
-                    
-                    // Add CPU graph under CPU percentage if enabled
-                    if (showCpuGraph && cpuHistory.isNotEmpty()) {
-                        textBuilder.append(createCpuUsageGraph(cpuHistory))
+                // Add title
+                addTextView("DeviceInsight", true)
+                addSeparator()
+                
+                // Display metrics in custom order
+                metricOrder.forEach { metricId ->
+                    when (metricId) {
+                        "cpu" -> if (showCpu) {
+                            addTextView("CPU: ${cpuUsage}%")
+                            cpuProgressBar.progress = cpuUsage
+                            contentLayout.addView(cpuProgressBar)
+                            addSeparator()
+                        }
+                        "cpuGraph" -> if (showCpu && showCpuGraph && cpuHistory.isNotEmpty()) {
+                            addTextView(createCpuUsageGraph(cpuHistory))
+                            addSeparator()
+                        }
+                        "cpuFreq" -> if (showCpu && showCpuFreq && cpuCoreFrequencies.isNotEmpty()) {
+                            val freqBuilder = StringBuilder("Freq:")
+                            cpuCoreFrequencies.forEachIndexed { index, freq ->
+                                if (index % 2 == 0) freqBuilder.append("\n")
+                                else freqBuilder.append("  ")
+                                freqBuilder.append("$index:$freq")
+                            }
+                            addTextView(freqBuilder.toString())
+                            addSeparator()
+                        }
+                        "cpuTemp" -> if (showCpuTemp) {
+                            if (cpuTemperature > 0) {
+                                addTextView("CPU Temp: ${cpuTemperature}°C")
+                            } else {
+                                addTextView("CPU Temp: N/A")
+                            }
+                            addSeparator()
+                        }
+                        "power" -> if (showPower) {
+                            if (powerConsumption > 0) {
+                                addTextView("Power: ${"%.2f".format(powerConsumption)}W")
+                            } else {
+                                addTextView("Power: N/A")
+                            }
+                            addSeparator()
+                        }
+                        "battery" -> if (showBattery) {
+                            addTextView("Battery: ${batteryLevel}%")
+                            batteryProgressBar.progress = batteryLevel
+                            contentLayout.addView(batteryProgressBar)
+                            addSeparator()
+                        }
+                        "batteryTemp" -> if (showBatteryTemp) {
+                            if (batteryTemperature > 0) {
+                                addTextView("Battery Temp: ${batteryTemperature}°C")
+                            } else {
+                                addTextView("Battery Temp: N/A")
+                            }
+                            addSeparator()
+                        }
+                        "ram" -> if (showRam) {
+                            val ramPercentage = if (ramTotalMb > 0) ((ramUsedMb.toFloat() / ramTotalMb) * 100).toInt() else 0
+                            addTextView("RAM: ${ramUsedMb}/${ramTotalMb} MB (${ramPercentage}%)")
+                            ramProgressBar.progress = ramPercentage
+                            contentLayout.addView(ramProgressBar)
+                            addSeparator()
+                        }
+                        "swap" -> if (showSwap) {
+                            val swapPercentage = if (swapTotalMb > 0) ((swapUsedMb.toFloat() / swapTotalMb) * 100).toInt() else 0
+                            addTextView("Swap: ${swapUsedMb}/${swapTotalMb} MB (${swapPercentage}%)")
+                            swapProgressBar.progress = swapPercentage
+                            contentLayout.addView(swapProgressBar)
+                            addSeparator()
+                        }
                     }
                 }
-                
-                // Add CPU core frequencies
-                if (showCpuFreq && cpuCoreFrequencies.isNotEmpty()) {
-                    textBuilder.append("\nCPU Freq:")
-                    cpuCoreFrequencies.forEachIndexed { index, freq ->
-                        if (index % 4 == 0) textBuilder.append("\n  ") // New line every 4 cores
-                        textBuilder.append("C$index:${freq}MHz ")
-                    }
-                }
-                
-                if (showBattery) {
-                    textBuilder.append("\nBattery: ${batteryLevel}%")
-                }
-                
-                // Add power consumption (wattage)
-                if (showPower) {
-                    if (powerConsumption > 0) {
-                        textBuilder.append("\nPower: ${"%.2f".format(powerConsumption)}W")
-                    } else {
-                        textBuilder.append("\nPower: N/A")
-                    }
-                }
-                
-                if (showRam) {
-                    textBuilder.append("\nRAM: ${ramUsedMb}/${ramTotalMb} MB")
-                }
-                if (showSwap) {
-                    textBuilder.append("\nSwap: ${swapUsedMb}/${swapTotalMb} MB")
-                }
-                if (showCpuTemp) {
-                    if (cpuTemperature > 0) {
-                        textBuilder.append("\nCPU Temp: ${cpuTemperature}°C")
-                    } else {
-                        textBuilder.append("\nCPU Temp: N/A")
-                    }
-                }
-                if (showBatteryTemp) {
-                    if (batteryTemperature > 0) {
-                        textBuilder.append("\nBattery Temp: ${batteryTemperature}°C")
-                    } else {
-                        textBuilder.append("\nBattery Temp: N/A")
-                    }
-                }
-                
-                val finalText = textBuilder.toString()
-                android.util.Log.d("OverlayService", "Updating overlay text")
-                android.util.Log.d("OverlayService", "Final overlay text (${finalText.lines().size} lines):\n$finalText")
-                contentTextView.text = finalText
             }
         }
+    }
+    
+    private fun addTextView(text: String, isBold: Boolean = false) {
+        val textView = TextView(this).apply {
+            this.text = text
+            textSize = 14f * scaleFactor
+            setTextColor(android.graphics.Color.WHITE)
+            if (isBold) {
+                setTypeface(null, android.graphics.Typeface.BOLD)
+            }
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                setMargins(0, (2 * scaleFactor).toInt(), 0, (2 * scaleFactor).toInt())
+            }
+        }
+        contentLayout.addView(textView)
+    }
+    
+    private fun addSeparator() {
+        val separator = android.view.View(this).apply {
+            setBackgroundColor(0x40FFFFFF.toInt()) // Semi-transparent white
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                (2 * scaleFactor).toInt().coerceAtLeast(1)
+            ).apply {
+                setMargins(0, (8 * scaleFactor).toInt(), 0, (8 * scaleFactor).toInt())
+            }
+        }
+        contentLayout.addView(separator)
     }
 
     private fun collapseOverlay(params: WindowManager.LayoutParams) {
         isCollapsed = true
         
         // Fade out animation for content and collapse button
-        contentTextView.animate()
+        contentLayout.animate()
             .alpha(0f)
             .setDuration(200)
             .withEndAction {
-                contentTextView.visibility = android.view.View.GONE
+                contentLayout.visibility = android.view.View.GONE
                 collapseButton.visibility = android.view.View.GONE
                 
                 // Show expand button with fade in
@@ -333,13 +439,13 @@ class OverlayService : Service() {
                 expandButton.visibility = android.view.View.GONE
                 
                 // Show content and collapse button with fade in
-                contentTextView.visibility = android.view.View.VISIBLE
+                contentLayout.visibility = android.view.View.VISIBLE
                 collapseButton.visibility = android.view.View.VISIBLE
                 
-                contentTextView.alpha = 0f
+                contentLayout.alpha = 0f
                 collapseButton.alpha = 0f
                 
-                contentTextView.animate().alpha(1f).setDuration(200).start()
+                contentLayout.animate().alpha(1f).setDuration(200).start()
                 collapseButton.animate().alpha(1f).setDuration(200).start()
             }
             .start()
@@ -429,9 +535,6 @@ class OverlayService : Service() {
     }
     
     private fun updateOverlayWithNewParameters() {
-        // Update text size with new scale factor
-        contentTextView.textSize = 14f * scaleFactor
-        
         // Update the overlay layout with new scale factor - use WRAP_CONTENT
         val params = overlayView.layoutParams as WindowManager.LayoutParams
         params.width = WindowManager.LayoutParams.WRAP_CONTENT
