@@ -58,12 +58,19 @@ fun OverlayScreen() {
     var scaleFactor by remember { mutableStateOf(prefs.getFloat("scaleFactor", 1.0f)) }
     
     // Load metric order from preferences
-    val defaultOrder = listOf("cpu", "power", "battery", "ram", "swap", "cpuTemp", "batteryTemp", "cpuGraph", "cpuFreq")
-    val savedOrder = prefs.getString("metricOrder", defaultOrder.joinToString(","))?.split(",") ?: defaultOrder
+    val defaultOrder = listOf("cpu", "power", "battery", "ram", "swap", "cpuTemp", "batteryTemp", "cpuGraph", "cpuFreq", "network")
+    val savedOrderStr = prefs.getString("metricOrder", null)
+    val savedOrder = savedOrderStr?.split(",") ?: defaultOrder
+    
+    // Ensure "network" and other new metrics are added if missing from saved prefs
+    val finalOrder = savedOrder.toMutableList()
+    defaultOrder.forEach { 
+        if (!finalOrder.contains(it)) finalOrder.add(it) 
+    }
     
     var metrics by remember {
         mutableStateOf(
-            savedOrder.mapIndexed { index, id ->
+            finalOrder.mapIndexed { index, id ->
                 when (id) {
                     "cpu" -> OverlayMetric("cpu", "CPU Usage", prefs.getBoolean("showCpu", true), index)
                     "power" -> OverlayMetric("power", "Power Consumption", prefs.getBoolean("showPower", true), index)
@@ -74,6 +81,7 @@ fun OverlayScreen() {
                     "batteryTemp" -> OverlayMetric("batteryTemp", "Battery Temperature", prefs.getBoolean("showBatteryTemp", true), index)
                     "cpuGraph" -> OverlayMetric("cpuGraph", "CPU Usage Graph", prefs.getBoolean("showCpuGraph", true), index)
                     "cpuFreq" -> OverlayMetric("cpuFreq", "CPU Core Frequencies", prefs.getBoolean("showCpuFreq", true), index)
+                    "network" -> OverlayMetric("network", "Network Speed", prefs.getBoolean("showNetwork", true), index)
                     else -> OverlayMetric(id, id, true, index)
                 }
             }

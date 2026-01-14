@@ -17,7 +17,9 @@ data class DashboardMetrics(
     val cpuCoreFrequencies: List<Int>, // CPU core frequencies in MHz
     val storageUsedPerc: Float,// 0.0 - 1.0
     val storageFreeGb: String,
-    val networkSpeed: String,  // e.g., "1.2 MB/s"
+    val networkSpeed: String,  // Total speed
+    val networkDownloadSpeed: String, // Download speed
+    val networkUploadSpeed: String,   // Upload speed
     val uptime: String,
     val cpuHistory: List<CpuDataPoint> = emptyList(),
     val ramHistory: List<MemoryDataPoint> = emptyList(),

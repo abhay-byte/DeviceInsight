@@ -56,6 +56,37 @@ class DashboardRepositoryImpl @Inject constructor(
         val swapUsed = getSwapUsedBytes()
         val swapTotal = getSwapTotalBytes()
         val power = getPowerConsumption()
+        
+        // Calculate network speeds
+        val currentRx = TrafficStats.getTotalRxBytes()
+        val currentTx = TrafficStats.getTotalTxBytes()
+        val currentTime = SystemClock.elapsedRealtime()
+
+        val timeDiff = currentTime - lastNetworkCheckTime
+        val rxSpeed: String
+        val txSpeed: String
+        val totalSpeed: String
+        
+        if (timeDiff > 0) {
+            val rxDiff = currentRx - lastRxBytes
+            val txDiff = currentTx - lastTxBytes
+            val rxBps = (rxDiff * 1000) / timeDiff
+            val txBps = (txDiff * 1000) / timeDiff
+            val totalBps = ((rxDiff + txDiff) * 1000) / timeDiff
+            
+            rxSpeed = formatFileSize(rxBps) + "/s"
+            txSpeed = formatFileSize(txBps) + "/s"
+            totalSpeed = formatFileSize(totalBps) + "/s"
+            
+            // Update state
+            lastRxBytes = currentRx
+            lastTxBytes = currentTx
+            lastNetworkCheckTime = currentTime
+        } else {
+            rxSpeed = "0 B/s"
+            txSpeed = "0 B/s"
+            totalSpeed = "0 B/s"
+        }
          
         val now = System.currentTimeMillis()
         val x = historyCounter++
@@ -81,7 +112,9 @@ class DashboardRepositoryImpl @Inject constructor(
             cpuCoreFrequencies = getCpuCoreFrequencies(),
             storageUsedPerc = getStorageUsedPerc(),
             storageFreeGb = getStorageFreeGb(),
-            networkSpeed = getNetworkSpeed(),
+            networkSpeed = totalSpeed,
+            networkDownloadSpeed = rxSpeed,
+            networkUploadSpeed = txSpeed,
             uptime = getUptime(),
             cpuHistory = ArrayList(cpuHistory),
             ramHistory = ArrayList(ramHistory),
@@ -309,29 +342,6 @@ class DashboardRepositoryImpl @Inject constructor(
         return String.format("%.1f GB Free", freeGb)
     }
 
-    // --- Network ---
-    private fun getNetworkSpeed(): String {
-        val currentRx = TrafficStats.getTotalRxBytes()
-        val currentTx = TrafficStats.getTotalTxBytes()
-        val currentTime = SystemClock.elapsedRealtime()
-
-        val timeDiff = currentTime - lastNetworkCheckTime
-        if (timeDiff == 0L) return "0 KB/s"
-
-        val rxDiff = currentRx - lastRxBytes
-        val txDiff = currentTx - lastTxBytes
-        
-        // Update state
-        lastRxBytes = currentRx
-        lastTxBytes = currentTx
-        lastNetworkCheckTime = currentTime
-
-        val totalBytes = rxDiff + txDiff
-        val speedBps = (totalBytes * 1000) / timeDiff // bytes per second
-
-        return formatFileSize(speedBps) + "/s"
-    }
-    
     // --- CPU (Placeholder logic for now) ---
     private fun getCpuUsage(): Float {
         // On recent Android versions, /proc/stat is restricted.

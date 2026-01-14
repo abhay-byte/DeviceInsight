@@ -41,8 +41,9 @@ class OverlayService : Service() {
     private var showCpuGraph: Boolean = true
     private var showPower: Boolean = true
     private var showCpuFreq: Boolean = true
+    private var showNetwork: Boolean = true
     private var scaleFactor: Float = 1.0f
-    private var metricOrder: List<String> = listOf("cpu", "power", "battery", "ram", "swap", "cpuTemp", "batteryTemp", "cpuGraph", "cpuFreq")
+    private var metricOrder: List<String> = listOf("cpu", "power", "battery", "ram", "swap", "cpuTemp", "batteryTemp", "cpuGraph", "cpuFreq", "network")
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -68,9 +69,10 @@ class OverlayService : Service() {
             showCpuGraph = it.getBooleanExtra("showCpuGraph", true)
             showPower = it.getBooleanExtra("showPower", true)
             showCpuFreq = it.getBooleanExtra("showCpuFreq", true)
+            showNetwork = it.getBooleanExtra("showNetwork", true)
             scaleFactor = it.getFloatExtra("scaleFactor", 1.0f)
             metricOrder = it.getStringExtra("metricOrder")?.split(",") 
-                ?: listOf("cpu", "power", "battery", "ram", "swap", "cpuTemp", "batteryTemp", "cpuGraph", "cpuFreq")
+                ?: listOf("cpu", "power", "battery", "ram", "swap", "cpuTemp", "batteryTemp", "cpuGraph", "cpuFreq", "network")
             
             // Update the overlay with new parameters
             updateOverlayWithNewParameters()
@@ -288,6 +290,8 @@ class OverlayService : Service() {
                 val powerConsumption = metrics.powerConsumption
                 val cpuCoreFrequencies = metrics.cpuCoreFrequencies
                 val cpuHistory = metrics.cpuHistory
+                val netUpload = metrics.networkUploadSpeed
+                val netDownload = metrics.networkDownloadSpeed
                 
                 // Debug log to check temperature values
                 android.util.Log.d("OverlayService", "CPU Temp: ${cpuTemperature}°C, Battery Temp: ${batteryTemperature}°C, Power: ${powerConsumption}W")
@@ -318,7 +322,7 @@ class OverlayService : Service() {
                             cpuCoreFrequencies.forEachIndexed { index, freq ->
                                 if (index % 2 == 0) freqBuilder.append("\n")
                                 else freqBuilder.append("  ")
-                                freqBuilder.append("$index:$freq")
+                                freqBuilder.append("Core $index:$freq")
                             }
                             addTextView(freqBuilder.toString())
                             addSeparator()
@@ -365,6 +369,10 @@ class OverlayService : Service() {
                             addTextView("Swap: ${swapUsedMb}/${swapTotalMb} MB (${swapPercentage}%)")
                             swapProgressBar.progress = swapPercentage
                             contentLayout.addView(swapProgressBar)
+                            addSeparator()
+                        }
+                        "network" -> if (showNetwork) {
+                            addTextView("↑ $netUpload   ↓ $netDownload")
                             addSeparator()
                         }
                     }
