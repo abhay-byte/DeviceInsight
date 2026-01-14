@@ -100,6 +100,9 @@ dependencies {
     // DataStore for preferences
     implementation("androidx.datastore:datastore-preferences:1.1.1")
 
+    // Haze (Glassmorphism)
+    implementation("dev.chrisbanes.haze:haze:0.7.3")
+
     // Testing
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")

@@ -10,36 +10,49 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BatteryFull
 import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.DeviceThermostat
+import androidx.compose.material.icons.filled.Router
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.compose.runtime.getValue
 import com.ivarna.deviceinsight.presentation.components.CircularGauge
 import com.ivarna.deviceinsight.presentation.components.GlassCard
 import com.ivarna.deviceinsight.presentation.components.CpuUtilizationGraph
 import com.ivarna.deviceinsight.presentation.components.PowerConsumptionGraph
-import androidx.compose.foundation.shape.RoundedCornerShape
+import com.ivarna.deviceinsight.presentation.components.RamUsageGraph
 
 @Composable
 fun DashboardScreen(
@@ -48,84 +61,294 @@ fun DashboardScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
+        modifier = Modifier.fillMaxSize()
     ) {
-        // Ambient background glow
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .size(300.dp)
-                .padding(top = 50.dp, end = 50.dp)
-                .clip(CircleShape)
-                .background(
-                    brush = Brush.radialGradient(
-                        colors = listOf(
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
-                            Color.Transparent
-                        )
-                    )
-                )
-        )
-        
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            contentPadding = PaddingValues(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 110.dp),
+            verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
-            // Header
+            // Header Section
             item {
-                Column(modifier = Modifier.padding(vertical = 8.dp)) {
-                    Text(
-                        text = uiState?.let { "Uptime: ${it.uptime}" } ?: "Loading...",
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.Bottom
+                ) {
+                    Column {
+                        Surface(
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                            shape = RoundedCornerShape(4.dp),
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        ) {
+                            Text(
+                                text = "SYSTEM ONLINE",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 2.sp
+                                ),
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                            )
+                        }
+                        Text(
+                            text = "Dashboard",
+                            style = MaterialTheme.typography.headlineLarge.copy(
+                                fontWeight = FontWeight.ExtraBold,
+                                letterSpacing = (-1).sp
+                            ),
+                            color = MaterialTheme.colorScheme.onSurface
                         )
+                    }
+                    Text(
+                        text = uiState?.let { "UPTIME: ${it.uptime.uppercase()}" } ?: "LOADING...",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                     )
                 }
             }
 
-            // Primary Gauges Row
+            // Performance Overview (Gauges)
             item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     GlassCard(
-                        modifier = Modifier.weight(1f).padding(end = 8.dp),
+                        modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(24.dp)
                     ) {
-                        Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(16.dp)) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
                             CircularGauge(
                                 value = uiState?.cpuUsage ?: 0f,
                                 label = "CPU",
                                 color = MaterialTheme.colorScheme.primary,
-                                size = 120.dp
+                                size = 130.dp
                             )
                         }
                     }
                     GlassCard(
-                        modifier = Modifier.weight(1f).padding(start = 8.dp),
+                        modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(24.dp)
                     ) {
-                        Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(16.dp)) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
                             CircularGauge(
                                 value = uiState?.ramUsage ?: 0f,
                                 label = "RAM",
                                 color = MaterialTheme.colorScheme.tertiary,
-                                size = 120.dp
+                                size = 130.dp
                             )
                         }
                     }
                 }
             }
-            
-            // CPU Graph Section (New)
+
+            // CPU Core Trackers
+            item {
+                Column {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "PROCESSOR CORES",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 1.sp
+                            ),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Box(
+                            modifier = Modifier
+                                .height(1.dp)
+                                .weight(1f)
+                                .padding(horizontal = 12.dp)
+                                .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                        )
+                    }
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        items(uiState?.cpuCoreFrequencies ?: emptyList()) { freq ->
+                            GlassCard(
+                                shape = RoundedCornerShape(16.dp),
+                                borderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f),
+                                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.1f)
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    Text(
+                                        text = "${freq}",
+                                        style = MaterialTheme.typography.titleLarge.copy(
+                                            fontFamily = FontFamily.SansSerif,
+                                            fontWeight = FontWeight.ExtraBold
+                                        ),
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    Text(
+                                        text = "MHz",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Network Activity
+            item {
+                GlassCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    borderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f)
+                ) {
+                    Column(modifier = Modifier.padding(20.dp)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(bottom = 16.dp)
+                        ) {
+                            Icon(
+                                Icons.Filled.Router, 
+                                null, 
+                                tint = MaterialTheme.colorScheme.primary, 
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(
+                                "NETWORK TRAFFIC", 
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 1.sp
+                                ),
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                        
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            NetworkMetric(
+                                icon = Icons.Filled.ArrowDownward,
+                                label = "DL",
+                                speed = uiState?.networkDownloadSpeed ?: "0 B/S",
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.weight(1f)
+                            )
+                            NetworkMetric(
+                                icon = Icons.Filled.ArrowUpward,
+                                label = "UL",
+                                speed = uiState?.networkUploadSpeed ?: "0 B/S",
+                                color = Color(0xFF00E676), // Neon Green
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Detailed Storage & Memory
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    DetailedResourceCard(
+                        title = "Storage",
+                        icon = Icons.Filled.Storage,
+                        usedLabel = "Used",
+                        usedValue = "${((uiState?.storageUsedPerc ?: 0f) * 100).toInt()}%",
+                        subtext = "${uiState?.storageFreeGb ?: "0"} GB free",
+                        progress = uiState?.storageUsedPerc ?: 0f,
+                        color = MaterialTheme.colorScheme.secondary,
+                        modifier = Modifier.weight(1f)
+                    )
+                    DetailedResourceCard(
+                        title = "Swap",
+                        icon = Icons.Filled.Memory,
+                        usedLabel = "Used",
+                        usedValue = uiState?.let { "${it.swapUsedBytes / (1024 * 1024)}MB" } ?: "0MB",
+                        subtext = uiState?.let { "Total ${it.swapTotalBytes / (1024 * 1024)}MB" } ?: "0MB",
+                        progress = uiState?.let { if(it.swapTotalBytes > 0) it.swapUsedBytes.toFloat() / it.swapTotalBytes else 0f } ?: 0f,
+                        color = MaterialTheme.colorScheme.tertiary,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+
+            // Power & Thermal Card
+            item {
+                GlassCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.05f),
+                    borderColor = MaterialTheme.colorScheme.error.copy(alpha = 0.1f)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(20.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    Icons.Filled.DeviceThermostat, 
+                                    null, 
+                                    tint = MaterialTheme.colorScheme.error, 
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    "THERMAL HUB", 
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        letterSpacing = 1.sp
+                                    )
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                                ThermalItem("CORE", "${uiState?.cpuTemperature ?: "--"}°C")
+                                ThermalItem("BOARD", "${uiState?.temperature ?: "--"}°C")
+                            }
+                        }
+                        
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text(
+                                "POWER DRAW", 
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                            )
+                            Text(
+                                text = "${uiState?.powerConsumption ?: "--"}W",
+                                style = MaterialTheme.typography.headlineMedium.copy(
+                                    fontFamily = FontFamily.SansSerif,
+                                    fontWeight = FontWeight.Black
+                                ),
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                }
+            }
+
+            // CPU Usage History
             item {
                 GlassCard(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                         CpuUtilizationGraph(
+                        CpuUtilizationGraph(
                             dataPoints = uiState?.cpuHistory ?: emptyList(),
                             modifier = Modifier.height(180.dp)
                         )
@@ -133,153 +356,73 @@ fun DashboardScreen(
                 }
             }
 
-            // GPU and Temp Row
-            item {
-                GlassCard(modifier = Modifier.fillMaxWidth()) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceAround
-                    ) {
-                        CircularGauge(
-                            value = uiState?.gpuUsage ?: 0f,
-                            label = "GPU",
-                            color = MaterialTheme.colorScheme.secondary,
-                            size = 100.dp
-                        )
-                        Column(horizontalAlignment = Alignment.End) {
-                            Text(
-                                uiState?.gpuModel ?: "Adreno GPU",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                uiState?.let { "${it.temperature}°C" } ?: "--°C",
-                                style = MaterialTheme.typography.displayMedium.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                            )
-                        }
-                    }
-                }
-            }
-
-            // Quick Metrics Grid
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    QuickMetricItem(
-                        icon = Icons.Filled.BatteryFull,
-                        label = "Battery",
-                        value = uiState?.let { "${it.batteryLevel}%" } ?: "--%",
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.weight(1f)
-                    )
-                    QuickMetricItem(
-                        icon = Icons.Filled.Storage,
-                        label = "Storage",
-                        value = uiState?.storageFreeGb ?: "-- GB",
-                        color = MaterialTheme.colorScheme.secondary,
-                        modifier = Modifier.weight(1f)
-                    )
-                    QuickMetricItem(
-                        icon = Icons.Filled.Speed,
-                        label = "Network",
-                        value = uiState?.networkSpeed ?: "0 KB/s",
-                        color = MaterialTheme.colorScheme.tertiary,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-            }
-            
-            // Swap Metrics
+            // RAM Usage History
             item {
                 GlassCard(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        Text(
-                            text = "Swap",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurface
+                        RamUsageGraph(
+                            dataPoints = uiState?.ramHistory ?: emptyList(),
+                            modifier = Modifier.height(180.dp)
                         )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(
-                                text = "Used:",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Text(
-                                text = uiState?.let { "${it.swapUsedBytes / (1024 * 1024)} MB" } ?: "0 MB",
-                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(
-                                text = "Total:",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Text(
-                                text = uiState?.let { "${it.swapTotalBytes / (1024 * 1024)} MB" } ?: "0 MB",
-                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
                     }
                 }
             }
             
-            // Power Graph
+            // Power History with Control
             item {
                 val powerMultiplier by viewModel.powerMultiplier.collectAsStateWithLifecycle()
                 
                 GlassCard(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(16.dp)) {
+                    Column(modifier = Modifier.padding(20.dp)) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                "Power Consumption",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.onSurface
+                                "POWER ANALYSIS",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 1.sp
+                                ),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                         
                         // Multiplier Chips
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                        LazyRow(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            listOf(0.01f, 0.1f, 1f, 10f, 100f).forEach { mult ->
+                            items(listOf(0.01f, 0.1f, 1f, 10f, 100f)) { mult ->
                                 val label = when(mult) {
-                                    0.01f -> "0.01x"
-                                    0.1f -> "0.1x"
-                                    1f -> "1x"
-                                    10f -> "10x"
-                                    100f -> "100x"
-                                    else -> "${mult}x"
+                                    0.01f -> "0.01X"
+                                    0.1f -> "0.1X"
+                                    1f -> "1.0X"
+                                    10f -> "10X"
+                                    100f -> "100X"
+                                    else -> "${mult}X"
                                 }
-                                val selected = powerMultiplier == mult
-                                androidx.compose.material3.FilterChip(
-                                    selected = selected,
+                                FilterChip(
+                                    selected = powerMultiplier == mult,
                                     onClick = { viewModel.setPowerMultiplier(mult) },
-                                    label = { Text(label) },
-                                    colors = androidx.compose.material3.FilterChipDefaults.filterChipColors(
-                                        selectedContainerColor = MaterialTheme.colorScheme.primary,
-                                        selectedLabelColor = MaterialTheme.colorScheme.onPrimary
+                                    label = { 
+                                        Text(
+                                            label, 
+                                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold)
+                                        ) 
+                                    },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
+                                        selectedLabelColor = MaterialTheme.colorScheme.primary,
+                                        containerColor = Color.Transparent,
+                                        labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                    ),
+                                    border = FilterChipDefaults.filterChipBorder(
+                                        enabled = true,
+                                        selected = powerMultiplier == mult,
+                                        borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f),
+                                        selectedBorderColor = MaterialTheme.colorScheme.primary
                                     )
                                 )
                             }
@@ -294,6 +437,120 @@ fun DashboardScreen(
                 }
             }
         }
+    }
+}
+
+@Composable
+fun NetworkMetric(
+    icon: ImageVector,
+    label: String,
+    speed: String,
+    color: Color,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier = modifier) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(icon, null, tint = color, modifier = Modifier.size(14.dp))
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                label, 
+                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold), 
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+            )
+        }
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            speed.uppercase(), 
+            style = MaterialTheme.typography.titleMedium.copy(
+                fontFamily = FontFamily.SansSerif,
+                fontWeight = FontWeight.ExtraBold
+            )
+        )
+    }
+}
+
+@Composable
+fun DetailedResourceCard(
+    title: String,
+    icon: ImageVector,
+    usedLabel: String,
+    usedValue: String,
+    subtext: String,
+    progress: Float,
+    color: Color,
+    modifier: Modifier = Modifier
+) {
+    GlassCard(
+        modifier = modifier,
+        borderColor = color.copy(alpha = 0.1f),
+        containerColor = color.copy(alpha = 0.03f)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(icon, null, tint = color, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    title.uppercase(), 
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.sp
+                    )
+                )
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Bottom
+            ) {
+                Text(
+                    usedLabel, 
+                    style = MaterialTheme.typography.labelSmall, 
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                )
+                Text(
+                    usedValue, 
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontFamily = FontFamily.SansSerif,
+                        fontWeight = FontWeight.Bold
+                    )
+                )
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            LinearProgressIndicator(
+                progress = { progress },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(4.dp)
+                    .clip(CircleShape),
+                color = color,
+                trackColor = color.copy(alpha = 0.1f)
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                subtext, 
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp), 
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+            )
+        }
+    }
+}
+
+@Composable
+fun ThermalItem(label: String, value: String) {
+    Column {
+        Text(
+            label, 
+            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold), 
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+        )
+        Text(
+            value, 
+            style = MaterialTheme.typography.titleMedium.copy(
+                fontFamily = FontFamily.SansSerif,
+                fontWeight = FontWeight.ExtraBold
+            )
+        )
     }
 }
 

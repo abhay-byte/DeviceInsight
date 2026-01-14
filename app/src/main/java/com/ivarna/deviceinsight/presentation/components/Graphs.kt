@@ -1,9 +1,12 @@
 package com.ivarna.deviceinsight.presentation.components
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -11,8 +14,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.font.FontWeight
 import com.ivarna.deviceinsight.domain.model.CpuDataPoint
 import com.ivarna.deviceinsight.domain.model.PowerDataPoint
+import com.ivarna.deviceinsight.domain.model.MemoryDataPoint
 import com.patrykandpatrick.vico.compose.cartesian.CartesianChartHost
 import com.patrykandpatrick.vico.compose.cartesian.axis.rememberBottomAxis
 import com.patrykandpatrick.vico.compose.cartesian.axis.rememberStartAxis
@@ -22,6 +27,9 @@ import com.patrykandpatrick.vico.core.cartesian.data.CartesianChartModelProducer
 import com.patrykandpatrick.vico.core.cartesian.data.lineSeries
 import com.patrykandpatrick.vico.core.cartesian.layer.LineCartesianLayer
 import androidx.compose.ui.graphics.toArgb
+import com.patrykandpatrick.vico.core.cartesian.axis.VerticalAxis
+import com.patrykandpatrick.vico.core.common.shader.DynamicShader
+import com.patrykandpatrick.vico.compose.common.shader.verticalGradient
 
 @Composable
 fun CpuUtilizationGraph(
@@ -29,6 +37,7 @@ fun CpuUtilizationGraph(
     modifier: Modifier = Modifier
 ) {
     val modelProducer = remember { CartesianChartModelProducer.build() }
+    val primaryColor = MaterialTheme.colorScheme.primary
     
     androidx.compose.runtime.LaunchedEffect(dataPoints) {
         if (dataPoints.isNotEmpty()) {
@@ -44,12 +53,24 @@ fun CpuUtilizationGraph(
     }
 
     Column(modifier = modifier) {
-        Text(
-            text = "CPU Load History",
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(bottom = 8.dp)
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+        ) {
+            Text(
+                text = "CPU Load History",
+                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            if (dataPoints.isNotEmpty()) {
+                Text(
+                    text = "${dataPoints.last().utilization.toInt()}%",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold),
+                    color = primaryColor
+                )
+            }
+        }
         if (dataPoints.isNotEmpty()) {
             CartesianChartHost(
                 chart = rememberCartesianChart(
@@ -57,45 +78,49 @@ fun CpuUtilizationGraph(
                         lineProvider = LineCartesianLayer.LineProvider.series(
                             LineCartesianLayer.Line(
                                 fill = LineCartesianLayer.LineFill.single(
-                                    fill = com.patrykandpatrick.vico.core.common.Fill(MaterialTheme.colorScheme.primary.toArgb())
-                                )
+                                    fill = com.patrykandpatrick.vico.core.common.Fill(primaryColor.toArgb())
+                                ),
+                                areaFill = LineCartesianLayer.AreaFill.single(
+                                    fill = com.patrykandpatrick.vico.core.common.Fill(
+                                        DynamicShader.verticalGradient(
+                                            arrayOf(primaryColor.copy(alpha = 0.3f), Color.Transparent)
+                                        )
+                                    )
+                                ),
+                                pointProvider = null
                             )
                         )
                     ),
                     startAxis = rememberStartAxis(
                         valueFormatter = { value, _, _ -> "${value.toInt()}%" },
-                        itemPlacer = com.patrykandpatrick.vico.core.cartesian.axis.VerticalAxis.ItemPlacer.step({ 25.0 })
+                        itemPlacer = VerticalAxis.ItemPlacer.step({ 50.0 }),
+                        label = null,
+                        line = null,
+                        tick = null
                     ),
                     bottomAxis = rememberBottomAxis(
-                        valueFormatter = { _, _, _ -> "" } // Hide X labels for cleanliness or format time
+                        valueFormatter = { _, _, _ -> "" },
+                        line = null,
+                        tick = null
                     ),
                 ),
                 modelProducer = modelProducer,
                 modifier = Modifier
-                    .height(150.dp)
-                    .fillMaxWidth()
-                    .padding(end = 16.dp), // Padding for Y-axis labels
+                    .weight(1f)
+                    .fillMaxWidth(),
                 zoomState = com.patrykandpatrick.vico.compose.cartesian.rememberVicoZoomState(
                     initialZoom = com.patrykandpatrick.vico.core.cartesian.Zoom.Content,
                     minZoom = com.patrykandpatrick.vico.core.cartesian.Zoom.Content
                 ),
-                scrollState = com.patrykandpatrick.vico.compose.cartesian.rememberVicoScrollState(
-                    scrollEnabled = true
-                )
             )
         } else {
-             androidx.compose.foundation.layout.Box(
-                modifier = Modifier.height(150.dp).fillMaxWidth(),
+             Box(
+                modifier = Modifier.weight(1f).fillMaxWidth(),
                 contentAlignment = androidx.compose.ui.Alignment.Center
              ) {
                  Text("No Data", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
              }
         }
-        Text(
-             text = if (dataPoints.isNotEmpty()) "Current: ${dataPoints.last().utilization.toInt()}%" else "",
-             style = MaterialTheme.typography.bodySmall,
-             color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
     }
 }
 
@@ -106,6 +131,7 @@ fun PowerConsumptionGraph(
     modifier: Modifier = Modifier
 ) {
     val modelProducer = remember { CartesianChartModelProducer.build() }
+    val secondaryColor = MaterialTheme.colorScheme.secondary
     
     androidx.compose.runtime.LaunchedEffect(dataPoints, multiplier) {
         if (dataPoints.isNotEmpty()) {
@@ -121,12 +147,24 @@ fun PowerConsumptionGraph(
     }
 
     Column(modifier = modifier) {
-         Text(
-            text = "Power Consumption (Watts)",
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.secondary,
-            modifier = Modifier.padding(bottom = 8.dp)
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Power (Watts)",
+                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            if (dataPoints.isNotEmpty()) {
+                Text(
+                    text = String.format("%.2f W", dataPoints.last().powerWatts * multiplier),
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold),
+                    color = secondaryColor
+                )
+            }
+        }
         if (dataPoints.isNotEmpty()) {
             CartesianChartHost(
                 chart = rememberCartesianChart(
@@ -134,28 +172,123 @@ fun PowerConsumptionGraph(
                         lineProvider = LineCartesianLayer.LineProvider.series(
                              LineCartesianLayer.Line(
                                 fill = LineCartesianLayer.LineFill.single(
-                                    fill = com.patrykandpatrick.vico.core.common.Fill(MaterialTheme.colorScheme.secondary.toArgb())
+                                    fill = com.patrykandpatrick.vico.core.common.Fill(secondaryColor.toArgb())
+                                ),
+                                areaFill = LineCartesianLayer.AreaFill.single(
+                                    fill = com.patrykandpatrick.vico.core.common.Fill(
+                                        DynamicShader.verticalGradient(
+                                            arrayOf(secondaryColor.copy(alpha = 0.3f), Color.Transparent)
+                                        )
+                                    )
                                 )
                             )
                         )
                     ),
-                    startAxis = rememberStartAxis(),
+                    startAxis = rememberStartAxis(
+                        valueFormatter = { value, _, _ -> String.format("%.1f", value) },
+                        line = null,
+                        tick = null
+                    ),
                     bottomAxis = rememberBottomAxis(
-                        valueFormatter = { _, _, _ -> "" }
+                        valueFormatter = { _, _, _ -> "" },
+                        line = null,
+                        tick = null
                     ),
                 ),
                 modelProducer = modelProducer,
                 modifier = Modifier
-                    .height(150.dp)
-                    .fillMaxWidth()
-                    .padding(end = 16.dp),
-                scrollState = com.patrykandpatrick.vico.compose.cartesian.rememberVicoScrollState(
-                    scrollEnabled = true
-                )
+                    .weight(1f)
+                    .fillMaxWidth(),
             )
         } else {
-             androidx.compose.foundation.layout.Box(
-                modifier = Modifier.height(150.dp).fillMaxWidth(),
+             Box(
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                contentAlignment = androidx.compose.ui.Alignment.Center
+             ) {
+                 Text("No Data", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+             }
+        }
+    }
+}
+
+@Composable
+fun RamUsageGraph(
+    dataPoints: List<MemoryDataPoint>,
+    modifier: Modifier = Modifier
+) {
+    val modelProducer = remember { CartesianChartModelProducer.build() }
+    val tertiaryColor = MaterialTheme.colorScheme.tertiary
+    
+    androidx.compose.runtime.LaunchedEffect(dataPoints) {
+        if (dataPoints.isNotEmpty()) {
+            modelProducer.tryRunTransaction {
+                lineSeries {
+                    series(
+                        x = dataPoints.map { it.xValue },
+                        y = dataPoints.map { it.utilization }
+                    )
+                }
+            }
+        }
+    }
+
+    Column(modifier = modifier) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+        ) {
+            Text(
+                text = "RAM Usage (%)",
+                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            if (dataPoints.isNotEmpty()) {
+                Text(
+                    text = String.format("%.1f%%", dataPoints.last().utilization * 100),
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold),
+                    color = tertiaryColor
+                )
+            }
+        }
+        if (dataPoints.isNotEmpty()) {
+            CartesianChartHost(
+                chart = rememberCartesianChart(
+                    rememberLineCartesianLayer(
+                        lineProvider = LineCartesianLayer.LineProvider.series(
+                            LineCartesianLayer.Line(
+                                fill = LineCartesianLayer.LineFill.single(
+                                    fill = com.patrykandpatrick.vico.core.common.Fill(tertiaryColor.toArgb())
+                                ),
+                                areaFill = LineCartesianLayer.AreaFill.single(
+                                    fill = com.patrykandpatrick.vico.core.common.Fill(
+                                        DynamicShader.verticalGradient(
+                                            arrayOf(tertiaryColor.copy(alpha = 0.3f), Color.Transparent)
+                                        )
+                                    )
+                                )
+                            )
+                        )
+                    ),
+                    startAxis = rememberStartAxis(
+                        valueFormatter = { value, _, _ -> String.format("%.0f%%", value * 100) },
+                        line = null,
+                        tick = null
+                    ),
+                    bottomAxis = rememberBottomAxis(
+                        valueFormatter = { _, _, _ -> "" },
+                        line = null,
+                        tick = null
+                    ),
+                ),
+                modelProducer = modelProducer,
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
+            )
+        } else {
+             Box(
+                modifier = Modifier.weight(1f).fillMaxWidth(),
                 contentAlignment = androidx.compose.ui.Alignment.Center
              ) {
                  Text("No Data", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

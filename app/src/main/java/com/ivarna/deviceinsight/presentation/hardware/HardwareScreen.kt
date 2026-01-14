@@ -1,6 +1,7 @@
 package com.ivarna.deviceinsight.presentation.hardware
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -32,11 +33,15 @@ fun HardwareScreen(
     var selectedTabIndex by remember { mutableIntStateOf(0) }
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp)
+        modifier = Modifier.fillMaxSize()
     ) {
-        hardwareInfo?.let { info ->
+        Box(modifier = Modifier.fillMaxSize()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 110.dp)
+            ) {
+                hardwareInfo?.let { info ->
             // Curved Tab Bar
             val surfaceColor = MaterialTheme.colorScheme.surfaceContainer
             Box(
@@ -99,6 +104,8 @@ fun HardwareScreen(
             }
         }
     }
+}
+}
 }
 
 @Composable
