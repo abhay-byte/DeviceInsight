@@ -125,7 +125,7 @@ fun OverlayScreen() {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 110.dp)
+            .padding(start = 16.dp, top = 16.dp, end = 16.dp)
             .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Top
@@ -296,6 +296,7 @@ fun OverlayScreen() {
                 }
             }
         }
+        Spacer(modifier = Modifier.height(110.dp))
     }
 }
 @Composable

@@ -2,6 +2,8 @@ package com.ivarna.deviceinsight.presentation.hardware
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -39,73 +41,78 @@ fun HardwareScreen(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 110.dp)
+                    .padding(start = 16.dp, top = 16.dp, end = 16.dp)
+                    .verticalScroll(rememberScrollState())
             ) {
                 hardwareInfo?.let { info ->
-            // Curved Tab Bar
-            val surfaceColor = MaterialTheme.colorScheme.surfaceContainer
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(60.dp)
-                    .clip(shape = androidx.compose.foundation.shape.RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
-            ) {
-                Canvas(modifier = Modifier.matchParentSize()) {
-                    val path = Path().apply {
-                        val width = size.width
-                        val height = size.height
-                        val cornerRadius = 24.dp.toPx()
+                    // Curved Tab Bar
+                    val surfaceColor = MaterialTheme.colorScheme.surfaceContainer
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(60.dp)
+                            .clip(shape = androidx.compose.foundation.shape.RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
+                    ) {
+                        Canvas(modifier = Modifier.matchParentSize()) {
+                            val path = Path().apply {
+                                val width = size.width
+                                val height = size.height
+                                val cornerRadius = 24.dp.toPx()
+                                
+                                // Top curve
+                                moveTo(0f, cornerRadius)
+                                quadraticBezierTo(0f, 0f, cornerRadius, 0f)
+                                lineTo(width - cornerRadius, 0f)
+                                quadraticBezierTo(width, 0f, width, cornerRadius)
+                                lineTo(width, height)
+                                lineTo(0f, height)
+                                close()
+                            }
+                            drawPath(
+                                path = path,
+                                color = surfaceColor
+                            )
+                        }
                         
-                        // Top curve
-                        moveTo(0f, cornerRadius)
-                        quadraticBezierTo(0f, 0f, cornerRadius, 0f)
-                        lineTo(width - cornerRadius, 0f)
-                        quadraticBezierTo(width, 0f, width, cornerRadius)
-                        lineTo(width, height)
-                        lineTo(0f, height)
-                        close()
+                        // Tab Row
+                        TabRow(
+                            selectedTabIndex = selectedTabIndex,
+                            containerColor = Color.Transparent,
+                            contentColor = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.padding(top = 8.dp)
+                        ) {
+                            tabs.forEachIndexed { index, title ->
+                                Tab(
+                                    selected = selectedTabIndex == index,
+                                    onClick = { selectedTabIndex = index },
+                                    text = { Text(text = title) }
+                                )
+                            }
+                        }
                     }
-                    drawPath(
-                        path = path,
-                        color = surfaceColor
-                    )
-                }
-                
-                // Tab Row
-                TabRow(
-                    selectedTabIndex = selectedTabIndex,
-                    containerColor = Color.Transparent,
-                    contentColor = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.padding(top = 8.dp)
-                ) {
-                    tabs.forEachIndexed { index, title ->
-                        Tab(
-                            selected = selectedTabIndex == index,
-                            onClick = { selectedTabIndex = index },
-                            text = { Text(text = title) }
-                        )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Tab Content
+                    when (selectedTabIndex) {
+                        0 -> SystemTab(info)
+                        1 -> BuildTab(info)
+                        2 -> DisplayTab(info)
+                        3 -> BatteryTab(info)
+                        4 -> SensorsTab(info)
+                    }
+                    Spacer(modifier = Modifier.height(110.dp))
+                } ?: run {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = androidx.compose.ui.Alignment.Center
+                    ) {
+                        androidx.compose.material3.CircularProgressIndicator()
                     }
                 }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Tab Content
-            when (selectedTabIndex) {
-                0 -> SystemTab(info)
-                1 -> BuildTab(info)
-                2 -> DisplayTab(info)
-                3 -> BatteryTab(info)
-                4 -> SensorsTab(info)
-            }
-        } ?: run {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.Center) {
-                androidx.compose.material3.CircularProgressIndicator()
             }
         }
     }
-}
-}
 }
 
 @Composable
