@@ -17,11 +17,11 @@ import com.ivarna.deviceinsight.R
 import androidx.glance.text.FontWeight
 import androidx.glance.ImageProvider
 import com.ivarna.deviceinsight.presentation.widgets.theme.WidgetTheme
-import java.io.RandomAccessFile
+import com.ivarna.deviceinsight.utils.CpuUtilizationUtils
 
 class DashboardWidget : GlanceAppWidget() {
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val cpuUsage = getCpuUsage()
+        val cpuUsage = CpuUtilizationUtils(context).getCpuUtilizationPercentage() * 100
         val batteryLevel = getBatteryLevel(context)
         val memoryInfo = getMemoryInfo(context)
 
@@ -129,23 +129,6 @@ class DashboardWidget : GlanceAppWidget() {
                     }
                 }
             }
-        }
-    }
-
-    private fun getCpuUsage(): Float {
-        return try {
-            val reader = RandomAccessFile("/proc/stat", "r")
-            val load = reader.readLine()
-            reader.close()
-
-            val toks = load.split(" +".toRegex())
-            val idle = toks[4].toLong()
-            val cpu = toks.slice(1..7).sumOf { it.toLong() }
-            val total = idle + cpu
-            
-            ((cpu.toFloat() / total.toFloat()) * 100).coerceIn(0f, 100f)
-        } catch (e: Exception) {
-            0f
         }
     }
 

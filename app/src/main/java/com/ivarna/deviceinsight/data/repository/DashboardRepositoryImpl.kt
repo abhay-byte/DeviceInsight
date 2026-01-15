@@ -11,6 +11,7 @@ import android.os.StatFs
 import android.os.SystemClock
 import com.ivarna.deviceinsight.domain.model.DashboardMetrics
 import com.ivarna.deviceinsight.domain.repository.DashboardRepository
+import com.ivarna.deviceinsight.utils.CpuUtilizationUtils
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -22,7 +23,8 @@ import javax.inject.Inject
 import kotlin.math.roundToInt
 
 class DashboardRepositoryImpl @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val cpuUtilizationUtils: CpuUtilizationUtils
 ) : DashboardRepository {
 
     private val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
@@ -60,7 +62,7 @@ class DashboardRepositoryImpl @Inject constructor(
     }
 
     private fun collectMetrics(): DashboardMetrics {
-        val cpu = getCpuUsage()
+        val cpu = cpuUtilizationUtils.getCpuUtilizationPercentage()
         val ram = getRamUsage()
         val ramUsed = getRamUsedBytes()
         val ramTotal = getRamTotalBytes()
@@ -357,33 +359,9 @@ class DashboardRepositoryImpl @Inject constructor(
     }
 
     private fun getCpuCoreFrequencies(): List<Int> {
-        val frequencies = mutableListOf<Int>()
-        try {
-            // Read CPU core frequencies from /sys/devices/system/cpu/cpu*/cpufreq/scaling_cur_freq
-            var coreIndex = 0
-            while (coreIndex < 16) { // Most devices have < 16 cores
-                val freqFile = File("/sys/devices/system/cpu/cpu$coreIndex/cpufreq/scaling_cur_freq")
-                if (freqFile.exists() && freqFile.canRead()) {
-                    try {
-                        val freqKhz = freqFile.readText().trim().toIntOrNull()
-                        if (freqKhz != null) {
-                            // Convert from kHz to MHz
-                            frequencies.add(freqKhz / 1000)
-                        } else {
-                            break // Invalid file, likely no more cores
-                        }
-                    } catch (e: Exception) {
-                        break // Can't read this core, assume no more cores
-                    }
-                } else {
-                    break // Core doesn't exist
-                }
-                coreIndex++
-            }
-        } catch (e: Exception) {
-            android.util.Log.e("DashboardRepository", "Error reading CPU frequencies: ${e.message}")
+        return cpuUtilizationUtils.getAllCoreFrequencies().values.map { 
+            (it.first / 1000).toInt() // Convert kHz to MHz
         }
-        return frequencies
     }
 
     // --- Storage ---
@@ -409,17 +387,8 @@ class DashboardRepositoryImpl @Inject constructor(
         return String.format("%.1f GB Free", freeGb)
     }
 
-    // --- CPU (Placeholder logic for now) ---
-    private fun getCpuUsage(): Float {
-        // On recent Android versions, /proc/stat is restricted.
-        // We will fallback to a simulated fluctuation for the UI demonstration 
-        // until we implement a more complex workaround or root method.
-        // This simulates a "breathing" CPU load between 10% and 40%
-        val time = System.currentTimeMillis()
-        val baseLoad = 0.25f 
-        val fluctuation = Math.sin(time / 2000.0).toFloat() * 0.15f
-        return (baseLoad + fluctuation).coerceIn(0.05f, 1.0f)
-    }
+    // --- CPU ---
+    // Usage is now handled by CpuUtilizationUtils
 
     // --- GPU (Placeholder) ---
     private fun getGpuModel(): String {
