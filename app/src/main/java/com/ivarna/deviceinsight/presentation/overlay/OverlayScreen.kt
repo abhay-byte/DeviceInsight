@@ -16,6 +16,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DragHandle
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -55,6 +56,7 @@ fun OverlayScreen() {
     val prefs = remember { context.getSharedPreferences("overlay_prefs", Context.MODE_PRIVATE) }
     
     var hasPermission by remember { mutableStateOf(false) }
+    var hasUsageStats by remember { mutableStateOf(false) }
     var scaleFactor by remember { mutableStateOf(prefs.getFloat("scaleFactor", 1.0f)) }
     
     // Load metric order from preferences
@@ -109,6 +111,7 @@ fun OverlayScreen() {
     
     fun checkPermission() {
         hasPermission = Settings.canDrawOverlays(context)
+        hasUsageStats = hasUsageStatsPermission(context)
     }
 
     DisposableEffect(lifecycleOwner) {
@@ -249,6 +252,25 @@ fun OverlayScreen() {
                         }
                     }
                     
+                    if (!hasUsageStats) {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        OutlinedButton(
+                            onClick = {
+                                val intent = Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)
+                                context.startActivity(intent)
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Settings,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Grant Usage Access for App Detection")
+                        }
+                    }
+
                     Spacer(modifier = Modifier.height(16.dp))
                    
                     // Scale factor control
