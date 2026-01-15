@@ -156,7 +156,7 @@ fun SystemStatsApp() {
                                 )
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Text(
-                                    text = "DEVICE INSIGHTS",
+                                    text = "DeviceInsights",
                                     style = MaterialTheme.typography.titleMedium.copy(
                                         fontWeight = FontWeight.Black,
                                         letterSpacing = 1.sp

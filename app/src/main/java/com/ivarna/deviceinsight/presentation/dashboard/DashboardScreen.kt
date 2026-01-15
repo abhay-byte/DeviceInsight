@@ -122,7 +122,9 @@ fun DashboardScreen(
                         shape = RoundedCornerShape(24.dp)
                     ) {
                         Column(
-                            modifier = Modifier.padding(16.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             CircularGauge(
@@ -131,6 +133,14 @@ fun DashboardScreen(
                                 color = MaterialTheme.colorScheme.primary,
                                 size = 130.dp
                             )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = uiState?.let { String.format("%.0f°C", it.cpuTemperature) } ?: "--°C",
+                                style = MaterialTheme.typography.labelMedium.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
+                                )
+                            )
                         }
                     }
                     GlassCard(
@@ -138,7 +148,9 @@ fun DashboardScreen(
                         shape = RoundedCornerShape(24.dp)
                     ) {
                         Column(
-                            modifier = Modifier.padding(16.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             CircularGauge(
@@ -146,6 +158,16 @@ fun DashboardScreen(
                                 label = "RAM",
                                 color = MaterialTheme.colorScheme.tertiary,
                                 size = 130.dp
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            val usedGb = (uiState?.ramUsedBytes ?: 0L) / (1024f * 1024f * 1024f)
+                            val totalGb = (uiState?.ramTotalBytes ?: 0L) / (1024f * 1024f * 1024f)
+                            Text(
+                                text = String.format("%.1f / %.1f GB", usedGb, totalGb),
+                                style = MaterialTheme.typography.labelMedium.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.8f)
+                                )
                             )
                         }
                     }
