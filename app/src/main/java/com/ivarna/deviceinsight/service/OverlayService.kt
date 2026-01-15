@@ -573,16 +573,16 @@ class OverlayService : Service() {
     }
 
     private inner class OverlayGraphView(context: Context, val label: String, val color: Int) : View(context) {
+        private val density = context.resources.displayMetrics.density
+        
         private val linePaint = android.graphics.Paint().apply {
             this.color = this@OverlayGraphView.color
-            strokeWidth = 2f * scaleFactor
             style = android.graphics.Paint.Style.STROKE
             isAntiAlias = true
         }
         
         private val textPaint = android.graphics.Paint().apply {
             color = android.graphics.Color.WHITE
-            textSize = 14f * scaleFactor
             isAntiAlias = true
             setShadowLayer(1f, 1f, 1f, android.graphics.Color.BLACK)
         }
@@ -597,19 +597,23 @@ class OverlayService : Service() {
         override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
             val desiredHeight = (60 * scaleFactor).toInt()
             val width = MeasureSpec.getSize(widthMeasureSpec)
-            
-            // Respect parent's width constraints but enforce our height
             setMeasuredDimension(width, desiredHeight)
         }
 
         override fun onDraw(canvas: android.graphics.Canvas) {
             super.onDraw(canvas)
             
+            // Update paints based on current scaleFactor
+            linePaint.strokeWidth = 2f * density * scaleFactor
+            textPaint.textSize = 14f * density * scaleFactor
+
             // Draw a semi-transparent background for the graph area
             canvas.drawColor(0x20000000) 
             
-            // Draw label
-            canvas.drawText(label, 4f, 16f * scaleFactor, textPaint)
+            // Draw label with padding
+            val padding = 4f * density * scaleFactor
+            val textY = textPaint.textSize + padding/2
+            canvas.drawText(label, padding, textY, textPaint)
             
             if (points.isEmpty()) return
             
