@@ -208,7 +208,18 @@ class DashboardRepositoryImpl @Inject constructor(
         val voltageV = voltageMv / 1000f
         val currentA = currentNow / 1_000_000f
         
-        return kotlin.math.abs(voltageV * currentA)
+        val power = voltageV * currentA
+        
+        // Use battery status to ensure correct sign for polarity
+        // +ve for charging, -ve for discharging
+        val status = intent?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1
+        return if (status == BatteryManager.BATTERY_STATUS_CHARGING || status == BatteryManager.BATTERY_STATUS_FULL) {
+            kotlin.math.abs(power)
+        } else if (status == BatteryManager.BATTERY_STATUS_DISCHARGING) {
+            -kotlin.math.abs(power)
+        } else {
+            power
+        }
     }
 
     // --- RAM ---

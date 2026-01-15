@@ -309,8 +309,14 @@ fun DashboardScreen(
                                 style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                             )
+                            val powerConsumption = uiState?.powerConsumption
+                            val powerText = if (powerConsumption != null) {
+                                if (powerConsumption > 0) String.format("+%.2f", powerConsumption)
+                                else String.format("%.2f", powerConsumption)
+                            } else "--"
+                            
                             Text(
-                                text = "${uiState?.powerConsumption ?: "--"}W",
+                                text = "${powerText}W",
                                 style = MaterialTheme.typography.headlineMedium.copy(
                                     fontFamily = FontFamily.SansSerif,
                                     fontWeight = FontWeight.Black

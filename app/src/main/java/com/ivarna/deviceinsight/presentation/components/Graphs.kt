@@ -165,7 +165,7 @@ fun PowerConsumptionGraph(
                  lineSeries {
                     series(
                         x = dataPoints.indices.map { it.toDouble() },
-                        y = dataPoints.map { it.powerWatts * multiplier }
+                        y = dataPoints.map { kotlin.math.abs(it.powerWatts) * multiplier }
                     )
                 }
             }
@@ -184,8 +184,11 @@ fun PowerConsumptionGraph(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             if (dataPoints.isNotEmpty()) {
+                val lastPower = dataPoints.last().powerWatts * multiplier
+                val powerText = if (lastPower > 0) String.format("+%.2f", lastPower) 
+                               else String.format("%.2f", lastPower)
                 Text(
-                    text = String.format("%.2f W", dataPoints.last().powerWatts * multiplier),
+                    text = "${powerText} W",
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold),
                     color = secondaryColor
                 )
