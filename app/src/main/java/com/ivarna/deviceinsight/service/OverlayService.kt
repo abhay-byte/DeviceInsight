@@ -336,11 +336,9 @@ class OverlayService : Service() {
                             addSeparator()
                         }
                         "power" -> if (showPower) {
-                            if (powerConsumption > 0) {
-                                addTextView("Power: ${"%.2f".format(powerConsumption)}W")
-                            } else {
-                                addTextView("Power: N/A")
-                            }
+                            val powerText = if (powerConsumption > 0) "+%.2f".format(powerConsumption)
+                                           else "%.2f".format(powerConsumption)
+                            addTextView("Power: ${powerText}W")
                             addSeparator()
                         }
                         "battery" -> if (showBattery) {
