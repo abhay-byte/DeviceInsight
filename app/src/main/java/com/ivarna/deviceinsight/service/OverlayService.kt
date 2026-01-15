@@ -97,6 +97,7 @@ class OverlayService : Service() {
     private lateinit var batteryProgressBar: ProgressBar
     private lateinit var ramProgressBar: ProgressBar
     private lateinit var swapProgressBar: ProgressBar
+    private lateinit var cpuGraphView: CpuGraphView
     
     private fun createOverlayView() {
         // Since we don't have XML layout, we'll create view programmatically or inflate if we had one.
@@ -192,6 +193,15 @@ class OverlayService : Service() {
             max = 100
             progress = 0
             scaleY = 1.5f * scaleFactor
+        }
+
+        cpuGraphView = CpuGraphView(this).apply {
+             layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                (60 * scaleFactor).toInt()
+            ).apply {
+                setMargins(0, (4 * scaleFactor).toInt(), 0, (4 * scaleFactor).toInt())
+            }
         }
         
         // Collapse button - minimize overlay
@@ -319,7 +329,15 @@ class OverlayService : Service() {
                             addSeparator()
                         }
                         "cpuGraph" -> if (showCpu && showCpuGraph && cpuHistory.isNotEmpty()) {
-                            addTextView(createCpuUsageGraph(cpuHistory))
+                            cpuGraphView.setCpuData(cpuHistory)
+                            // Update layout params to handle potential scaleFactor changes
+                             cpuGraphView.layoutParams = LinearLayout.LayoutParams(
+                                LinearLayout.LayoutParams.MATCH_PARENT,
+                                (60 * scaleFactor).toInt()
+                            ).apply {
+                                setMargins(0, (4 * scaleFactor).toInt(), 0, (4 * scaleFactor).toInt())
+                            }
+                            contentLayout.addView(cpuGraphView)
                             addSeparator()
                         }
                         "cpuFreq" -> if (showCpu && showCpuFreq && cpuCoreFrequencies.isNotEmpty()) {
@@ -519,32 +537,7 @@ class OverlayService : Service() {
         }.start()
     }
     
-    private fun createCpuUsageGraph(cpuHistory: List<CpuDataPoint>): String {
-        if (cpuHistory.isEmpty()) return ""
-        
-        // Simple CPU trend indicator
-        val recentHistory = cpuHistory.takeLast(Math.min(10, cpuHistory.size))
-        
-        if (recentHistory.size < 2) {
-            return "\nCPU Trend: N/A"
-        }
-        
-        // Calculate trend
-        val firstUsage = recentHistory.first().utilization
-        val lastUsage = recentHistory.last().utilization
-        val trend = lastUsage - firstUsage
-        
-        // Determine trend direction
-        val trendIndicator = when {
-            trend > 5 -> "↑ Increasing"
-            trend < -5 -> "↓ Decreasing"
-            else -> "→ Stable"
-        }
-        
-        // Show current and trend
-        return "\nCPU Trend: ${lastUsage.toInt()}% $trendIndicator"
-    }
-    
+
     private fun updateOverlayWithNewParameters() {
         // Update the overlay layout with new scale factor - use WRAP_CONTENT
         val params = overlayView.layoutParams as WindowManager.LayoutParams
@@ -553,6 +546,63 @@ class OverlayService : Service() {
         
         android.util.Log.d("OverlayService", "Updated overlay to WRAP_CONTENT dimensions")
         windowManager.updateViewLayout(overlayView, params)
+    }
+
+    private inner class CpuGraphView(context: Context) : View(context) {
+        private val linePaint = android.graphics.Paint().apply {
+            color = android.graphics.Color.GREEN
+            strokeWidth = 2f * scaleFactor
+            style = android.graphics.Paint.Style.STROKE
+            isAntiAlias = true
+        }
+        
+        private var points: List<CpuDataPoint> = emptyList()
+
+        fun setCpuData(newPoints: List<CpuDataPoint>) {
+            points = newPoints
+            invalidate() // Redraw
+        }
+
+        override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+            val desiredHeight = (60 * scaleFactor).toInt()
+            val width = MeasureSpec.getSize(widthMeasureSpec)
+            
+            // Respect parent's width constraints but enforce our height
+            setMeasuredDimension(width, desiredHeight)
+        }
+
+        override fun onDraw(canvas: android.graphics.Canvas) {
+            super.onDraw(canvas)
+            if (points.isEmpty()) return
+            
+            // Draw a semi-transparent background for the graph area
+            canvas.drawColor(0x20000000) 
+            
+            // We want to show last 60 points or so
+            val maxPoints = 60
+            val displayPoints = if (points.size > maxPoints) points.takeLast(maxPoints) else points
+            
+            if (displayPoints.size < 2) return
+
+            val path = android.graphics.Path()
+            val w = width.toFloat()
+            val h = height.toFloat()
+            // Step X to fill the width
+            val stepX = w / (displayPoints.size - 1).coerceAtLeast(1)
+            
+            displayPoints.forEachIndexed { index, point ->
+                val x = index * stepX
+                // Map utilization 0..100 to h..0
+                val y = h - (point.utilization / 100f * h)
+                
+                if (index == 0) {
+                    path.moveTo(x, y)
+                } else {
+                    path.lineTo(x, y)
+                }
+            }
+            canvas.drawPath(path, linePaint)
+        }
     }
 
     private fun startForegroundService() {
