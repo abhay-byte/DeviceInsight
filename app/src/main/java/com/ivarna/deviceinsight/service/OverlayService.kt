@@ -168,20 +168,22 @@ class OverlayService : Service() {
             setTextColor(android.graphics.Color.WHITE)
             setTypeface(null, android.graphics.Typeface.BOLD)
             layoutParams = LinearLayout.LayoutParams(
-                0,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 1f
             )
         }
         
-        // Button size
-        val buttonSize = (24 * scaleFactor).toInt()
+        // Button size - use density independent pixels conversion
+        val density = resources.displayMetrics.density
+        val buttonSize = (32 * density * scaleFactor).toInt()
         
         // Collapse button
         val collapseButton = android.widget.ImageButton(this).apply {
             setImageResource(android.R.drawable.arrow_up_float)
             setBackgroundColor(android.graphics.Color.TRANSPARENT)
             scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
+            setColorFilter(android.graphics.Color.WHITE) // Ensure visibility against dark background
             
             layoutParams = LinearLayout.LayoutParams(
                 buttonSize,
@@ -198,12 +200,13 @@ class OverlayService : Service() {
             setImageResource(android.R.drawable.ic_menu_close_clear_cancel)
             setBackgroundColor(android.graphics.Color.TRANSPARENT)
             scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
+            setColorFilter(android.graphics.Color.WHITE) // Ensure visibility against dark background
             
             layoutParams = LinearLayout.LayoutParams(
                 buttonSize,
                 buttonSize
             ).apply {
-                setMargins((8 * scaleFactor).toInt(), 0, 0, 0)
+                setMargins((8 * density * scaleFactor).toInt(), 0, 0, 0)
             }
             
             setOnClickListener {
