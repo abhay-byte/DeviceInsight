@@ -18,6 +18,7 @@ import androidx.glance.text.FontWeight
 import androidx.glance.ImageProvider
 import com.ivarna.deviceinsight.presentation.widgets.theme.WidgetTheme
 import com.ivarna.deviceinsight.utils.CpuUtilizationUtils
+import java.io.RandomAccessFile
 
 class DashboardWidget : GlanceAppWidget() {
     override suspend fun provideGlance(context: Context, id: GlanceId) {

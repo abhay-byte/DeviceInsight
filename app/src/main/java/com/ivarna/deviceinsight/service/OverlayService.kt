@@ -22,6 +22,7 @@ import com.ivarna.deviceinsight.R
 import com.ivarna.deviceinsight.data.repository.DashboardRepositoryImpl
 import com.ivarna.deviceinsight.domain.model.CpuDataPoint
 import com.ivarna.deviceinsight.domain.repository.DashboardRepository
+import com.ivarna.deviceinsight.utils.CpuUtilizationUtils
 import kotlinx.coroutines.*
 
 class OverlayService : Service() {
@@ -50,7 +51,7 @@ class OverlayService : Service() {
     override fun onCreate() {
         super.onCreate()
         windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
-        dashboardRepository = DashboardRepositoryImpl(this)
+        dashboardRepository = DashboardRepositoryImpl(this, CpuUtilizationUtils(this))
         
         createOverlayView()
         startForegroundService()
