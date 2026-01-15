@@ -582,7 +582,7 @@ class OverlayService : Service() {
         
         private val textPaint = android.graphics.Paint().apply {
             color = android.graphics.Color.WHITE
-            textSize = 10f * scaleFactor
+            textSize = 14f * scaleFactor
             isAntiAlias = true
             setShadowLayer(1f, 1f, 1f, android.graphics.Color.BLACK)
         }
@@ -609,7 +609,7 @@ class OverlayService : Service() {
             canvas.drawColor(0x20000000) 
             
             // Draw label
-            canvas.drawText(label, 4f, 12f * scaleFactor, textPaint)
+            canvas.drawText(label, 4f, 16f * scaleFactor, textPaint)
             
             if (points.isEmpty()) return
             
