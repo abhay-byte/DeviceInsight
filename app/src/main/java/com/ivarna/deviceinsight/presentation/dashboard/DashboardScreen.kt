@@ -134,13 +134,26 @@ fun DashboardScreen(
                                 size = 130.dp
                             )
                             Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = uiState?.let { String.format("%.0f°C", it.cpuTemperature) } ?: "--°C",
-                                style = MaterialTheme.typography.labelMedium.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = uiState?.let { String.format("%.0f°C", it.cpuTemperature) } ?: "--°C",
+                                    style = MaterialTheme.typography.labelMedium.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
+                                    )
                                 )
-                            )
+                                uiState?.cpuGovernor?.let { governor ->
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = governor.uppercase(),
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                                            letterSpacing = 0.5.sp
+                                        )
+                                    )
+                                }
+                            }
                         }
                     }
                     GlassCard(

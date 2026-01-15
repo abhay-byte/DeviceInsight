@@ -21,6 +21,7 @@ data class DashboardMetrics(
     val networkDownloadSpeed: String, // Download speed
     val networkUploadSpeed: String,   // Upload speed
     val uptime: String,
+    val cpuGovernor: String? = null,
     val maxCpuFrequency: Int = 3000, // Max CPU frequency in MHz
     val cpuHistory: List<CpuDataPoint> = emptyList(),
     val cpuCoreHistory: List<List<CpuCoreDataPoint>> = emptyList(),

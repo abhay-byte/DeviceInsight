@@ -309,7 +309,8 @@ class OverlayService : Service() {
                 metricOrder.forEach { metricId ->
                     when (metricId) {
                         "cpu" -> if (showCpu) {
-                            addTextView("CPU: ${cpuUsage}%")
+                            val governorText = metrics.cpuGovernor?.let { " ($it)" } ?: ""
+                            addTextView("CPU: ${cpuUsage}%$governorText")
                             cpuProgressBar.progress = cpuUsage
                             contentLayout.addView(cpuProgressBar)
                             addSeparator()

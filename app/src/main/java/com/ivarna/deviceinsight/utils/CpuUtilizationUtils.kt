@@ -121,4 +121,19 @@ class CpuUtilizationUtils(context: Context) {
             0L
         }
     }
+
+    /**
+     * Get the current CPU scaling governor
+     */
+    fun getCurrentCpuGovernor(): String? {
+        try {
+            val governorFile = File("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor")
+            if (governorFile.exists()) {
+                return governorFile.readText().trim()
+            }
+        } catch (e: Exception) {
+            Log.e("CpuUtilizationUtils", "Error getting CPU governor", e)
+        }
+        return null
+    }
 }

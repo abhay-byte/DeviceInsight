@@ -146,6 +146,7 @@ class DashboardRepositoryImpl @Inject constructor(
             networkDownloadSpeed = rxSpeed,
             networkUploadSpeed = txSpeed,
             uptime = getUptime(),
+            cpuGovernor = cpuUtilizationUtils.getCurrentCpuGovernor(),
             maxCpuFrequency = maxCpuFreqCache,
             cpuHistory = ArrayList(cpuHistory),
             cpuCoreHistory = cpuCoreHistoryList.map { ArrayList(it) },
