@@ -586,6 +586,12 @@ class OverlayService : Service() {
             isAntiAlias = true
             setShadowLayer(1f, 1f, 1f, android.graphics.Color.BLACK)
         }
+
+        private val borderPaint = android.graphics.Paint().apply {
+            color = 0x80FFFFFF.toInt() // Semi-transparent white
+            style = android.graphics.Paint.Style.STROKE
+            isAntiAlias = true
+        }
         
         private var points: List<Float> = emptyList()
 
@@ -606,9 +612,13 @@ class OverlayService : Service() {
             // Update paints based on current scaleFactor
             linePaint.strokeWidth = 2f * density * scaleFactor
             textPaint.textSize = 14f * density * scaleFactor
+            borderPaint.strokeWidth = 1f * density * scaleFactor
 
             // Draw a semi-transparent background for the graph area
             canvas.drawColor(0x20000000) 
+            
+            // Draw border
+            canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), borderPaint)
             
             // Draw label with padding
             val padding = 4f * density * scaleFactor
