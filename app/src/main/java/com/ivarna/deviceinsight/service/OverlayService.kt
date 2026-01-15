@@ -149,26 +149,43 @@ class OverlayService : Service() {
             )
         }
         
-        // Header Layout for buttons
+        // Header Layout for buttons and title
         val headerLayout = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.END
+            gravity = Gravity.CENTER_VERTICAL
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply {
-                setMargins(0, 0, 0, (8 * scaleFactor).toInt())
+                setMargins(0, 0, 0, (4 * scaleFactor).toInt())
             }
         }
+
+        // Title View
+        val titleView = TextView(this).apply {
+            text = "DeviceInsights"
+            textSize = 14f * scaleFactor
+            setTextColor(android.graphics.Color.WHITE)
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            layoutParams = LinearLayout.LayoutParams(
+                0,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                1f
+            )
+        }
+        
+        // Button size
+        val buttonSize = (24 * scaleFactor).toInt()
         
         // Collapse button
         val collapseButton = android.widget.ImageButton(this).apply {
             setImageResource(android.R.drawable.arrow_up_float)
             setBackgroundColor(android.graphics.Color.TRANSPARENT)
+            scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
             
             layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
+                buttonSize,
+                buttonSize
             )
             
             setOnClickListener {
@@ -180,12 +197,13 @@ class OverlayService : Service() {
         val closeButton = android.widget.ImageButton(this).apply {
             setImageResource(android.R.drawable.ic_menu_close_clear_cancel)
             setBackgroundColor(android.graphics.Color.TRANSPARENT)
+            scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
             
             layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
+                buttonSize,
+                buttonSize
             ).apply {
-                setMargins((16 * scaleFactor).toInt(), 0, 0, 0)
+                setMargins((8 * scaleFactor).toInt(), 0, 0, 0)
             }
             
             setOnClickListener {
@@ -193,6 +211,7 @@ class OverlayService : Service() {
             }
         }
         
+        headerLayout.addView(titleView)
         headerLayout.addView(collapseButton)
         headerLayout.addView(closeButton)
         mainLayout.addView(headerLayout)
@@ -369,10 +388,6 @@ class OverlayService : Service() {
                 
                 // Clear and rebuild layout
                 contentLayout.removeAllViews()
-                
-                // Add title
-                addTextView("DeviceInsights", true)
-                addSeparator()
                 
                 // Display metrics in custom order
                 metricOrder.forEach { metricId ->
