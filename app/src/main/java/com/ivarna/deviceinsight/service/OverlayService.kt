@@ -353,8 +353,9 @@ class OverlayService : Service() {
                             contentLayout.addView(cpuGraphView)
                             addSeparator()
                         }
-                        "powerGraph" -> if (showPower && showPowerGraph && powerHistory.isNotEmpty()) {
-                             powerGraphView.setData(powerHistory.map { it.powerWatts })
+                        "powerGraph" -> if (showPower && showPowerGraph) {
+                             val data = if (powerHistory.isNotEmpty()) powerHistory.map { it.powerWatts } else listOf(powerConsumption)
+                             powerGraphView.setData(data)
                              powerGraphView.layoutParams = LinearLayout.LayoutParams(
                                 LinearLayout.LayoutParams.MATCH_PARENT,
                                 (60 * scaleFactor).toInt()
