@@ -44,11 +44,12 @@ class OverlayService : Service() {
     private var showCpuTemp: Boolean = true
     private var showBatteryTemp: Boolean = true
     private var showCpuGraph: Boolean = true
+    private var showPowerGraph: Boolean = true
     private var showPower: Boolean = true
     private var showCpuFreq: Boolean = true
     private var showNetwork: Boolean = true
     private var scaleFactor: Float = 1.0f
-    private var metricOrder: List<String> = listOf("cpu", "power", "battery", "ram", "swap", "cpuTemp", "batteryTemp", "cpuGraph", "cpuFreq", "network")
+    private var metricOrder: List<String> = listOf("cpu", "power", "battery", "ram", "swap", "cpuTemp", "batteryTemp", "cpuGraph", "powerGraph", "cpuFreq", "network")
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -71,12 +72,13 @@ class OverlayService : Service() {
             showCpuTemp = it.getBooleanExtra("showCpuTemp", true)
             showBatteryTemp = it.getBooleanExtra("showBatteryTemp", true)
             showCpuGraph = it.getBooleanExtra("showCpuGraph", true)
+            showPowerGraph = it.getBooleanExtra("showPowerGraph", true)
             showPower = it.getBooleanExtra("showPower", true)
             showCpuFreq = it.getBooleanExtra("showCpuFreq", true)
             showNetwork = it.getBooleanExtra("showNetwork", true)
             scaleFactor = it.getFloatExtra("scaleFactor", 1.0f)
             metricOrder = it.getStringExtra("metricOrder")?.split(",") 
-                ?: listOf("cpu", "power", "battery", "ram", "swap", "cpuTemp", "batteryTemp", "cpuGraph", "cpuFreq", "network")
+                ?: listOf("cpu", "power", "battery", "ram", "swap", "cpuTemp", "batteryTemp", "cpuGraph", "powerGraph", "cpuFreq", "network")
             
             // Update the overlay with new parameters
             updateOverlayWithNewParameters()
@@ -97,7 +99,8 @@ class OverlayService : Service() {
     private lateinit var batteryProgressBar: ProgressBar
     private lateinit var ramProgressBar: ProgressBar
     private lateinit var swapProgressBar: ProgressBar
-    private lateinit var cpuGraphView: CpuGraphView
+    private lateinit var cpuGraphView: OverlayGraphView
+    private lateinit var powerGraphView: OverlayGraphView
     
     private fun createOverlayView() {
         // Since we don't have XML layout, we'll create view programmatically or inflate if we had one.
@@ -195,7 +198,16 @@ class OverlayService : Service() {
             scaleY = 1.5f * scaleFactor
         }
 
-        cpuGraphView = CpuGraphView(this).apply {
+        cpuGraphView = OverlayGraphView(this, "CPU %", android.graphics.Color.GREEN).apply {
+             layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                (60 * scaleFactor).toInt()
+            ).apply {
+                setMargins(0, (4 * scaleFactor).toInt(), 0, (4 * scaleFactor).toInt())
+            }
+        }
+        
+        powerGraphView = OverlayGraphView(this, "Power W", android.graphics.Color.YELLOW).apply {
              layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 (60 * scaleFactor).toInt()
@@ -304,6 +316,7 @@ class OverlayService : Service() {
                 val powerConsumption = metrics.powerConsumption
                 val cpuCoreFrequencies = metrics.cpuCoreFrequencies
                 val cpuHistory = metrics.cpuHistory
+                val powerHistory = metrics.powerHistory
                 val netUpload = metrics.networkUploadSpeed
                 val netDownload = metrics.networkDownloadSpeed
                 
@@ -329,7 +342,7 @@ class OverlayService : Service() {
                             addSeparator()
                         }
                         "cpuGraph" -> if (showCpu && showCpuGraph && cpuHistory.isNotEmpty()) {
-                            cpuGraphView.setCpuData(cpuHistory)
+                            cpuGraphView.setData(cpuHistory.map { it.utilization })
                             // Update layout params to handle potential scaleFactor changes
                              cpuGraphView.layoutParams = LinearLayout.LayoutParams(
                                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -338,6 +351,17 @@ class OverlayService : Service() {
                                 setMargins(0, (4 * scaleFactor).toInt(), 0, (4 * scaleFactor).toInt())
                             }
                             contentLayout.addView(cpuGraphView)
+                            addSeparator()
+                        }
+                        "powerGraph" -> if (showPower && showPowerGraph && powerHistory.isNotEmpty()) {
+                             powerGraphView.setData(powerHistory.map { it.powerWatts })
+                             powerGraphView.layoutParams = LinearLayout.LayoutParams(
+                                LinearLayout.LayoutParams.MATCH_PARENT,
+                                (60 * scaleFactor).toInt()
+                            ).apply {
+                                setMargins(0, (4 * scaleFactor).toInt(), 0, (4 * scaleFactor).toInt())
+                            }
+                            contentLayout.addView(powerGraphView)
                             addSeparator()
                         }
                         "cpuFreq" -> if (showCpu && showCpuFreq && cpuCoreFrequencies.isNotEmpty()) {
@@ -548,17 +572,24 @@ class OverlayService : Service() {
         windowManager.updateViewLayout(overlayView, params)
     }
 
-    private inner class CpuGraphView(context: Context) : View(context) {
+    private inner class OverlayGraphView(context: Context, val label: String, val color: Int) : View(context) {
         private val linePaint = android.graphics.Paint().apply {
-            color = android.graphics.Color.GREEN
+            this.color = this@OverlayGraphView.color
             strokeWidth = 2f * scaleFactor
             style = android.graphics.Paint.Style.STROKE
             isAntiAlias = true
         }
         
-        private var points: List<CpuDataPoint> = emptyList()
+        private val textPaint = android.graphics.Paint().apply {
+            color = android.graphics.Color.WHITE
+            textSize = 10f * scaleFactor
+            isAntiAlias = true
+            setShadowLayer(1f, 1f, 1f, android.graphics.Color.BLACK)
+        }
+        
+        private var points: List<Float> = emptyList()
 
-        fun setCpuData(newPoints: List<CpuDataPoint>) {
+        fun setData(newPoints: List<Float>) {
             points = newPoints
             invalidate() // Redraw
         }
@@ -573,10 +604,14 @@ class OverlayService : Service() {
 
         override fun onDraw(canvas: android.graphics.Canvas) {
             super.onDraw(canvas)
-            if (points.isEmpty()) return
             
             // Draw a semi-transparent background for the graph area
             canvas.drawColor(0x20000000) 
+            
+            // Draw label
+            canvas.drawText(label, 4f, 12f * scaleFactor, textPaint)
+            
+            if (points.isEmpty()) return
             
             // We want to show last 60 points or so
             val maxPoints = 60
@@ -588,12 +623,15 @@ class OverlayService : Service() {
             val w = width.toFloat()
             val h = height.toFloat()
             // Step X to fill the width
-            val stepX = w / (displayPoints.size - 1).coerceAtLeast(1)
+            val stepX = w / (points.size - 1).coerceAtLeast(1)
             
-            displayPoints.forEachIndexed { index, point ->
+            // Find max value for scaling Y, default to 100 for percentage
+            val maxY = if (label.contains("%")) 100f else (points.maxOrNull() ?: 10f).coerceAtLeast(1f) * 1.2f
+
+            displayPoints.forEachIndexed { index, value ->
                 val x = index * stepX
-                // Map utilization 0..100 to h..0
-                val y = h - (point.utilization / 100f * h)
+                // Map value 0..maxY to h..0
+                val y = h - (value / maxY * h)
                 
                 if (index == 0) {
                     path.moveTo(x, y)
