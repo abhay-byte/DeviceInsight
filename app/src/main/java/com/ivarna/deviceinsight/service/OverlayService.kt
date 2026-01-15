@@ -19,18 +19,22 @@ import android.widget.LinearLayout
 import androidx.core.app.NotificationCompat
 import com.ivarna.deviceinsight.MainActivity
 import com.ivarna.deviceinsight.R
-import com.ivarna.deviceinsight.data.repository.DashboardRepositoryImpl
 import com.ivarna.deviceinsight.domain.model.CpuDataPoint
 import com.ivarna.deviceinsight.domain.repository.DashboardRepository
 import com.ivarna.deviceinsight.utils.CpuUtilizationUtils
 import kotlinx.coroutines.*
+import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 
+@AndroidEntryPoint
 class OverlayService : Service() {
 
     private lateinit var windowManager: WindowManager
     private lateinit var overlayView: View
     private var job: Job? = null
-    private lateinit var dashboardRepository: DashboardRepository
+    
+    @Inject
+    lateinit var dashboardRepository: DashboardRepository
     
     // Default values for parameters
     private var showCpu: Boolean = true
@@ -51,7 +55,6 @@ class OverlayService : Service() {
     override fun onCreate() {
         super.onCreate()
         windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
-        dashboardRepository = DashboardRepositoryImpl(this, CpuUtilizationUtils(this))
         
         createOverlayView()
         startForegroundService()

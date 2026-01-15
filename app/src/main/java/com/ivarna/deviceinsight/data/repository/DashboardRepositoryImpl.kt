@@ -13,9 +13,13 @@ import com.ivarna.deviceinsight.domain.model.DashboardMetrics
 import com.ivarna.deviceinsight.domain.repository.DashboardRepository
 import com.ivarna.deviceinsight.utils.CpuUtilizationUtils
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.launch
 import java.io.File
 import java.io.RandomAccessFile
 import java.util.concurrent.TimeUnit
@@ -26,6 +30,26 @@ class DashboardRepositoryImpl @Inject constructor(
     @ApplicationContext private val context: Context,
     private val cpuUtilizationUtils: CpuUtilizationUtils
 ) : DashboardRepository {
+
+    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private val _dashboardMetrics = MutableStateFlow<DashboardMetrics?>(null)
+
+    init {
+        startMonitoring()
+    }
+
+    private fun startMonitoring() {
+        scope.launch {
+            while (true) {
+                try {
+                    _dashboardMetrics.emit(collectMetrics())
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+                kotlinx.coroutines.delay(1000)
+            }
+        }
+    }
 
     private val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
     private var lastRxBytes = TrafficStats.getTotalRxBytes()
@@ -50,15 +74,10 @@ class DashboardRepositoryImpl @Inject constructor(
 
     private var historyCounter: Long = 61
 
-    override fun getDashboardMetrics(): Flow<DashboardMetrics> = flow {
-        while (true) {
-            emit(collectMetrics())
-            delay(1000) // Update every second
-        }
-    }
+    override fun getDashboardMetrics(): kotlinx.coroutines.flow.Flow<DashboardMetrics> = _dashboardMetrics.asStateFlow().filterNotNull()
 
     override fun refreshMetrics() {
-        // No-op for flow-based approach
+        // Handled by internal loop
     }
 
     private fun collectMetrics(): DashboardMetrics {
