@@ -30,12 +30,23 @@ class DashboardRepositoryImpl @Inject constructor(
     private var lastTxBytes = TrafficStats.getTotalTxBytes()
     private var lastNetworkCheckTime = SystemClock.elapsedRealtime()
 
-    private val cpuHistory = java.util.LinkedList<com.ivarna.deviceinsight.domain.model.CpuDataPoint>()
-    private val ramHistory = java.util.LinkedList<com.ivarna.deviceinsight.domain.model.MemoryDataPoint>()
-    private val powerHistory = java.util.LinkedList<com.ivarna.deviceinsight.domain.model.PowerDataPoint>()
-    private val HISTORY_SIZE = 60
+    private val cpuHistory = java.util.LinkedList<com.ivarna.deviceinsight.domain.model.CpuDataPoint>().apply {
+        val now = System.currentTimeMillis()
+        for (i in 0 until 61) add(com.ivarna.deviceinsight.domain.model.CpuDataPoint(i.toLong(), now - (60 - i) * 1000, 0f))
+    }
+    private val cpuCoreHistoryList = ArrayList<java.util.LinkedList<com.ivarna.deviceinsight.domain.model.CpuCoreDataPoint>>()
+    private val ramHistory = java.util.LinkedList<com.ivarna.deviceinsight.domain.model.MemoryDataPoint>().apply {
+        val now = System.currentTimeMillis()
+        for (i in 0 until 61) add(com.ivarna.deviceinsight.domain.model.MemoryDataPoint(i.toLong(), now - (60 - i) * 1000, 0f))
+    }
+    private val powerHistory = java.util.LinkedList<com.ivarna.deviceinsight.domain.model.PowerDataPoint>().apply {
+        val now = System.currentTimeMillis()
+        for (i in 0 until 61) add(com.ivarna.deviceinsight.domain.model.PowerDataPoint(i.toLong(), now - (60 - i) * 1000, 0f))
+    }
+    private val HISTORY_SIZE = 61
+    private var maxCpuFreqCache: Int = 0
 
-    private var historyCounter: Long = 0
+    private var historyCounter: Long = 61
 
     override fun getDashboardMetrics(): Flow<DashboardMetrics> = flow {
         while (true) {
@@ -95,6 +106,23 @@ class DashboardRepositoryImpl @Inject constructor(
         addToHistory(ramHistory, com.ivarna.deviceinsight.domain.model.MemoryDataPoint(x, now, ram * 100))
         addToHistory(powerHistory, com.ivarna.deviceinsight.domain.model.PowerDataPoint(x, now, power))
 
+        val coreFrequencies = getCpuCoreFrequencies()
+        while (cpuCoreHistoryList.size < coreFrequencies.size) {
+            val list = java.util.LinkedList<com.ivarna.deviceinsight.domain.model.CpuCoreDataPoint>()
+            val now = System.currentTimeMillis()
+            for (i in 0 until 61) {
+                list.add(com.ivarna.deviceinsight.domain.model.CpuCoreDataPoint(i.toLong(), now - (60 - i) * 1000, 0f))
+            }
+            cpuCoreHistoryList.add(list)
+        }
+        coreFrequencies.forEachIndexed { index, freq ->
+            addToHistory(cpuCoreHistoryList[index], com.ivarna.deviceinsight.domain.model.CpuCoreDataPoint(x, now, freq.toFloat()))
+        }
+
+        if (maxCpuFreqCache == 0) {
+            maxCpuFreqCache = getMaxCpuFrequency()
+        }
+
         return DashboardMetrics(
             cpuUsage = cpu,
             ramUsage = ram,
@@ -109,17 +137,45 @@ class DashboardRepositoryImpl @Inject constructor(
             temperature = getBatteryTemperature(),
             cpuTemperature = getCpuTemperature(),
             powerConsumption = power,
-            cpuCoreFrequencies = getCpuCoreFrequencies(),
+            cpuCoreFrequencies = coreFrequencies,
             storageUsedPerc = getStorageUsedPerc(),
             storageFreeGb = getStorageFreeGb(),
             networkSpeed = totalSpeed,
             networkDownloadSpeed = rxSpeed,
             networkUploadSpeed = txSpeed,
             uptime = getUptime(),
+            maxCpuFrequency = maxCpuFreqCache,
             cpuHistory = ArrayList(cpuHistory),
+            cpuCoreHistory = cpuCoreHistoryList.map { ArrayList(it) },
             ramHistory = ArrayList(ramHistory),
             powerHistory = ArrayList(powerHistory)
         )
+    }
+
+    private fun getMaxCpuFrequency(): Int {
+        var maxFreq = 0
+        try {
+            // Check up to 16 cores
+            for (i in 0 until 16) {
+                // Try cpuinfo_max_freq first (hardware limit)
+                var file = File("/sys/devices/system/cpu/cpu$i/cpufreq/cpuinfo_max_freq")
+                if (!file.exists()) {
+                    // Fallback to scaling_max_freq (current policy limit)
+                    file = File("/sys/devices/system/cpu/cpu$i/cpufreq/scaling_max_freq")
+                }
+                
+                if (file.exists() && file.canRead()) {
+                    val freq = file.readText().trim().toIntOrNull()
+                    if (freq != null) {
+                        if (freq > maxFreq) maxFreq = freq
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("DashboardRepository", "Error reading max CPU freq: ${e.message}")
+        }
+        // Return in MHz (files are usually in kHz)
+        return if (maxFreq > 0) maxFreq / 1000 else 3000 // Default to 3000 MHz if not found
     }
 
     private fun <T> addToHistory(list: java.util.LinkedList<T>, item: T) {

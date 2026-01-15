@@ -51,6 +51,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ivarna.deviceinsight.presentation.components.CircularGauge
 import com.ivarna.deviceinsight.presentation.components.GlassCard
 import com.ivarna.deviceinsight.presentation.components.CpuUtilizationGraph
+import com.ivarna.deviceinsight.presentation.components.CpuMultiCoreFrequencyGraph
 import com.ivarna.deviceinsight.presentation.components.PowerConsumptionGraph
 import com.ivarna.deviceinsight.presentation.components.RamUsageGraph
 
@@ -151,60 +152,15 @@ fun DashboardScreen(
                 }
             }
 
-            // CPU Core Trackers
+            // CPU Multi-Core Frequency Graph
             item {
-                Column {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "PROCESSOR CORES",
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.sp
-                            ),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                GlassCard(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        CpuMultiCoreFrequencyGraph(
+                            coreHistory = uiState?.cpuCoreHistory ?: emptyList(),
+                            maxFreq = uiState?.maxCpuFrequency ?: 3000,
+                            modifier = Modifier.height(220.dp)
                         )
-                        Box(
-                            modifier = Modifier
-                                .height(1.dp)
-                                .weight(1f)
-                                .padding(horizontal = 12.dp)
-                                .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-                        )
-                    }
-                    LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        items(uiState?.cpuCoreFrequencies ?: emptyList()) { freq ->
-                            GlassCard(
-                                shape = RoundedCornerShape(16.dp),
-                                borderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f),
-                                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.1f)
-                            ) {
-                                Column(
-                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                                    horizontalAlignment = Alignment.CenterHorizontally
-                                ) {
-                                    Text(
-                                        text = "${freq}",
-                                        style = MaterialTheme.typography.titleLarge.copy(
-                                            fontFamily = FontFamily.SansSerif,
-                                            fontWeight = FontWeight.ExtraBold
-                                        ),
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                    Text(
-                                        text = "MHz",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                                    )
-                                }
-                            }
-                        }
                     }
                 }
             }
