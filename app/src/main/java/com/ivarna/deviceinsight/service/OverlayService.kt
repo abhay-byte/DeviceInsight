@@ -95,8 +95,10 @@ class OverlayService : Service() {
     private var initialY = 0
     private var initialTouchX = 0f
     private var initialTouchY = 0f
+    private lateinit var mainLayout: LinearLayout
     private lateinit var collapseButton: android.widget.ImageButton
     private lateinit var expandButton: android.widget.ImageButton
+    private lateinit var closeButton: android.widget.ImageButton
     private lateinit var contentLayout: LinearLayout
     private lateinit var cpuProgressBar: ProgressBar
     private lateinit var batteryProgressBar: ProgressBar
@@ -133,22 +135,78 @@ class OverlayService : Service() {
         params.x = 100
         params.y = 100
  
-        // Create a container layout for the overlay
-        val container = android.widget.FrameLayout(this).apply {
+        // Create a wrapper container (FrameLayout)
+        val container = android.widget.FrameLayout(this)
+        
+        // Main Layout containing Header and Content
+        val mainLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
             setBackgroundResource(R.drawable.rounded_widget_background)
             setPadding(16, 16, 16, 16)
+            layoutParams = android.widget.FrameLayout.LayoutParams(
+                android.widget.FrameLayout.LayoutParams.WRAP_CONTENT,
+                android.widget.FrameLayout.LayoutParams.WRAP_CONTENT
+            )
         }
+        
+        // Header Layout for buttons
+        val headerLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.END
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                setMargins(0, 0, 0, (8 * scaleFactor).toInt())
+            }
+        }
+        
+        // Collapse button
+        val collapseButton = android.widget.ImageButton(this).apply {
+            setImageResource(android.R.drawable.arrow_up_float)
+            setBackgroundColor(android.graphics.Color.TRANSPARENT)
+            
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+            
+            setOnClickListener {
+                collapseOverlay(params)
+            }
+        }
+        
+        // Close button
+        val closeButton = android.widget.ImageButton(this).apply {
+            setImageResource(android.R.drawable.ic_menu_close_clear_cancel)
+            setBackgroundColor(android.graphics.Color.TRANSPARENT)
+            
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                setMargins((16 * scaleFactor).toInt(), 0, 0, 0)
+            }
+            
+            setOnClickListener {
+                stopSelf()
+            }
+        }
+        
+        headerLayout.addView(collapseButton)
+        headerLayout.addView(closeButton)
+        mainLayout.addView(headerLayout)
 
         // Create a LinearLayout for content with progress bars
         val contentLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            layoutParams = android.widget.FrameLayout.LayoutParams(
-                android.widget.FrameLayout.LayoutParams.WRAP_CONTENT,
-                android.widget.FrameLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                setMargins(0, 0, 0, 40) // Leave space for pin button
-            }
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
         }
+        
+        mainLayout.addView(contentLayout)
         
         // Create progress bars - they will size dynamically based on content width
         val progressBarWidth = LinearLayout.LayoutParams.MATCH_PARENT
@@ -219,25 +277,6 @@ class OverlayService : Service() {
             }
         }
         
-        // Collapse button - minimize overlay
-        val collapseButton = android.widget.ImageButton(this).apply {
-            setImageResource(android.R.drawable.arrow_up_float)
-            setBackgroundColor(android.graphics.Color.TRANSPARENT)
-            
-            val layoutParams = android.widget.FrameLayout.LayoutParams(
-                android.widget.FrameLayout.LayoutParams.WRAP_CONTENT,
-                android.widget.FrameLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                gravity = android.view.Gravity.END or android.view.Gravity.TOP
-                setMargins(0, 0, 16, 16) // Better spacing
-            }
-            this.layoutParams = layoutParams
-            
-            setOnClickListener {
-                collapseOverlay(params)
-            }
-        }
-        
         // Expand button - shown when collapsed
         val expandButton = android.widget.ImageButton(this).apply {
             setImageResource(android.R.drawable.arrow_down_float)
@@ -258,21 +297,22 @@ class OverlayService : Service() {
             }
         }
 
-        container.addView(contentLayout)
-        container.addView(collapseButton)
+        container.addView(mainLayout)
         container.addView(expandButton)
 
         overlayView = container
+        this.mainLayout = mainLayout
         this.contentLayout = contentLayout
         this.collapseButton = collapseButton
         this.expandButton = expandButton
+        this.closeButton = closeButton
         this.cpuProgressBar = cpuProgressBar
         this.batteryProgressBar = batteryProgressBar
         this.ramProgressBar = ramProgressBar
         this.swapProgressBar = swapProgressBar
         
-        // Make the overlay draggable by touching the content area
-        contentLayout.setOnTouchListener { v, event ->
+        // Make the overlay draggable by touching the main layout
+        mainLayout.setOnTouchListener { v, event ->
             when (event.action) {
                 android.view.MotionEvent.ACTION_DOWN -> {
                     initialX = params.x
@@ -469,13 +509,12 @@ class OverlayService : Service() {
     private fun collapseOverlay(params: WindowManager.LayoutParams) {
         isCollapsed = true
         
-        // Fade out animation for content and collapse button
-        contentLayout.animate()
+        // Fade out animation for main layout
+        mainLayout.animate()
             .alpha(0f)
             .setDuration(200)
             .withEndAction {
-                contentLayout.visibility = android.view.View.GONE
-                collapseButton.visibility = android.view.View.GONE
+                mainLayout.visibility = android.view.View.GONE
                 
                 // Show expand button with fade in
                 expandButton.visibility = android.view.View.VISIBLE
@@ -486,8 +525,6 @@ class OverlayService : Service() {
                 snapToEdge(params)
             }
             .start()
-        
-        collapseButton.animate().alpha(0f).setDuration(200).start()
     }
     
     private fun expandOverlay(params: WindowManager.LayoutParams) {
@@ -500,15 +537,10 @@ class OverlayService : Service() {
             .withEndAction {
                 expandButton.visibility = android.view.View.GONE
                 
-                // Show content and collapse button with fade in
-                contentLayout.visibility = android.view.View.VISIBLE
-                collapseButton.visibility = android.view.View.VISIBLE
-                
-                contentLayout.alpha = 0f
-                collapseButton.alpha = 0f
-                
-                contentLayout.animate().alpha(1f).setDuration(200).start()
-                collapseButton.animate().alpha(1f).setDuration(200).start()
+                // Show main layout with fade in
+                mainLayout.visibility = android.view.View.VISIBLE
+                mainLayout.alpha = 0f
+                mainLayout.animate().alpha(1f).setDuration(200).start()
             }
             .start()
     }
