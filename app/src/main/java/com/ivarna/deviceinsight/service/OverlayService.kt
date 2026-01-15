@@ -48,8 +48,9 @@ class OverlayService : Service() {
     private var showPower: Boolean = true
     private var showCpuFreq: Boolean = true
     private var showNetwork: Boolean = true
+    private var showCurrentApp: Boolean = true
     private var scaleFactor: Float = 1.0f
-    private var metricOrder: List<String> = listOf("cpu", "power", "battery", "ram", "swap", "cpuTemp", "batteryTemp", "cpuGraph", "powerGraph", "cpuFreq", "network")
+    private var metricOrder: List<String> = listOf("cpu", "power", "battery", "ram", "swap", "cpuTemp", "batteryTemp", "cpuGraph", "powerGraph", "cpuFreq", "network", "currentApp")
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -76,9 +77,10 @@ class OverlayService : Service() {
             showPower = it.getBooleanExtra("showPower", true)
             showCpuFreq = it.getBooleanExtra("showCpuFreq", true)
             showNetwork = it.getBooleanExtra("showNetwork", true)
+            showCurrentApp = it.getBooleanExtra("showCurrentApp", true)
             scaleFactor = it.getFloatExtra("scaleFactor", 1.0f)
             metricOrder = it.getStringExtra("metricOrder")?.split(",") 
-                ?: listOf("cpu", "power", "battery", "ram", "swap", "cpuTemp", "batteryTemp", "cpuGraph", "powerGraph", "cpuFreq", "network")
+                ?: listOf("cpu", "power", "battery", "ram", "swap", "cpuTemp", "batteryTemp", "cpuGraph", "powerGraph", "cpuFreq", "network", "currentApp")
             
             // Update the overlay with new parameters
             updateOverlayWithNewParameters()
@@ -421,6 +423,11 @@ class OverlayService : Service() {
                             addTextView("↑ $netUpload   ↓ $netDownload")
                             addSeparator()
                         }
+                        "currentApp" -> if (showCurrentApp) {
+                            val appName = getForegroundApp()
+                            addTextView("App: $appName")
+                            addSeparator()
+                        }
                     }
                 }
             }
@@ -663,6 +670,29 @@ class OverlayService : Service() {
             }
             canvas.drawPath(path, linePaint)
         }
+    }
+
+    private fun getForegroundApp(): String {
+        try {
+            val usm = getSystemService(Context.USAGE_STATS_SERVICE) as android.app.usage.UsageStatsManager
+            val time = System.currentTimeMillis()
+            val stats = usm.queryUsageStats(android.app.usage.UsageStatsManager.INTERVAL_DAILY, time - 1000 * 10, time)
+
+            if (stats != null && stats.isNotEmpty()) {
+                val sortedStats = stats.sortedByDescending { it.lastTimeUsed }
+                val topPackageName = sortedStats[0].packageName
+                return try {
+                    val pm = packageManager
+                    val appInfo = pm.getApplicationInfo(topPackageName, 0)
+                    pm.getApplicationLabel(appInfo).toString()
+                } catch (e: Exception) {
+                    topPackageName
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        return "Unknown"
     }
 
     private fun startForegroundService() {

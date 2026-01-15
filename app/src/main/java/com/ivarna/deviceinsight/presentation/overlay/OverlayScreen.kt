@@ -58,7 +58,7 @@ fun OverlayScreen() {
     var scaleFactor by remember { mutableStateOf(prefs.getFloat("scaleFactor", 1.0f)) }
     
     // Load metric order from preferences
-    val defaultOrder = listOf("cpu", "power", "battery", "ram", "swap", "cpuTemp", "batteryTemp", "cpuGraph", "powerGraph", "cpuFreq", "network")
+    val defaultOrder = listOf("cpu", "power", "battery", "ram", "swap", "cpuTemp", "batteryTemp", "cpuGraph", "powerGraph", "cpuFreq", "network", "currentApp")
     val savedOrderStr = prefs.getString("metricOrder", null)
     val savedOrder = savedOrderStr?.split(",") ?: defaultOrder
     
@@ -83,6 +83,7 @@ fun OverlayScreen() {
                     "powerGraph" -> OverlayMetric("powerGraph", "Power Usage Graph", prefs.getBoolean("showPowerGraph", true), index)
                     "cpuFreq" -> OverlayMetric("cpuFreq", "CPU Core Frequencies", prefs.getBoolean("showCpuFreq", true), index)
                     "network" -> OverlayMetric("network", "Network Speed", prefs.getBoolean("showNetwork", true), index)
+                    "currentApp" -> OverlayMetric("currentApp", "Current App", prefs.getBoolean("showCurrentApp", true), index)
                     else -> OverlayMetric(id, id, true, index)
                 }
             }
@@ -234,6 +235,11 @@ fun OverlayScreen() {
                                 metric = metric,
                                 isDragging = isDragging,
                                 onToggle = { enabled ->
+                                    if (metric.id == "currentApp" && enabled && !hasUsageStatsPermission(context)) {
+                                        val intent = Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)
+                                        context.startActivity(intent)
+                                        android.widget.Toast.makeText(context, "Please grant Usage Access", android.widget.Toast.LENGTH_SHORT).show()
+                                    }
                                     metrics = metrics.map {
                                         if (it.id == metric.id) it.copy(enabled = enabled) else it
                                     }
@@ -370,4 +376,10 @@ fun PremiumMetricCard(
             }
         }
     }
+}
+
+fun hasUsageStatsPermission(context: Context): Boolean {
+    val appOps = context.getSystemService(Context.APP_OPS_SERVICE) as android.app.AppOpsManager
+    val mode = appOps.checkOpNoThrow(android.app.AppOpsManager.OPSTR_GET_USAGE_STATS, android.os.Process.myUid(), context.packageName)
+    return mode == android.app.AppOpsManager.MODE_ALLOWED
 }
