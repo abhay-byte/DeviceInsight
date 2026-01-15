@@ -271,7 +271,7 @@ fun RamUsageGraph(
                 lineSeries {
                     series(
                         x = dataPoints.indices.map { it.toDouble() },
-                        y = dataPoints.map { it.utilization * 100 }
+                        y = dataPoints.map { it.utilization }
                     )
                 }
             }
@@ -291,7 +291,7 @@ fun RamUsageGraph(
             )
             if (dataPoints.isNotEmpty()) {
                 Text(
-                    text = String.format("%.1f%%", dataPoints.last().utilization * 100),
+                    text = String.format("%.1f%%", dataPoints.last().utilization),
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold),
                     color = tertiaryColor
                 )
