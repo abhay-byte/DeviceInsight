@@ -49,6 +49,7 @@ class OverlayService : Service() {
     private var showCpuFreq: Boolean = true
     private var showNetwork: Boolean = true
     private var showCurrentApp: Boolean = true
+    private var lastKnownApp: String = "DeviceInsight"
     private var scaleFactor: Float = 1.0f
     private var metricOrder: List<String> = listOf("cpu", "power", "battery", "ram", "swap", "cpuTemp", "batteryTemp", "cpuGraph", "powerGraph", "cpuFreq", "network", "currentApp")
 
@@ -676,23 +677,40 @@ class OverlayService : Service() {
         try {
             val usm = getSystemService(Context.USAGE_STATS_SERVICE) as android.app.usage.UsageStatsManager
             val time = System.currentTimeMillis()
-            val stats = usm.queryUsageStats(android.app.usage.UsageStatsManager.INTERVAL_DAILY, time - 1000 * 10, time)
+            // Query events for the last 1 minute
+            val events = usm.queryEvents(time - 1000 * 60, time) 
+            var topPackageName: String? = null
+            var lastEventTime = 0L
 
-            if (stats != null && stats.isNotEmpty()) {
-                val sortedStats = stats.sortedByDescending { it.lastTimeUsed }
-                val topPackageName = sortedStats[0].packageName
-                return try {
+            if (events != null) {
+                val event = android.app.usage.UsageEvents.Event()
+                while (events.hasNextEvent()) {
+                    events.getNextEvent(event)
+                    if (event.eventType == android.app.usage.UsageEvents.Event.MOVE_TO_FOREGROUND) {
+                         if (event.timeStamp > lastEventTime) {
+                             lastEventTime = event.timeStamp
+                             topPackageName = event.packageName
+                         }
+                    }
+                }
+            }
+            
+            if (topPackageName != null) {
+                 return try {
                     val pm = packageManager
                     val appInfo = pm.getApplicationInfo(topPackageName, 0)
-                    pm.getApplicationLabel(appInfo).toString()
+                    val label = pm.getApplicationLabel(appInfo).toString()
+                    lastKnownApp = label
+                    label
                 } catch (e: Exception) {
+                    lastKnownApp = topPackageName
                     topPackageName
                 }
             }
         } catch (e: Exception) {
             e.printStackTrace()
         }
-        return "Unknown"
+        return lastKnownApp
     }
 
     private fun startForegroundService() {
