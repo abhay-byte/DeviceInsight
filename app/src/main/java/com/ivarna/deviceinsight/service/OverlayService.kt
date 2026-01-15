@@ -341,7 +341,7 @@ class OverlayService : Service() {
                             contentLayout.addView(cpuProgressBar)
                             addSeparator()
                         }
-                        "cpuGraph" -> if (showCpu && showCpuGraph && cpuHistory.isNotEmpty()) {
+                        "cpuGraph" -> if (showCpuGraph && cpuHistory.isNotEmpty()) {
                             cpuGraphView.setData(cpuHistory.map { it.utilization })
                             // Update layout params to handle potential scaleFactor changes
                              cpuGraphView.layoutParams = LinearLayout.LayoutParams(
@@ -353,8 +353,8 @@ class OverlayService : Service() {
                             contentLayout.addView(cpuGraphView)
                             addSeparator()
                         }
-                        "powerGraph" -> if (showPower && showPowerGraph) {
-                             val data = if (powerHistory.isNotEmpty()) powerHistory.map { it.powerWatts } else listOf(powerConsumption)
+                        "powerGraph" -> if (showPowerGraph) {
+                             val data = if (powerHistory.isNotEmpty()) powerHistory.map { kotlin.math.abs(it.powerWatts) } else listOf(kotlin.math.abs(powerConsumption))
                              powerGraphView.setData(data)
                              powerGraphView.layoutParams = LinearLayout.LayoutParams(
                                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -641,14 +641,21 @@ class OverlayService : Service() {
             val stepX = w / (points.size - 1).coerceAtLeast(1)
             
             // Find max value for scaling Y, default to 100 for percentage
-            val maxY = if (label.contains("%")) 100f else (points.maxOrNull() ?: 10f).coerceAtLeast(1f) * 1.2f
+            val maxY = if (label.contains("%")) 100f else (points.maxOrNull() ?: 10f).coerceAtLeast(0.1f) * 1.2f
 
             displayPoints.forEachIndexed { index, value ->
                 val x = index * stepX
-                // Map value 0..maxY to h..0
-                val y = h - (value / maxY * h)
+                
+                // Add padding to Y to avoid drawing on edges (margin)
+                val graphHeight = h * 0.9f 
+                val yOffset = h * 0.05f 
+                
+                // Map value 0..maxY to graphHeight..0
+                val ratio = (value / maxY).coerceIn(0f, 1f)
+                val y = (h - yOffset) - (ratio * graphHeight)
                 
                 if (index == 0) {
+
                     path.moveTo(x, y)
                 } else {
                     path.lineTo(x, y)
