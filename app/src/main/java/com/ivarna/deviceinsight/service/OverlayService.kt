@@ -177,6 +177,7 @@ class OverlayService : Service() {
         // Button size - use density independent pixels conversion
         val density = resources.displayMetrics.density
         val buttonSize = (32 * density * scaleFactor).toInt()
+        val buttonPadding = (4 * density * scaleFactor).toInt()
         
         // Collapse button
         val collapseButton = android.widget.ImageButton(this).apply {
@@ -184,6 +185,7 @@ class OverlayService : Service() {
             setBackgroundColor(android.graphics.Color.TRANSPARENT)
             scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
             setColorFilter(android.graphics.Color.WHITE) // Ensure visibility against dark background
+            setPadding(buttonPadding, buttonPadding, buttonPadding, buttonPadding)
             
             layoutParams = LinearLayout.LayoutParams(
                 buttonSize,
@@ -201,12 +203,13 @@ class OverlayService : Service() {
             setBackgroundColor(android.graphics.Color.TRANSPARENT)
             scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
             setColorFilter(android.graphics.Color.WHITE) // Ensure visibility against dark background
+            setPadding(buttonPadding, buttonPadding, buttonPadding, buttonPadding)
             
             layoutParams = LinearLayout.LayoutParams(
                 buttonSize,
                 buttonSize
             ).apply {
-                setMargins((8 * density * scaleFactor).toInt(), 0, 0, 0)
+                setMargins(0, 0, 0, 0) // No margin to keep them close
             }
             
             setOnClickListener {
