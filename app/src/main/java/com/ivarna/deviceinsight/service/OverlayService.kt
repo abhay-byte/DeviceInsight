@@ -301,7 +301,7 @@ class OverlayService : Service() {
                 contentLayout.removeAllViews()
                 
                 // Add title
-                addTextView("DeviceInsight", true)
+                addTextView("DeviceInsights", true)
                 addSeparator()
                 
                 // Display metrics in custom order
@@ -564,7 +564,7 @@ class OverlayService : Service() {
         }
 
         val notification: Notification = NotificationCompat.Builder(this, channelId)
-            .setContentTitle("DeviceInsight Overlay")
+            .setContentTitle("DeviceInsights Overlay")
             .setContentText("Performance monitor is running")
             .setSmallIcon(R.mipmap.ic_launcher) // Use default icon
             .build()
