@@ -176,8 +176,8 @@ class OverlayService : Service() {
         
         // Button size - use density independent pixels conversion
         val density = resources.displayMetrics.density
-        val buttonSize = (32 * density * scaleFactor).toInt()
-        val buttonPadding = (4 * density * scaleFactor).toInt()
+        val buttonSize = (16 * density * scaleFactor).toInt()
+        val buttonPadding = (2 * density * scaleFactor).toInt()
         
         // Collapse button
         val collapseButton = android.widget.ImageButton(this).apply {
