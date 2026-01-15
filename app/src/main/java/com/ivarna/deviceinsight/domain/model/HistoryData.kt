@@ -17,6 +17,12 @@ data class PowerDataPoint(
     val powerWatts: Float
 )
 
+data class FpsDataPoint(
+    val xValue: Long,
+    val timestamp: Long,
+    val fps: Int
+)
+
 data class CpuCoreDataPoint(
     val xValue: Long,
     val timestamp: Long,

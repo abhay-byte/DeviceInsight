@@ -26,5 +26,7 @@ data class DashboardMetrics(
     val cpuHistory: List<CpuDataPoint> = emptyList(),
     val cpuCoreHistory: List<List<CpuCoreDataPoint>> = emptyList(),
     val ramHistory: List<MemoryDataPoint> = emptyList(),
-    val powerHistory: List<PowerDataPoint> = emptyList()
+    val powerHistory: List<PowerDataPoint> = emptyList(),
+    val fps: Int = 0,
+    val fpsHistory: List<FpsDataPoint> = emptyList()
 )

@@ -49,9 +49,11 @@ class OverlayService : Service() {
     private var showCpuFreq: Boolean = true
     private var showNetwork: Boolean = true
     private var showCurrentApp: Boolean = true
+    private var showFps: Boolean = true
+    private var showFpsGraph: Boolean = true
     private var lastKnownApp: String = "DeviceInsight"
     private var scaleFactor: Float = 1.0f
-    private var metricOrder: List<String> = listOf("cpu", "power", "battery", "ram", "swap", "cpuTemp", "batteryTemp", "cpuGraph", "powerGraph", "cpuFreq", "network", "currentApp")
+    private var metricOrder: List<String> = listOf("cpu", "power", "battery", "ram", "swap", "cpuTemp", "batteryTemp", "cpuGraph", "powerGraph", "fps", "fpsGraph", "cpuFreq", "network", "currentApp")
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -79,9 +81,11 @@ class OverlayService : Service() {
             showCpuFreq = it.getBooleanExtra("showCpuFreq", true)
             showNetwork = it.getBooleanExtra("showNetwork", true)
             showCurrentApp = it.getBooleanExtra("showCurrentApp", true)
+            showFps = it.getBooleanExtra("showFps", true)
+            showFpsGraph = it.getBooleanExtra("showFpsGraph", true)
             scaleFactor = it.getFloatExtra("scaleFactor", 1.0f)
             metricOrder = it.getStringExtra("metricOrder")?.split(",") 
-                ?: listOf("cpu", "power", "battery", "ram", "swap", "cpuTemp", "batteryTemp", "cpuGraph", "powerGraph", "cpuFreq", "network", "currentApp")
+                ?: listOf("cpu", "power", "battery", "ram", "swap", "cpuTemp", "batteryTemp", "cpuGraph", "powerGraph", "fps", "fpsGraph", "cpuFreq", "network", "currentApp")
             
             // Update the overlay with new parameters
             updateOverlayWithNewParameters()
@@ -106,6 +110,7 @@ class OverlayService : Service() {
     private lateinit var swapProgressBar: ProgressBar
     private lateinit var cpuGraphView: OverlayGraphView
     private lateinit var powerGraphView: OverlayGraphView
+    private lateinit var fpsGraphView: OverlayGraphView
     
     private fun createOverlayView() {
         // Since we don't have XML layout, we'll create view programmatically or inflate if we had one.
@@ -301,6 +306,15 @@ class OverlayService : Service() {
                 setMargins(0, (4 * scaleFactor).toInt(), 0, (4 * scaleFactor).toInt())
             }
         }
+
+        fpsGraphView = OverlayGraphView(this, "FPS", android.graphics.Color.CYAN).apply {
+             layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                (60 * scaleFactor).toInt()
+            ).apply {
+                setMargins(0, (4 * scaleFactor).toInt(), 0, (4 * scaleFactor).toInt())
+            }
+        }
         
         // Expand button - shown when collapsed
         val expandButton = android.widget.ImageButton(this).apply {
@@ -385,6 +399,8 @@ class OverlayService : Service() {
                 val cpuCoreFrequencies = metrics.cpuCoreFrequencies
                 val cpuHistory = metrics.cpuHistory
                 val powerHistory = metrics.powerHistory
+                val fpsHistory = metrics.fpsHistory
+                val fps = metrics.fps
                 val netUpload = metrics.networkUploadSpeed
                 val netDownload = metrics.networkDownloadSpeed
                 
@@ -427,6 +443,21 @@ class OverlayService : Service() {
                                 setMargins(0, (4 * scaleFactor).toInt(), 0, (4 * scaleFactor).toInt())
                             }
                             contentLayout.addView(powerGraphView)
+                            addSeparator()
+                        }
+                        "fps" -> if (showFps) {
+                            addTextView("FPS: $fps")
+                            addSeparator()
+                        }
+                        "fpsGraph" -> if (showFpsGraph && fpsHistory.isNotEmpty()) {
+                            fpsGraphView.setData(fpsHistory.map { it.fps.toFloat() })
+                            fpsGraphView.layoutParams = LinearLayout.LayoutParams(
+                                LinearLayout.LayoutParams.MATCH_PARENT,
+                                (60 * scaleFactor).toInt()
+                            ).apply {
+                                setMargins(0, (4 * scaleFactor).toInt(), 0, (4 * scaleFactor).toInt())
+                            }
+                            contentLayout.addView(fpsGraphView)
                             addSeparator()
                         }
                         "cpuFreq" -> if (showCpu && showCpuFreq && cpuCoreFrequencies.isNotEmpty()) {

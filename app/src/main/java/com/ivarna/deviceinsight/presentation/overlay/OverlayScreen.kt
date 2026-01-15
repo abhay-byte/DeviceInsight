@@ -60,7 +60,7 @@ fun OverlayScreen() {
     var scaleFactor by remember { mutableStateOf(prefs.getFloat("scaleFactor", 1.0f)) }
     
     // Load metric order from preferences
-    val defaultOrder = listOf("cpu", "power", "battery", "ram", "swap", "cpuTemp", "batteryTemp", "cpuGraph", "powerGraph", "cpuFreq", "network", "currentApp")
+    val defaultOrder = listOf("cpu", "power", "battery", "ram", "swap", "cpuTemp", "batteryTemp", "cpuGraph", "powerGraph", "fps", "fpsGraph", "cpuFreq", "network", "currentApp")
     val savedOrderStr = prefs.getString("metricOrder", null)
     val savedOrder = savedOrderStr?.split(",") ?: defaultOrder
     
@@ -83,6 +83,8 @@ fun OverlayScreen() {
                     "batteryTemp" -> OverlayMetric("batteryTemp", "Battery Temperature", prefs.getBoolean("showBatteryTemp", true), index)
                     "cpuGraph" -> OverlayMetric("cpuGraph", "CPU Usage Graph", prefs.getBoolean("showCpuGraph", true), index)
                     "powerGraph" -> OverlayMetric("powerGraph", "Power Usage Graph", prefs.getBoolean("showPowerGraph", true), index)
+                    "fps" -> OverlayMetric("fps", "FPS Monitor", prefs.getBoolean("showFps", true), index)
+                    "fpsGraph" -> OverlayMetric("fpsGraph", "FPS History Graph", prefs.getBoolean("showFpsGraph", true), index)
                     "cpuFreq" -> OverlayMetric("cpuFreq", "CPU Core Frequencies", prefs.getBoolean("showCpuFreq", true), index)
                     "network" -> OverlayMetric("network", "Network Speed", prefs.getBoolean("showNetwork", true), index)
                     "currentApp" -> OverlayMetric("currentApp", "Current App", prefs.getBoolean("showCurrentApp", true), index)
@@ -243,6 +245,9 @@ fun OverlayScreen() {
                                         context.startActivity(intent)
                                         android.widget.Toast.makeText(context, "Please grant Usage Access", android.widget.Toast.LENGTH_SHORT).show()
                                     }
+                                    if (metric.id == "fps" && enabled) {
+                                         android.widget.Toast.makeText(context, "FPS metric shows screen refresh rate", android.widget.Toast.LENGTH_SHORT).show()
+                                    }
                                     metrics = metrics.map {
                                         if (it.id == metric.id) it.copy(enabled = enabled) else it
                                     }
@@ -297,8 +302,14 @@ fun OverlayScreen() {
                             onClick = {
                                 savePreferences()
                                 val intent = Intent(context, OverlayService::class.java).apply {
+                                    // Specifically pass FPS explicitly because the loop might miss it if id != showX pattern
+                                    putExtra("showFps", metrics.find { it.id == "fps" }?.enabled ?: true)
+                                    putExtra("showFpsGraph", metrics.find { it.id == "fpsGraph" }?.enabled ?: true)
+                                    
                                     metrics.forEach { metric ->
-                                        putExtra("show${metric.id.capitalize()}", metric.enabled)
+                                        // Handle special case where id matches param name
+                                        val paramName = "show" + metric.id.replaceFirstChar { if (it.isLowerCase()) it.titlecase(java.util.Locale.getDefault()) else it.toString() }
+                                        putExtra(paramName, metric.enabled)
                                     }
                                     putExtra("scaleFactor", scaleFactor)
                                     putExtra("metricOrder", metrics.sortedBy { it.order }.joinToString(",") { it.id })
