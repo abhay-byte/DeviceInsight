@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import rikka.shizuku.Shizuku
 import com.ivarna.deviceinsight.presentation.components.GlassCard
 import com.ivarna.deviceinsight.presentation.components.ReorderableList
 import com.ivarna.deviceinsight.service.OverlayService
@@ -57,6 +58,10 @@ fun OverlayScreen() {
     
     var hasPermission by remember { mutableStateOf(false) }
     var hasUsageStats by remember { mutableStateOf(false) }
+    var hasShizukuPermission by remember { mutableStateOf(false) }
+    var isShizukuAvailable by remember { mutableStateOf(false) }
+    var isRootAvailable by remember { mutableStateOf(false) }
+    var fpsMode by remember { mutableStateOf(prefs.getString("fps_mode", "AUTO") ?: "AUTO") }
     var scaleFactor by remember { mutableStateOf(prefs.getFloat("scaleFactor", 1.0f)) }
     
     // Load metric order from preferences
@@ -104,6 +109,7 @@ fun OverlayScreen() {
                 putBoolean("show${metric.id.capitalize()}", metric.enabled)
             }
             putFloat("scaleFactor", scaleFactor)
+            putString("fps_mode", fpsMode)
             putString("metricOrder", metrics.sortedBy { it.order }.joinToString(",") { it.id })
             apply()
         }
@@ -114,6 +120,22 @@ fun OverlayScreen() {
     fun checkPermission() {
         hasPermission = Settings.canDrawOverlays(context)
         hasUsageStats = hasUsageStatsPermission(context)
+        try {
+            isShizukuAvailable = Shizuku.pingBinder()
+            if (isShizukuAvailable) {
+                 hasShizukuPermission = Shizuku.checkSelfPermission() == android.content.pm.PackageManager.PERMISSION_GRANTED
+            }
+        } catch (e: Exception) {
+            isShizukuAvailable = false
+        }
+        
+        // Check Root Access
+        Thread {
+            isRootAvailable = try {
+                val process = Runtime.getRuntime().exec(arrayOf("su", "-c", "echo root"))
+                process.waitFor() == 0
+            } catch (e: Exception) { false }
+        }.start()
     }
 
     DisposableEffect(lifecycleOwner) {
@@ -169,6 +191,55 @@ fun OverlayScreen() {
                 }
             }
         } else {
+            GlassCard(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
+                Column(
+                    modifier = Modifier.padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "FPS Monitor Method",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    val statusText = if (fpsMode == "SHIZUKU") {
+                         if (isShizukuAvailable && hasShizukuPermission) "Active: Shizuku" else "Inactive (Shizuku not ready)"
+                    } else if (fpsMode == "ROOT") {
+                         if (isRootAvailable) "Active: Root" else "Inactive (Root not found)"
+                    } else {
+                         if (isShizukuAvailable && hasShizukuPermission) "Active: Shizuku (Auto)"
+                         else if (isRootAvailable) "Active: Root (Auto)"
+                         else "Fallback: Display Refresh Rate"
+                    }
+                    
+                    Text(text = statusText, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.tertiary)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    
+                    Row(
+                        modifier = Modifier.fillMaxWidth(), 
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                         listOf("AUTO", "ROOT", "SHIZUKU").forEach { mode ->
+                             FilterChip(
+                                 selected = fpsMode == mode,
+                                 onClick = { 
+                                     fpsMode = mode
+                                     savePreferences()
+                                     // Optional: Request permissions immediately if forced
+                                     if (mode == "SHIZUKU" && isShizukuAvailable && !hasShizukuPermission) {
+                                         try { Shizuku.requestPermission(0) } catch(e: Exception){}
+                                     }
+                                 },
+                                 label = { Text(mode) }
+                             )
+                         }
+                    }
+                }
+            }
+
             GlassCard(modifier = Modifier.fillMaxWidth()) {
                 Column(
                     modifier = Modifier.padding(24.dp),
@@ -246,7 +317,21 @@ fun OverlayScreen() {
                                         android.widget.Toast.makeText(context, "Please grant Usage Access", android.widget.Toast.LENGTH_SHORT).show()
                                     }
                                     if (metric.id == "fps" && enabled) {
-                                         android.widget.Toast.makeText(context, "FPS metric shows screen refresh rate", android.widget.Toast.LENGTH_SHORT).show()
+                                         // Check Shizuku status for user info
+                                         try {
+                                             if (rikka.shizuku.Shizuku.pingBinder()) {
+                                                 if (rikka.shizuku.Shizuku.checkSelfPermission() != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                                                     rikka.shizuku.Shizuku.requestPermission(0)
+                                                 } else {
+                                                     android.widget.Toast.makeText(context, "Using Shizuku for accurate FPS", android.widget.Toast.LENGTH_SHORT).show()
+                                                 }
+                                             } else {
+                                                 android.widget.Toast.makeText(context, "Shizuku not running. Showing screen refresh rate.", android.widget.Toast.LENGTH_SHORT).show()
+                                             }
+                                         } catch (e: Exception) {
+                                             // Shizuku not installed or other error
+                                             android.widget.Toast.makeText(context, "Install Shizuku for accurate FPS (currently showing refresh rate)", android.widget.Toast.LENGTH_SHORT).show()
+                                         }
                                     }
                                     metrics = metrics.map {
                                         if (it.id == metric.id) it.copy(enabled = enabled) else it
@@ -273,6 +358,28 @@ fun OverlayScreen() {
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text("Grant Usage Access for App Detection")
+                        }
+                    }
+
+                    if (isShizukuAvailable && !hasShizukuPermission) {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        OutlinedButton(
+                            onClick = {
+                                try {
+                                    Shizuku.requestPermission(0)
+                                } catch (e: Exception) {
+                                    // ignore
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Settings,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Grant Shizuku Permission for Accurate FPS")
                         }
                     }
 

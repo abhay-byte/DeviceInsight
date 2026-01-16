@@ -13,6 +13,7 @@ import com.ivarna.deviceinsight.domain.model.DashboardMetrics
 import com.ivarna.deviceinsight.domain.repository.DashboardRepository
 import com.ivarna.deviceinsight.utils.DisplayRefreshRateUtils
 import com.ivarna.deviceinsight.utils.CpuUtilizationUtils
+import com.ivarna.deviceinsight.data.fps.FpsMonitor
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -30,7 +31,8 @@ import kotlin.math.roundToInt
 class DashboardRepositoryImpl @Inject constructor(
     @ApplicationContext private val context: Context,
     private val cpuUtilizationUtils: CpuUtilizationUtils,
-    private val displayRefreshRateUtils: DisplayRefreshRateUtils
+    private val displayRefreshRateUtils: DisplayRefreshRateUtils,
+    private val fpsMonitor: FpsMonitor
 ) : DashboardRepository {
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
@@ -129,7 +131,13 @@ class DashboardRepositoryImpl @Inject constructor(
         val now = System.currentTimeMillis()
         val x = historyCounter++
         
-        val fps = displayRefreshRateUtils.getRefreshRate()
+        // Try to get accurate FPS using Root/Shizuku first
+        var fps = fpsMonitor.getCurrentFps()
+        
+        // Fallback to Display Refresh Rate if no advanced access or failed (0)
+        if (fps <= 0) {
+            fps = displayRefreshRateUtils.getRefreshRate()
+        }
          
         addToHistory(cpuHistory, com.ivarna.deviceinsight.domain.model.CpuDataPoint(x, now, cpu * 100))
         addToHistory(ramHistory, com.ivarna.deviceinsight.domain.model.MemoryDataPoint(x, now, ram * 100))
@@ -355,6 +363,34 @@ class DashboardRepositoryImpl @Inject constructor(
         val intent = getBatteryIntent() ?: return 0f
         val tempInt = intent.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, 0)
         return tempInt / 10f // Battery temp is in tenths of a degree Celsius
+    }
+
+    private fun getForegroundPackageHere(): String? {
+        try {
+            val usm = context.getSystemService(Context.USAGE_STATS_SERVICE) as android.app.usage.UsageStatsManager
+            val time = System.currentTimeMillis()
+            // Query events for the last 1 minute
+            val events = usm.queryEvents(time - 1000 * 60, time) 
+            var topPackageName: String? = null
+            var lastEventTime = 0L
+
+            if (events != null) {
+                val event = android.app.usage.UsageEvents.Event()
+                while (events.hasNextEvent()) {
+                    events.getNextEvent(event)
+                    if (event.eventType == android.app.usage.UsageEvents.Event.MOVE_TO_FOREGROUND) {
+                         if (event.timeStamp > lastEventTime) {
+                             lastEventTime = event.timeStamp
+                             topPackageName = event.packageName
+                         }
+                    }
+                }
+            }
+            return topPackageName
+        } catch (e: Exception) {
+            e.printStackTrace()
+            return null
+        }
     }
 
     private fun getCpuTemperature(): Float {

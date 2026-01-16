@@ -10,6 +10,11 @@ android {
     namespace = "com.ivarna.deviceinsight"
     compileSdk = 36
 
+    buildFeatures {
+        compose = true
+        buildConfig = true
+    }
+
     defaultConfig {
         applicationId = "com.ivarna.deviceinsight"
         minSdk = 26
@@ -45,9 +50,7 @@ android {
         jvmTarget = "17"
     }
 
-    buildFeatures {
-        compose = true
-    }
+
 
     packaging {
         resources {
@@ -102,6 +105,10 @@ dependencies {
 
     // Haze (Glassmorphism)
     implementation("dev.chrisbanes.haze:haze:0.7.3")
+
+    // Shizuku (System API access)
+    implementation("dev.rikka.shizuku:api:13.1.5")
+    implementation("dev.rikka.shizuku:provider:13.1.5")
 
     // Testing
     testImplementation("junit:junit:4.13.2")

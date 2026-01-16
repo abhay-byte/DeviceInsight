@@ -5,6 +5,7 @@ import com.ivarna.deviceinsight.data.repository.DashboardRepositoryImpl
 import com.ivarna.deviceinsight.domain.repository.DashboardRepository
 import com.ivarna.deviceinsight.utils.CpuUtilizationUtils
 import com.ivarna.deviceinsight.utils.DisplayRefreshRateUtils
+import com.ivarna.deviceinsight.data.fps.FpsMonitor
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -29,9 +30,10 @@ object AppModule {
     fun provideDashboardRepository(
         @ApplicationContext context: Context,
         cpuUtilizationUtils: CpuUtilizationUtils,
-        displayRefreshRateUtils: DisplayRefreshRateUtils
+        displayRefreshRateUtils: DisplayRefreshRateUtils,
+        fpsMonitor: FpsMonitor
     ): DashboardRepository {
-        return DashboardRepositoryImpl(context, cpuUtilizationUtils, displayRefreshRateUtils)
+        return DashboardRepositoryImpl(context, cpuUtilizationUtils, displayRefreshRateUtils, fpsMonitor)
     }
 
     @Provides
