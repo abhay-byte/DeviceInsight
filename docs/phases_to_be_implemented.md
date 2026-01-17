@@ -34,7 +34,7 @@ Based on the core features already implemented (Dashboard, Hardware, Tasks, Sett
 - [ ] **Root Detection**: Implement reliable root check (e.g., checking `su` binary).
 - [ ] **Process Killing**: Implement `su` commands to force-kill processes from `TasksScreen`.
 - [ ] **Advanced GPU Stats**: Read GPU load/frequency from system files (usually requires root on Qualcomm devices).
-- [ ] **FPS Monitoring**: Implement service to read frame times (SurfaceFlinger dumpsys often requires root/ADB).
+- [x] **FPS Monitoring**: Reliable frame tracking using a hybrid approach of `SurfaceFlinger` latency for games and `gfxinfo` for UI apps. Supports 120 FPS. See [fps_monitor_implementation.md](fps_monitor_implementation.md) for details.
 
 ## Phase 7: Polish & Optimization
 **Goal**: Refine the user experience and performance.

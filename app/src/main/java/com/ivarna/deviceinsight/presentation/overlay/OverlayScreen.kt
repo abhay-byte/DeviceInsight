@@ -65,7 +65,7 @@ fun OverlayScreen() {
     var scaleFactor by remember { mutableStateOf(prefs.getFloat("scaleFactor", 1.0f)) }
     
     // Load metric order from preferences
-    val defaultOrder = listOf("cpu", "power", "battery", "ram", "swap", "cpuTemp", "batteryTemp", "cpuGraph", "powerGraph", "fps", "fpsGraph", "cpuFreq", "network", "currentApp")
+    val defaultOrder = listOf("time", "cpu", "power", "battery", "ram", "swap", "cpuTemp", "batteryTemp", "cpuGraph", "powerGraph", "fps", "fpsGraph", "cpuFreq", "network", "currentApp")
     val savedOrderStr = prefs.getString("metricOrder", null)
     val savedOrder = savedOrderStr?.split(",") ?: defaultOrder
     
@@ -79,6 +79,7 @@ fun OverlayScreen() {
         mutableStateOf(
             finalOrder.mapIndexed { index, id ->
                 when (id) {
+                    "time" -> OverlayMetric("time", "System Time", prefs.getBoolean("showTime", true), index)
                     "cpu" -> OverlayMetric("cpu", "CPU Usage", prefs.getBoolean("showCpu", true), index)
                     "power" -> OverlayMetric("power", "Power Consumption", prefs.getBoolean("showPower", true), index)
                     "battery" -> OverlayMetric("battery", "Battery Level", prefs.getBoolean("showBattery", true), index)

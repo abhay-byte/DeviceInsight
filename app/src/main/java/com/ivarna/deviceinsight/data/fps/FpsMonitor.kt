@@ -135,12 +135,12 @@ class FpsMonitor @Inject constructor(@ApplicationContext private val context: Co
             return 0
         }
 
-        // Try gfxinfo first (works for most UI apps and many games)
-        val fps = getGfxInfoFps(packageName)
-        if (fps > 0) return fps
+        // For games and high-performance apps, SurfaceFlinger latency is more accurate
+        val sfFps = getSurfaceFlingerFps(packageName)
+        if (sfFps > 0) return sfFps
 
-        // Fallback or legacy (not implemented fully reliable yet due to layer name issues)
-        return 0
+        // Fallback to gfxinfo for standard UI apps
+        return getGfxInfoFps(packageName)
     }
 
     private fun getForegroundPackage(): String? {
@@ -203,6 +203,49 @@ class FpsMonitor @Inject constructor(@ApplicationContext private val context: Co
         
         Log.d(TAG, "GfxInfo FPS for $packageName: $frameCount")
         return frameCount
+    }
+
+    private fun getSurfaceFlingerFps(packageName: String): Int {
+        val layerName = findSurfaceFlingerLayer(packageName) ?: return 0
+        val cmd = "dumpsys SurfaceFlinger --latency '$layerName'"
+        val output = executeCommand(cmd)
+        
+        val fps = parseFps(output)
+        Log.d(TAG, "SurfaceFlinger FPS for $packageName ($layerName): $fps")
+        return fps
+    }
+
+    private fun findSurfaceFlingerLayer(packageName: String): String? {
+        val cmd = "dumpsys SurfaceFlinger --list"
+        val output = executeCommand(cmd)
+        
+        // Prioritize BLAST layers which are common in newer Android versions / high perf apps
+        val blastLayer = output.firstOrNull { it.contains(packageName) && it.contains("BLAST") }
+        if (blastLayer != null) return extractLayerName(blastLayer)
+        
+        // Then SurfaceView
+        val surfaceViewLayer = output.firstOrNull { it.contains(packageName) && it.contains("SurfaceView") }
+        if (surfaceViewLayer != null) return extractLayerName(surfaceViewLayer)
+        
+        // Then any layer matching package
+        val genericLayer = output.firstOrNull { it.contains(packageName) }
+        if (genericLayer != null) return extractLayerName(genericLayer)
+        
+        return null
+    }
+
+    private fun extractLayerName(rawLine: String): String {
+        var name = rawLine.trim()
+        if (name.startsWith("RequestedLayerState{")) {
+            name = name.substringAfter("RequestedLayerState{").substringBeforeLast("}")
+            // Match until the first space followed by metadata like parentId
+            // OR until the end of the string if no spaces
+            val firstSpace = name.indexOf(' ')
+            if (firstSpace != -1) {
+                name = name.substring(0, firstSpace)
+            }
+        }
+        return name
     }
 
     fun isShizukuPermissionGranted(): Boolean {

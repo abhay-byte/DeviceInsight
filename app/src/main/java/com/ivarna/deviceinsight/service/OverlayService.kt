@@ -24,6 +24,9 @@ import com.ivarna.deviceinsight.domain.repository.DashboardRepository
 import com.ivarna.deviceinsight.utils.CpuUtilizationUtils
 import kotlinx.coroutines.*
 import dagger.hilt.android.AndroidEntryPoint
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -51,9 +54,10 @@ class OverlayService : Service() {
     private var showCurrentApp: Boolean = true
     private var showFps: Boolean = true
     private var showFpsGraph: Boolean = true
+    private var showTime: Boolean = true
     private var lastKnownApp: String = "DeviceInsight"
     private var scaleFactor: Float = 1.0f
-    private var metricOrder: List<String> = listOf("cpu", "power", "battery", "ram", "swap", "cpuTemp", "batteryTemp", "cpuGraph", "powerGraph", "fps", "fpsGraph", "cpuFreq", "network", "currentApp")
+    private var metricOrder: List<String> = listOf("time", "cpu", "power", "battery", "ram", "swap", "cpuTemp", "batteryTemp", "cpuGraph", "powerGraph", "fps", "fpsGraph", "cpuFreq", "network", "currentApp")
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -83,9 +87,10 @@ class OverlayService : Service() {
             showCurrentApp = it.getBooleanExtra("showCurrentApp", true)
             showFps = it.getBooleanExtra("showFps", true)
             showFpsGraph = it.getBooleanExtra("showFpsGraph", true)
+            showTime = it.getBooleanExtra("showTime", true)
             scaleFactor = it.getFloatExtra("scaleFactor", 1.0f)
             metricOrder = it.getStringExtra("metricOrder")?.split(",") 
-                ?: listOf("cpu", "power", "battery", "ram", "swap", "cpuTemp", "batteryTemp", "cpuGraph", "powerGraph", "fps", "fpsGraph", "cpuFreq", "network", "currentApp")
+                ?: listOf("time", "cpu", "power", "battery", "ram", "swap", "cpuTemp", "batteryTemp", "cpuGraph", "powerGraph", "fps", "fpsGraph", "cpuFreq", "network", "currentApp")
             
             // Update the overlay with new parameters
             updateOverlayWithNewParameters()
@@ -414,6 +419,12 @@ class OverlayService : Service() {
                 // Display metrics in custom order
                 metricOrder.forEach { metricId ->
                     when (metricId) {
+                        "time" -> if (showTime) {
+                            val timeFormat = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
+                            val currentTime = timeFormat.format(Date())
+                            addTextView("Time: $currentTime", isBold = true)
+                            addSeparator()
+                        }
                         "cpu" -> if (showCpu) {
                             val governorText = metrics.cpuGovernor?.let { " ($it)" } ?: ""
                             addTextView("CPU: ${cpuUsage}%$governorText")
