@@ -63,6 +63,7 @@ fun OverlayScreen() {
     var isRootAvailable by remember { mutableStateOf(false) }
     var fpsMode by remember { mutableStateOf(prefs.getString("fps_mode", "AUTO") ?: "AUTO") }
     var scaleFactor by remember { mutableStateOf(prefs.getFloat("scaleFactor", 1.0f)) }
+    var isHorizontal by remember { mutableStateOf(prefs.getBoolean("isHorizontal", false)) }
     
     // Load metric order from preferences
     val defaultOrder = listOf("time", "cpu", "power", "battery", "ram", "swap", "cpuTemp", "batteryTemp", "cpuGraph", "powerGraph", "fps", "fpsGraph", "cpuFreq", "network", "currentApp")
@@ -110,6 +111,7 @@ fun OverlayScreen() {
                 putBoolean("show${metric.id.capitalize()}", metric.enabled)
             }
             putFloat("scaleFactor", scaleFactor)
+            putBoolean("isHorizontal", isHorizontal)
             putString("fps_mode", fpsMode)
             putString("metricOrder", metrics.sortedBy { it.order }.joinToString(",") { it.id })
             apply()
@@ -253,6 +255,35 @@ fun OverlayScreen() {
                         color = MaterialTheme.colorScheme.primary
                     )
                     Spacer(modifier = Modifier.height(16.dp))
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(
+                                text = "Horizontal Layout",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Text(
+                                text = "Display metrics side-by-side",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = isHorizontal,
+                            onCheckedChange = {
+                                isHorizontal = it
+                                savePreferences()
+                            }
+                        )
+                    }
+
                     Text(
                         text = "The overlay displays real-time CPU and system stats floating over other applications.",
                         style = MaterialTheme.typography.bodyMedium,
@@ -420,6 +451,7 @@ fun OverlayScreen() {
                                         putExtra(paramName, metric.enabled)
                                     }
                                     putExtra("scaleFactor", scaleFactor)
+                                    putExtra("isHorizontal", isHorizontal)
                                     putExtra("metricOrder", metrics.sortedBy { it.order }.joinToString(",") { it.id })
                                 }
                                 if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {

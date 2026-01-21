@@ -38,6 +38,8 @@ class OverlayService : Service() {
     
     @Inject
     lateinit var dashboardRepository: DashboardRepository
+
+    private var density: Float = 1.0f
     
     // Default values for parameters
     private var showCpu: Boolean = true
@@ -57,6 +59,7 @@ class OverlayService : Service() {
     private var showTime: Boolean = true
     private var lastKnownApp: String = "DeviceInsight"
     private var scaleFactor: Float = 1.0f
+    private var isHorizontal: Boolean = false
     private var metricOrder: List<String> = listOf("time", "cpu", "power", "battery", "ram", "swap", "cpuTemp", "batteryTemp", "cpuGraph", "powerGraph", "fps", "fpsGraph", "cpuFreq", "network", "currentApp")
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -64,6 +67,7 @@ class OverlayService : Service() {
     override fun onCreate() {
         super.onCreate()
         windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
+        density = resources.displayMetrics.density
         
         createOverlayView()
         startForegroundService()
@@ -89,7 +93,8 @@ class OverlayService : Service() {
             showFpsGraph = it.getBooleanExtra("showFpsGraph", true)
             showTime = it.getBooleanExtra("showTime", true)
             scaleFactor = it.getFloatExtra("scaleFactor", 1.0f)
-            metricOrder = it.getStringExtra("metricOrder")?.split(",") 
+            isHorizontal = it.getBooleanExtra("isHorizontal", false)
+            metricOrder = it.getStringExtra("metricOrder")?.split(",")
                 ?: listOf("time", "cpu", "power", "battery", "ram", "swap", "cpuTemp", "batteryTemp", "cpuGraph", "powerGraph", "fps", "fpsGraph", "cpuFreq", "network", "currentApp")
             
             // Update the overlay with new parameters
@@ -389,6 +394,145 @@ class OverlayService : Service() {
         }
     }
     
+    private fun createTextView(text: String, isBold: Boolean = false): TextView {
+         return TextView(this).apply {
+            this.text = text
+            textSize = 14f * scaleFactor
+            setTextColor(android.graphics.Color.WHITE)
+            if (isBold) {
+                setTypeface(null, android.graphics.Typeface.BOLD)
+            }
+            if (isHorizontal) {
+                setSingleLine(true)
+                ellipsize = android.text.TextUtils.TruncateAt.END
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply {
+                     setMargins(0, 0, 0, 0)
+                     gravity = Gravity.CENTER_VERTICAL
+                }
+            } else {
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    setMargins(0, (2 * scaleFactor).toInt(), 0, (2 * scaleFactor).toInt())
+                }
+            }
+        }
+    }
+    
+    private fun addMetricItem(
+        label: String?, 
+        progressView: View?, 
+        graphView: View?, 
+        extraText: String? = null,
+        isBold: Boolean = false
+    ) {
+        // Fix for "Child already has a parent" crash
+        (progressView?.parent as? android.view.ViewGroup)?.removeView(progressView)
+        (graphView?.parent as? android.view.ViewGroup)?.removeView(graphView)
+
+        if (!isHorizontal) {
+            // Vertical Layout - Stacks Text, then Progress/Graph vertically
+            if (label != null) {
+                val tv = createTextView(label, isBold)
+                contentLayout.addView(tv)
+            }
+            if (extraText != null) {
+                val tv = createTextView(extraText)
+                contentLayout.addView(tv)
+            }
+            if (progressView != null) {
+                progressView.layoutParams = LinearLayout.LayoutParams(
+                     LinearLayout.LayoutParams.MATCH_PARENT,
+                     (8 * scaleFactor).toInt()
+                ).apply {
+                    setMargins(0, (4 * scaleFactor).toInt(), 0, (4 * scaleFactor).toInt())
+                }
+                contentLayout.addView(progressView)
+            }
+            if (graphView != null) {
+                graphView.layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    (60 * scaleFactor).toInt()
+                ).apply {
+                    setMargins(0, (4 * scaleFactor).toInt(), 0, (4 * scaleFactor).toInt())
+                }
+                contentLayout.addView(graphView)
+            }
+            addSeparator()
+        } else {
+            // Horizontal Layout - Single Line Row per Metric
+            val container = LinearLayout(this).apply {
+                 orientation = LinearLayout.HORIZONTAL // Changed to Horizontal for concise 1-line
+                 layoutParams = LinearLayout.LayoutParams(
+                     LinearLayout.LayoutParams.WRAP_CONTENT,
+                     LinearLayout.LayoutParams.WRAP_CONTENT
+                 ).apply {
+                     setMargins(
+                         (6 * scaleFactor).toInt(), 
+                         0, 
+                         (6 * scaleFactor).toInt(), 
+                         0
+                     )
+                 }
+                 gravity = Gravity.CENTER_VERTICAL
+            }
+            
+            // Combine label and extra text for concise view
+            val combinedText = StringBuilder()
+            if (label != null) combinedText.append(label)
+            if (label != null && extraText != null) combinedText.append(" ")
+            if (extraText != null) combinedText.append(extraText)
+            
+            if (combinedText.isNotEmpty()) {
+                val tv = createTextView(combinedText.toString(), isBold).apply {
+                    setPadding(0, 0, (8 * scaleFactor).toInt(), 0)
+                    // Remove default margins for inline look
+                    (layoutParams as LinearLayout.LayoutParams).setMargins(0, 0, 0, 0)
+                }
+                container.addView(tv)
+            }
+            
+            if (progressView != null) {
+                 progressView.layoutParams = LinearLayout.LayoutParams(
+                     (40 * scaleFactor).toInt(), // Smaller width
+                     (6 * scaleFactor).toInt()   // Thin bar
+                 ).apply {
+                     setMargins(0, 0, 0, 0)
+                 }
+                 container.addView(progressView)
+            }
+            
+             if (graphView != null) {
+                 graphView.layoutParams = LinearLayout.LayoutParams(
+                     (50 * scaleFactor).toInt(), // Smaller width
+                     (20 * scaleFactor).toInt()  // Short height to fit in one line
+                 ).apply {
+                      setMargins(0, 0, 0, 0)
+                 }
+                 container.addView(graphView)
+             }
+             
+             contentLayout.addView(container)
+             
+             // Vertical Separator (Divider between items)
+             val separator = View(this).apply {
+                setBackgroundColor(0x40FFFFFF.toInt())
+                layoutParams = LinearLayout.LayoutParams(
+                    (1 * scaleFactor).toInt().coerceAtLeast(1),
+                    (16 * scaleFactor).toInt() // Height of separator
+                ).apply {
+                    setMargins((2 * scaleFactor).toInt(), 0, (2 * scaleFactor).toInt(), 0)
+                    gravity = Gravity.CENTER_VERTICAL
+                }
+            }
+            contentLayout.addView(separator)
+        }
+    }
+
     private fun startUpdatingStats() {
         job = CoroutineScope(Dispatchers.Main).launch {
             dashboardRepository.getDashboardMetrics().collect { metrics ->
@@ -422,115 +566,81 @@ class OverlayService : Service() {
                         "time" -> if (showTime) {
                             val timeFormat = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
                             val currentTime = timeFormat.format(Date())
-                            addTextView("Time: $currentTime", isBold = true)
-                            addSeparator()
+                            addMetricItem("Time: $currentTime", null, null, isBold = true)
                         }
                         "cpu" -> if (showCpu) {
                             val governorText = metrics.cpuGovernor?.let { " ($it)" } ?: ""
-                            addTextView("CPU: ${cpuUsage}%$governorText")
                             cpuProgressBar.progress = cpuUsage
-                            contentLayout.addView(cpuProgressBar)
-                            addSeparator()
+                            addMetricItem("CPU: ${cpuUsage}%$governorText", cpuProgressBar, null)
                         }
                         "cpuGraph" -> if (showCpuGraph && cpuHistory.isNotEmpty()) {
                             cpuGraphView.setData(cpuHistory.map { it.utilization })
-                            // Update layout params to handle potential scaleFactor changes
-                             cpuGraphView.layoutParams = LinearLayout.LayoutParams(
-                                LinearLayout.LayoutParams.MATCH_PARENT,
-                                (60 * scaleFactor).toInt()
-                            ).apply {
-                                setMargins(0, (4 * scaleFactor).toInt(), 0, (4 * scaleFactor).toInt())
-                            }
-                            contentLayout.addView(cpuGraphView)
-                            addSeparator()
+                            addMetricItem("CPU Graph", null, cpuGraphView)
                         }
                         "powerGraph" -> if (showPowerGraph) {
                              val data = if (powerHistory.isNotEmpty()) powerHistory.map { kotlin.math.abs(it.powerWatts) } else listOf(kotlin.math.abs(powerConsumption))
                              powerGraphView.setData(data)
-                             powerGraphView.layoutParams = LinearLayout.LayoutParams(
-                                LinearLayout.LayoutParams.MATCH_PARENT,
-                                (60 * scaleFactor).toInt()
-                            ).apply {
-                                setMargins(0, (4 * scaleFactor).toInt(), 0, (4 * scaleFactor).toInt())
-                            }
-                            contentLayout.addView(powerGraphView)
-                            addSeparator()
+                             addMetricItem("Power Graph", null, powerGraphView)
                         }
                         "fps" -> if (showFps) {
-                            addTextView("FPS: $fps")
-                            addSeparator()
+                            addMetricItem("FPS: $fps", null, null)
                         }
                         "fpsGraph" -> if (showFpsGraph && fpsHistory.isNotEmpty()) {
                             fpsGraphView.setData(fpsHistory.map { it.fps.toFloat() })
-                            fpsGraphView.layoutParams = LinearLayout.LayoutParams(
-                                LinearLayout.LayoutParams.MATCH_PARENT,
-                                (60 * scaleFactor).toInt()
-                            ).apply {
-                                setMargins(0, (4 * scaleFactor).toInt(), 0, (4 * scaleFactor).toInt())
-                            }
-                            contentLayout.addView(fpsGraphView)
-                            addSeparator()
+                            addMetricItem("FPS Graph", null, fpsGraphView)
                         }
                         "cpuFreq" -> if (showCpu && showCpuFreq && cpuCoreFrequencies.isNotEmpty()) {
-                            val freqBuilder = StringBuilder("Freq:")
-                            cpuCoreFrequencies.forEachIndexed { index, freq ->
-                                if (index % 2 == 0) freqBuilder.append("\n")
-                                else freqBuilder.append("  ")
-                                freqBuilder.append("Core $index:$freq")
+                            if (isHorizontal) {
+                                // Simplified concise format for horizontal mode
+                                val avgFreq = cpuCoreFrequencies.map { it.toFloat() }.average() / 1000.0
+                                addMetricItem("Freq: %.1f".format(avgFreq), null, null)
+                            } else {
+                                val freqBuilder = StringBuilder("Freq:")
+                                cpuCoreFrequencies.forEachIndexed { index, freq ->
+                                    if (index % 2 == 0) freqBuilder.append("\n")
+                                    else freqBuilder.append("  ")
+                                    freqBuilder.append("Core $index:$freq")
+                                }
+                                addMetricItem(freqBuilder.toString(), null, null)
                             }
-                            addTextView(freqBuilder.toString())
-                            addSeparator()
                         }
                         "cpuTemp" -> if (showCpuTemp) {
                             if (cpuTemperature > 0) {
-                                addTextView("CPU Temp: ${cpuTemperature}°C")
+                                addMetricItem("CPU Temp: ${cpuTemperature}°C", null, null)
                             } else {
-                                addTextView("CPU Temp: N/A")
+                                addMetricItem("CPU Temp: N/A", null, null)
                             }
-                            addSeparator()
                         }
                         "power" -> if (showPower) {
                             val powerText = if (powerConsumption > 0) "+%.2f".format(powerConsumption)
                                            else "%.2f".format(powerConsumption)
-                            addTextView("Power: ${powerText}W")
-                            addSeparator()
+                            addMetricItem("Power: ${powerText}W", null, null)
                         }
                         "battery" -> if (showBattery) {
-                            addTextView("Battery: ${batteryLevel}%")
                             batteryProgressBar.progress = batteryLevel
-                            contentLayout.addView(batteryProgressBar)
-                            addSeparator()
+                            addMetricItem("Battery: ${batteryLevel}%", batteryProgressBar, null)
                         }
                         "batteryTemp" -> if (showBatteryTemp) {
                             if (batteryTemperature > 0) {
-                                addTextView("Battery Temp: ${batteryTemperature}°C")
+                                addMetricItem("Battery Temp: ${batteryTemperature}°C", null, null)
                             } else {
-                                addTextView("Battery Temp: N/A")
+                                addMetricItem("Battery Temp: N/A", null, null)
                             }
-                            addSeparator()
                         }
                         "ram" -> if (showRam) {
                             val ramPercentage = if (ramTotalMb > 0) ((ramUsedMb.toFloat() / ramTotalMb) * 100).toInt() else 0
-                            addTextView("RAM: ${ramUsedMb}/${ramTotalMb} MB (${ramPercentage}%)")
-                            ramProgressBar.progress = ramPercentage
-                            contentLayout.addView(ramProgressBar)
-                            addSeparator()
+                            addMetricItem("RAM: ${ramUsedMb}/${ramTotalMb} MB", ramProgressBar, null, "(${ramPercentage}%)")
                         }
                         "swap" -> if (showSwap) {
                             val swapPercentage = if (swapTotalMb > 0) ((swapUsedMb.toFloat() / swapTotalMb) * 100).toInt() else 0
-                            addTextView("Swap: ${swapUsedMb}/${swapTotalMb} MB (${swapPercentage}%)")
-                            swapProgressBar.progress = swapPercentage
-                            contentLayout.addView(swapProgressBar)
-                            addSeparator()
+                            addMetricItem("Swap: ${swapUsedMb}/${swapTotalMb} MB", swapProgressBar, null, "(${swapPercentage}%)")
                         }
                         "network" -> if (showNetwork) {
-                            addTextView("↑ $netUpload   ↓ $netDownload")
-                            addSeparator()
+                            addMetricItem("↑ $netUpload   ↓ $netDownload", null, null)
                         }
                         "currentApp" -> if (showCurrentApp) {
                             val appName = getForegroundApp()
-                            addTextView("App: $appName")
-                            addSeparator()
+                            addMetricItem("App: $appName", null, null)
                         }
                     }
                 }
@@ -673,6 +783,16 @@ class OverlayService : Service() {
         params.height = WindowManager.LayoutParams.WRAP_CONTENT
         
         android.util.Log.d("OverlayService", "Updated overlay to WRAP_CONTENT dimensions")
+        
+        contentLayout.orientation = if (isHorizontal) LinearLayout.HORIZONTAL else LinearLayout.VERTICAL
+        
+        // Adjust padding for concise horizontal mode
+        if (isHorizontal) {
+            mainLayout.setPadding((8 * scaleFactor).toInt(), (4 * scaleFactor).toInt(), (8 * scaleFactor).toInt(), (4 * scaleFactor).toInt())
+        } else {
+            mainLayout.setPadding(16, 16, 16, 16)
+        }
+        
         windowManager.updateViewLayout(overlayView, params)
     }
 
