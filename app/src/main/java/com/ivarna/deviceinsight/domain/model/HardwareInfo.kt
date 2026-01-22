@@ -7,6 +7,19 @@ data class HardwareInfo(
     val brand: String,
     val board: String,
     val hardware: String,
+    val supportedAbis: List<String>,
+    val cpuCoreCount: Int,
+    
+    // Memory & Storage
+    val totalRam: Long,
+    val availableRam: Long,
+    val totalStorage: Long,
+    val availableStorage: Long,
+
+    // Network
+    val networkOperator: String,
+    val networkType: String,
+    val ipAddress: String,
     
     // OS
     val androidVersion: String,
@@ -14,6 +27,7 @@ data class HardwareInfo(
     val securityPatch: String,
     val kernelVersion: String,
     val buildId: String,
+    val isRooted: Boolean,
     val upTime: String,
     
     // Display
@@ -25,9 +39,15 @@ data class HardwareInfo(
     // Battery
     val batteryTechnology: String,
     val batteryHealth: String, // Good, Dead etc
+    val batteryLevel: Int,
+    val batteryStatus: String,
+    val batteryVoltage: Int,
+    val batteryTemperature: Float,
+    val isCharging: Boolean,
     val batteryCapacity: String, // Capacity if available
     
     // Sensors
     val sensorCount: Int,
-    val availableSensors: List<String>
+    val availableSensors: List<String>,
+    val fingerprintSensorPresent: Boolean
 )
