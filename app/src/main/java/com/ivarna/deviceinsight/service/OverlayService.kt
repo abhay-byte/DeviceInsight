@@ -22,6 +22,7 @@ import com.ivarna.deviceinsight.R
 import com.ivarna.deviceinsight.domain.model.CpuDataPoint
 import com.ivarna.deviceinsight.domain.repository.DashboardRepository
 import com.ivarna.deviceinsight.utils.CpuUtilizationUtils
+import com.ivarna.deviceinsight.service.overlay.OverlayGraphView
 import kotlinx.coroutines.*
 import dagger.hilt.android.AndroidEntryPoint
 import java.text.SimpleDateFormat
@@ -300,6 +301,7 @@ class OverlayService : Service() {
         }
 
         cpuGraphView = OverlayGraphView(this, "CPU %", android.graphics.Color.GREEN).apply {
+             scaleFactor = this@OverlayService.scaleFactor
              layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 (60 * scaleFactor).toInt()
@@ -309,6 +311,7 @@ class OverlayService : Service() {
         }
         
         powerGraphView = OverlayGraphView(this, "Power W", android.graphics.Color.YELLOW).apply {
+             scaleFactor = this@OverlayService.scaleFactor
              layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 (60 * scaleFactor).toInt()
@@ -318,6 +321,7 @@ class OverlayService : Service() {
         }
 
         fpsGraphView = OverlayGraphView(this, "FPS", android.graphics.Color.CYAN).apply {
+             scaleFactor = this@OverlayService.scaleFactor
              layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 (60 * scaleFactor).toInt()
@@ -566,34 +570,47 @@ class OverlayService : Service() {
                         "time" -> if (showTime) {
                             val timeFormat = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
                             val currentTime = timeFormat.format(Date())
-                            addMetricItem("Time: $currentTime", null, null, isBold = true)
+                            if (isHorizontal) {
+                                // Just show MM:SS or HH:MM
+                                addMetricItem(currentTime.takeLast(5), null, null, isBold = true)
+                            } else {
+                                addMetricItem("Time: $currentTime", null, null, isBold = true)
+                            }
                         }
                         "cpu" -> if (showCpu) {
                             val governorText = metrics.cpuGovernor?.let { " ($it)" } ?: ""
                             cpuProgressBar.progress = cpuUsage
-                            addMetricItem("CPU: ${cpuUsage}%$governorText", cpuProgressBar, null)
+                            if (isHorizontal) {
+                                addMetricItem("${cpuUsage}%".take(3), cpuProgressBar, null)
+                            } else {
+                                addMetricItem("CPU: ${cpuUsage}%$governorText", cpuProgressBar, null)
+                            }
                         }
                         "cpuGraph" -> if (showCpuGraph && cpuHistory.isNotEmpty()) {
                             cpuGraphView.setData(cpuHistory.map { it.utilization })
-                            addMetricItem("CPU Graph", null, cpuGraphView)
+                            addMetricItem(if (isHorizontal) "CPU" else "CPU Graph", null, cpuGraphView)
                         }
                         "powerGraph" -> if (showPowerGraph) {
                              val data = if (powerHistory.isNotEmpty()) powerHistory.map { kotlin.math.abs(it.powerWatts) } else listOf(kotlin.math.abs(powerConsumption))
                              powerGraphView.setData(data)
-                             addMetricItem("Power Graph", null, powerGraphView)
+                             addMetricItem(if (isHorizontal) "PWR" else "Power Graph", null, powerGraphView)
                         }
                         "fps" -> if (showFps) {
-                            addMetricItem("FPS: $fps", null, null)
+                            if (isHorizontal) {
+                                addMetricItem("$fps".take(3), null, null)
+                            } else {
+                                addMetricItem("FPS: $fps", null, null)
+                            }
                         }
                         "fpsGraph" -> if (showFpsGraph && fpsHistory.isNotEmpty()) {
                             fpsGraphView.setData(fpsHistory.map { it.fps.toFloat() })
-                            addMetricItem("FPS Graph", null, fpsGraphView)
+                            addMetricItem(if (isHorizontal) "FPS" else "FPS Graph", null, fpsGraphView)
                         }
                         "cpuFreq" -> if (showCpu && showCpuFreq && cpuCoreFrequencies.isNotEmpty()) {
                             if (isHorizontal) {
                                 // Simplified concise format for horizontal mode
                                 val avgFreq = cpuCoreFrequencies.map { it.toFloat() }.average() / 1000.0
-                                addMetricItem("Freq: %.1f".format(avgFreq), null, null)
+                                addMetricItem("%.1f".format(avgFreq).take(3), null, null)
                             } else {
                                 val freqBuilder = StringBuilder("Freq:")
                                 cpuCoreFrequencies.forEachIndexed { index, freq ->
@@ -605,42 +622,75 @@ class OverlayService : Service() {
                             }
                         }
                         "cpuTemp" -> if (showCpuTemp) {
-                            if (cpuTemperature > 0) {
-                                addMetricItem("CPU Temp: ${cpuTemperature}°C", null, null)
+                            if (isHorizontal) {
+                                addMetricItem("${cpuTemperature.toInt()}°".take(3), null, null)
                             } else {
-                                addMetricItem("CPU Temp: N/A", null, null)
+                                if (cpuTemperature > 0) {
+                                    addMetricItem("CPU Temp: ${cpuTemperature}°C", null, null)
+                                } else {
+                                    addMetricItem("CPU Temp: N/A", null, null)
+                                }
                             }
                         }
                         "power" -> if (showPower) {
                             val powerText = if (powerConsumption > 0) "+%.2f".format(powerConsumption)
                                            else "%.2f".format(powerConsumption)
-                            addMetricItem("Power: ${powerText}W", null, null)
+                            if (isHorizontal) {
+                                addMetricItem("%.1fW".format(powerConsumption).take(3), null, null)
+                            } else {
+                                addMetricItem("Power: ${powerText}W", null, null)
+                            }
                         }
                         "battery" -> if (showBattery) {
                             batteryProgressBar.progress = batteryLevel
-                            addMetricItem("Battery: ${batteryLevel}%", batteryProgressBar, null)
+                            if (isHorizontal) {
+                                addMetricItem("${batteryLevel}%".take(3), batteryProgressBar, null)
+                            } else {
+                                addMetricItem("Battery: ${batteryLevel}%", batteryProgressBar, null)
+                            }
                         }
                         "batteryTemp" -> if (showBatteryTemp) {
-                            if (batteryTemperature > 0) {
-                                addMetricItem("Battery Temp: ${batteryTemperature}°C", null, null)
+                            if (isHorizontal) {
+                                addMetricItem("${batteryTemperature.toInt()}°".take(3), null, null)
                             } else {
-                                addMetricItem("Battery Temp: N/A", null, null)
+                                if (batteryTemperature > 0) {
+                                    addMetricItem("Battery Temp: ${batteryTemperature}°C", null, null)
+                                } else {
+                                    addMetricItem("Battery Temp: N/A", null, null)
+                                }
                             }
                         }
                         "ram" -> if (showRam) {
                             val ramPercentage = if (ramTotalMb > 0) ((ramUsedMb.toFloat() / ramTotalMb) * 100).toInt() else 0
-                            addMetricItem("RAM: ${ramUsedMb}/${ramTotalMb} MB", ramProgressBar, null, "(${ramPercentage}%)")
+                            if (isHorizontal) {
+                                addMetricItem("${ramPercentage}%".take(3), ramProgressBar, null)
+                            } else {
+                                addMetricItem("RAM: ${ramUsedMb}/${ramTotalMb} MB", ramProgressBar, null, "(${ramPercentage}%)")
+                            }
                         }
                         "swap" -> if (showSwap) {
                             val swapPercentage = if (swapTotalMb > 0) ((swapUsedMb.toFloat() / swapTotalMb) * 100).toInt() else 0
-                            addMetricItem("Swap: ${swapUsedMb}/${swapTotalMb} MB", swapProgressBar, null, "(${swapPercentage}%)")
+                            if (isHorizontal) {
+                                addMetricItem("${swapPercentage}%".take(3), swapProgressBar, null)
+                            } else {
+                                addMetricItem("Swap: ${swapUsedMb}/${swapTotalMb} MB", swapProgressBar, null, "(${swapPercentage}%)")
+                            }
                         }
                         "network" -> if (showNetwork) {
-                            addMetricItem("↑ $netUpload   ↓ $netDownload", null, null)
+                            if (isHorizontal) {
+                                // Combine or just show one
+                                addMetricItem(netDownload.take(3), null, null)
+                            } else {
+                                addMetricItem("↑ $netUpload   ↓ $netDownload", null, null)
+                            }
                         }
                         "currentApp" -> if (showCurrentApp) {
                             val appName = getForegroundApp()
-                            addMetricItem("App: $appName", null, null)
+                            if (isHorizontal) {
+                                addMetricItem(appName.take(3), null, null)
+                            } else {
+                                addMetricItem("App: $appName", null, null)
+                            }
                         }
                     }
                 }
@@ -793,99 +843,42 @@ class OverlayService : Service() {
             mainLayout.setPadding(16, 16, 16, 16)
         }
         
+        // Update graph views scale factor
+        if (::cpuGraphView.isInitialized) cpuGraphView.scaleFactor = scaleFactor
+        if (::powerGraphView.isInitialized) powerGraphView.scaleFactor = scaleFactor
+        if (::fpsGraphView.isInitialized) fpsGraphView.scaleFactor = scaleFactor
+        
+        // Note: Progress bars and other views layout params are recreated when added in addMetricItem
+        // but we should update their base layout params here if they are reused directly or if addMetricItem relies on current instances
+        
+        // Update existing progress bars layout params just in case they are currently attached or will be re-attached
+        val progressHeight = (8 * scaleFactor).toInt()
+        val progressMargin = (4 * scaleFactor).toInt()
+        val progressParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, 
+            progressHeight
+        ).apply {
+            setMargins(0, progressMargin, 0, progressMargin)
+        }
+        
+        if (::cpuProgressBar.isInitialized) {
+            cpuProgressBar.layoutParams = LinearLayout.LayoutParams(progressParams)
+            cpuProgressBar.scaleY = 1.5f * scaleFactor
+        }
+        if (::batteryProgressBar.isInitialized) {
+            batteryProgressBar.layoutParams = LinearLayout.LayoutParams(progressParams)
+            batteryProgressBar.scaleY = 1.5f * scaleFactor
+        }
+        if (::ramProgressBar.isInitialized) {
+            ramProgressBar.layoutParams = LinearLayout.LayoutParams(progressParams)
+            ramProgressBar.scaleY = 1.5f * scaleFactor
+        }
+        if (::swapProgressBar.isInitialized) {
+            swapProgressBar.layoutParams = LinearLayout.LayoutParams(progressParams)
+            swapProgressBar.scaleY = 1.5f * scaleFactor
+        }
+
         windowManager.updateViewLayout(overlayView, params)
-    }
-
-    private inner class OverlayGraphView(context: Context, val label: String, val color: Int) : View(context) {
-        private val density = context.resources.displayMetrics.density
-        
-        private val linePaint = android.graphics.Paint().apply {
-            this.color = this@OverlayGraphView.color
-            style = android.graphics.Paint.Style.STROKE
-            isAntiAlias = true
-        }
-        
-        private val textPaint = android.graphics.Paint().apply {
-            color = android.graphics.Color.WHITE
-            isAntiAlias = true
-            setShadowLayer(1f, 1f, 1f, android.graphics.Color.BLACK)
-        }
-
-        private val borderPaint = android.graphics.Paint().apply {
-            color = 0x80FFFFFF.toInt() // Semi-transparent white
-            style = android.graphics.Paint.Style.STROKE
-            isAntiAlias = true
-        }
-        
-        private var points: List<Float> = emptyList()
-
-        fun setData(newPoints: List<Float>) {
-            points = newPoints
-            invalidate() // Redraw
-        }
-
-        override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-            val desiredHeight = (60 * scaleFactor).toInt()
-            val width = MeasureSpec.getSize(widthMeasureSpec)
-            setMeasuredDimension(width, desiredHeight)
-        }
-
-        override fun onDraw(canvas: android.graphics.Canvas) {
-            super.onDraw(canvas)
-            
-            // Update paints based on current scaleFactor
-            linePaint.strokeWidth = 2f * density * scaleFactor
-            textPaint.textSize = 14f * density * scaleFactor
-            borderPaint.strokeWidth = 1f * density * scaleFactor
-
-            // Draw a semi-transparent background for the graph area
-            canvas.drawColor(0x20000000) 
-            
-            // Draw border
-            canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), borderPaint)
-            
-            // Draw label with padding
-            val padding = 4f * density * scaleFactor
-            val textY = textPaint.textSize + padding/2
-            canvas.drawText(label, padding, textY, textPaint)
-            
-            if (points.isEmpty()) return
-            
-            // We want to show last 60 points or so
-            val maxPoints = 60
-            val displayPoints = if (points.size > maxPoints) points.takeLast(maxPoints) else points
-            
-            if (displayPoints.size < 2) return
-
-            val path = android.graphics.Path()
-            val w = width.toFloat()
-            val h = height.toFloat()
-            // Step X to fill the width
-            val stepX = w / (points.size - 1).coerceAtLeast(1)
-            
-            // Find max value for scaling Y, default to 100 for percentage
-            val maxY = if (label.contains("%")) 100f else (points.maxOrNull() ?: 10f).coerceAtLeast(0.1f) * 1.2f
-
-            displayPoints.forEachIndexed { index, value ->
-                val x = index * stepX
-                
-                // Add padding to Y to avoid drawing on edges (margin)
-                val graphHeight = h * 0.9f 
-                val yOffset = h * 0.05f 
-                
-                // Map value 0..maxY to graphHeight..0
-                val ratio = (value / maxY).coerceIn(0f, 1f)
-                val y = (h - yOffset) - (ratio * graphHeight)
-                
-                if (index == 0) {
-
-                    path.moveTo(x, y)
-                } else {
-                    path.lineTo(x, y)
-                }
-            }
-            canvas.drawPath(path, linePaint)
-        }
     }
 
     private fun getForegroundApp(): String {
