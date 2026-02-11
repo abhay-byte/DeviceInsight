@@ -7,6 +7,9 @@ data class HardwareInfo(
     val brand: String,
     val board: String,
     val hardware: String,
+    val product: String,
+    val serial: String,
+    val deviceType: String,
     val supportedAbis: List<String>,
     val cpuCoreCount: Int,
     
@@ -15,6 +18,8 @@ data class HardwareInfo(
     val availableRam: Long,
     val totalStorage: Long,
     val availableStorage: Long,
+    val totalExternalStorage: Long,
+    val availableExternalStorage: Long,
 
     // Network
     val networkOperator: String,
@@ -29,6 +34,21 @@ data class HardwareInfo(
     val buildId: String,
     val isRooted: Boolean,
     val upTime: String,
+    
+    // CPU Details
+    val socModel: String,
+    val cpuArchitecture: String,
+    val manufacturingProcess: String,
+    val cpuRevision: String,
+    val cpuClockRange: String,
+    val cpuUtilization: Float,
+    val coreClocks: List<Int>,
+    val supported64BitAbis: List<String>,
+    val hasAes: Boolean,
+    val hasNeon: Boolean,
+    val hasPmull: Boolean,
+    val hasSha1: Boolean,
+    val hasSha2: Boolean,
     
     // Display
     val resolution: String,
