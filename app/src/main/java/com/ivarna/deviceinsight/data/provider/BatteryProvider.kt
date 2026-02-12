@@ -48,7 +48,14 @@ class BatteryProvider @Inject constructor(
         } else "Unknown"
 
         val cycles = if (Build.VERSION.SDK_INT >= 34) {
-            batteryManager.getIntProperty(8) // 8 is BATTERY_PROPERTY_CYCLE_COUNT
+            try {
+                batteryManager.getIntProperty(8) // 8 is BATTERY_PROPERTY_CYCLE_COUNT
+            } catch (e: SecurityException) {
+                // Some devices require BATTERY_STATS which is a signature permission
+                intent?.getIntExtra("cycle_count", -1) ?: -1
+            } catch (e: Exception) {
+                -1
+            }
         } else {
             intent?.getIntExtra("cycle_count", -1) ?: -1 // Some OEMs use this extra
         }
