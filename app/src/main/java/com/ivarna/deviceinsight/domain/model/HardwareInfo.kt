@@ -94,5 +94,6 @@ data class HardwareInfo(
     val androidDetailedInfo: AndroidDetailedInfo,
     val cameras: List<CameraInfo>,
     val usbDevices: List<UsbDeviceInfo>,
-    val thermalSensors: List<ThermalSensor>
+    val thermalSensors: List<ThermalSensor>,
+    val directoryInfo: DirectoryInfo
 )

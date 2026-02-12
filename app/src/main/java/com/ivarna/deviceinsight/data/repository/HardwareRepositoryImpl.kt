@@ -22,7 +22,8 @@ class HardwareRepositoryImpl @Inject constructor(
     private val gpuProvider: GpuProvider,
     private val cameraProvider: CameraProvider,
     private val usbProvider: UsbProvider,
-    private val thermalProvider: ThermalProvider
+    private val thermalProvider: ThermalProvider,
+    private val directoryProvider: DirectoryProvider
 ) : HardwareRepository {
 
     override fun getHardwareInfo(): HardwareInfo {
@@ -117,7 +118,8 @@ class HardwareRepositoryImpl @Inject constructor(
             androidDetailedInfo = deviceProvider.getAndroidDetailedInfo(),
             cameras = cameraProvider.getCameraInfo(),
             usbDevices = usbProvider.getUsbDevices(),
-            thermalSensors = thermalProvider.getThermalSensors()
+            thermalSensors = thermalProvider.getThermalSensors(),
+            directoryInfo = directoryProvider.getDirectoryInfo()
         )
     }
 }

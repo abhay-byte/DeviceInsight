@@ -16,6 +16,7 @@ import com.ivarna.deviceinsight.data.provider.BatteryProvider
 import com.ivarna.deviceinsight.data.provider.CameraProvider
 import com.ivarna.deviceinsight.data.provider.CpuProvider
 import com.ivarna.deviceinsight.data.provider.DeviceProvider
+import com.ivarna.deviceinsight.data.provider.DirectoryProvider
 import com.ivarna.deviceinsight.data.provider.DisplayProvider
 import com.ivarna.deviceinsight.data.provider.GpuProvider
 import com.ivarna.deviceinsight.data.provider.MemoryProvider
@@ -160,7 +161,8 @@ object AppModule {
         gpuProvider: GpuProvider,
         cameraProvider: CameraProvider,
         usbProvider: UsbProvider,
-        thermalProvider: ThermalProvider
+        thermalProvider: ThermalProvider,
+        directoryProvider: DirectoryProvider
     ): HardwareRepository {
         return HardwareRepositoryImpl(
             context,
@@ -176,7 +178,8 @@ object AppModule {
             gpuProvider,
             cameraProvider,
             usbProvider,
-            thermalProvider
+            thermalProvider,
+            directoryProvider
         )
     }
 
