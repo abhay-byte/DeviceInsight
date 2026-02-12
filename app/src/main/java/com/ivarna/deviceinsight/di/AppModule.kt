@@ -3,9 +3,11 @@ package com.ivarna.deviceinsight.di
 import android.content.Context
 import com.ivarna.deviceinsight.data.repository.DashboardRepositoryImpl
 import com.ivarna.deviceinsight.data.repository.HardwareRepositoryImpl
+import com.ivarna.deviceinsight.data.repository.SettingsRepositoryImpl
 import com.ivarna.deviceinsight.data.repository.TaskRepositoryImpl
 import com.ivarna.deviceinsight.domain.repository.DashboardRepository
 import com.ivarna.deviceinsight.domain.repository.HardwareRepository
+import com.ivarna.deviceinsight.domain.repository.SettingsRepository
 import com.ivarna.deviceinsight.domain.repository.TaskRepository
 import com.ivarna.deviceinsight.utils.CpuUtilizationUtils
 import com.ivarna.deviceinsight.utils.DisplayRefreshRateUtils
@@ -189,5 +191,13 @@ object AppModule {
         @ApplicationContext context: Context
     ): TaskRepository {
         return TaskRepositoryImpl(context)
+    }
+
+    @Provides
+    @Singleton
+    fun provideSettingsRepository(
+        @ApplicationContext context: Context
+    ): SettingsRepository {
+        return SettingsRepositoryImpl(context)
     }
 }

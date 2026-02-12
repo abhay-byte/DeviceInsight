@@ -95,9 +95,8 @@ fun SystemStatsApp() {
     val context = LocalContext.current
     val hazeState = remember { HazeState() }
     
-    SystemStatsTheme(theme = AppTheme.TechNoir) {
-        val navController = rememberNavController()
-        val bottomNavItems = listOf(
+    val navController = rememberNavController()
+    val bottomNavItems = listOf(
             Screen.Dashboard,
             Screen.Tasks,
             Screen.Hardware,
