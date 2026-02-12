@@ -39,8 +39,8 @@ class DeviceProvider @Inject constructor(
         val timeZoneStr = "${tz.displayName} (${getFormattedOffset(tz.rawOffset)})"
 
         // ICU Info
-        val icuVersion = if (Build.VERSION.SDK_INT >= 24) android.icu.util.VersionInfo.ICU_VERSION.toString() else "76.1"
-        val icuUnicode = if (Build.VERSION.SDK_INT >= 24) android.icu.util.VersionInfo.UNICODE_VERSION.toString() else "16.0"
+        val icuVersion = "76.1"
+        val icuUnicode = "16.0"
         
         return AndroidDetailedInfo(
             androidVersion = "${Build.VERSION.RELEASE} (${getAndroidCodename()})",
