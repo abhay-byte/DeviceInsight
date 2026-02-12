@@ -12,8 +12,8 @@ fun SystemTab(info: HardwareInfo) {
     val context = LocalContext.current
     
     Column {
-        InfoSection(title = "System") {
-            InfoRow("Device Model", "${info.brand.capitalizeWords()} ${info.model}")
+        InfoSection(title = "Device") {
+            InfoRow("Device Model", info.deviceModelName)
             InfoRow("Device Type", info.deviceType)
             InfoRow("Manufacturer", info.manufacturer)
             InfoRow("Model", info.model)
@@ -21,12 +21,13 @@ fun SystemTab(info: HardwareInfo) {
             InfoRow("Board", info.board)
             InfoRow("Device", info.deviceName)
             InfoRow("Hardware", info.hardware)
+            InfoRow("Platform", info.platform)
             InfoRow("Product", info.product)
             InfoRow("Serial", info.serial)
         }
 
         InfoSection(title = "Memory") {
-            InfoRow("Installed RAM", FormattingUtils.formatInstalledRam(info.totalRam))
+            InfoRow("Installed RAM", info.installedRam)
             InfoRow("Total Memory", FormattingUtils.formatMemorySize(info.totalRam))
             InfoRow("Available Memory", FormattingUtils.formatMemorySize(info.availableRam))
         }
@@ -36,10 +37,13 @@ fun SystemTab(info: HardwareInfo) {
             InfoRow("Free Space", FormattingUtils.formatFileSize(info.availableStorage))
         }
 
-        if (info.totalExternalStorage > 0) {
-            InfoSection(title = "External Storage") {
-                InfoRow("Total Space", FormattingUtils.formatFileSize(info.totalExternalStorage))
-                InfoRow("Free Space", FormattingUtils.formatFileSize(info.availableExternalStorage))
+        InfoSection(title = "Connectivity") {
+            InfoRow("Bluetooth Version", info.bluetoothVersion)
+        }
+
+        InfoSection(title = "Device Features") {
+            info.deviceFeatures.forEach { feature ->
+                InfoRow(feature.replace("android.hardware.", "").replace("android.software.", ""), "Yes")
             }
         }
 

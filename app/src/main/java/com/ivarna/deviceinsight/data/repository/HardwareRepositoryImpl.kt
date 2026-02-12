@@ -30,17 +30,20 @@ class HardwareRepositoryImpl @Inject constructor(
         
         return HardwareInfo(
             deviceName = Build.DEVICE,
+            deviceModelName = deviceProvider.getDeviceModelName(),
             model = Build.MODEL,
             manufacturer = Build.MANUFACTURER,
             brand = Build.BRAND,
             board = Build.BOARD,
             hardware = Build.HARDWARE,
+            platform = deviceProvider.getPlatform(),
             product = Build.PRODUCT,
             serial = deviceProvider.getSerial(),
             deviceType = deviceProvider.getDeviceType(),
             supportedAbis = Build.SUPPORTED_ABIS.toList(),
             cpuCoreCount = Runtime.getRuntime().availableProcessors(),
             
+            installedRam = memoryProvider.getInstalledRamString(),
             totalRam = memInfo.first,
             availableRam = memInfo.second,
             totalStorage = storageInfo.first,
@@ -90,7 +93,10 @@ class HardwareRepositoryImpl @Inject constructor(
             
             sensorCount = sensorProvider.getSensorCount(),
             availableSensors = sensorProvider.getSensorList(),
-            fingerprintSensorPresent = sensorProvider.hasFingerprintSensor()
+            fingerprintSensorPresent = sensorProvider.hasFingerprintSensor(),
+            
+            bluetoothVersion = deviceProvider.getBluetoothVersion(),
+            deviceFeatures = deviceProvider.getDeviceFeatures()
         )
     }
 }

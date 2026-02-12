@@ -1,12 +1,14 @@
 package com.ivarna.deviceinsight.domain.model
 
 data class HardwareInfo(
-    val deviceName: String,
+    val deviceName: String, // e.g. "duchamp"
+    val deviceModelName: String, // e.g. "Poco X6 Pro"
     val model: String,
     val manufacturer: String,
     val brand: String,
     val board: String,
     val hardware: String,
+    val platform: String,
     val product: String,
     val serial: String,
     val deviceType: String,
@@ -14,6 +16,7 @@ data class HardwareInfo(
     val cpuCoreCount: Int,
     
     // Memory & Storage
+    val installedRam: String, // e.g. "8 GB LPDDR5X"
     val totalRam: Long,
     val availableRam: Long,
     val totalStorage: Long,
@@ -69,5 +72,9 @@ data class HardwareInfo(
     // Sensors
     val sensorCount: Int,
     val availableSensors: List<String>,
-    val fingerprintSensorPresent: Boolean
+    val fingerprintSensorPresent: Boolean,
+    
+    // Additional System Info
+    val bluetoothVersion: String,
+    val deviceFeatures: List<String>
 )
