@@ -91,5 +91,7 @@ data class HardwareInfo(
     val gpuDetailedInfo: GpuDetailedInfo,
     val networkDetailedInfo: NetworkDetailedInfo,
     val batteryDetailedInfo: BatteryDetailedInfo,
-    val androidDetailedInfo: AndroidDetailedInfo
+    val androidDetailedInfo: AndroidDetailedInfo,
+    val cameras: List<CameraInfo>,
+    val usbDevices: List<UsbDeviceInfo>
 )

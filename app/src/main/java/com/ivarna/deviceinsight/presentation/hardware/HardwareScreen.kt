@@ -18,7 +18,7 @@ fun HardwareScreen(
     viewModel: HardwareViewModel = hiltViewModel()
 ) {
     val hardwareInfo by viewModel.hardwareInfo.collectAsStateWithLifecycle()
-    val tabs = listOf("System", "CPU", "Display", "GPU", "Network", "Battery", "Android", "Sensors")
+    val tabs = listOf("System", "CPU", "Display", "GPU", "Network", "Battery", "Android", "Devices", "Sensors")
     var selectedTabIndex by remember { mutableIntStateOf(0) }
 
     Column(
@@ -74,7 +74,8 @@ fun HardwareScreen(
                             4 -> NetworkTab(info)
                             5 -> BatteryTab(info)
                             6 -> AndroidTab(info)
-                            7 -> SensorsTab(info)
+                            7 -> DevicesTab(info)
+                            8 -> SensorsTab(info)
                         }
                     }
                     
