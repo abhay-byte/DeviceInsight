@@ -155,7 +155,9 @@ object AppModule {
         sensorProvider: SensorProvider,
         securityProvider: SecurityProvider,
         cpuProvider: CpuProvider,
-        gpuProvider: GpuProvider
+        gpuProvider: GpuProvider,
+        cameraProvider: CameraProvider,
+        usbProvider: UsbProvider
     ): HardwareRepository {
         return HardwareRepositoryImpl(
             context,
@@ -168,7 +170,9 @@ object AppModule {
             sensorProvider,
             securityProvider,
             cpuProvider,
-            gpuProvider
+            gpuProvider,
+            cameraProvider,
+            usbProvider
         )
     }
 
