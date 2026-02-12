@@ -97,17 +97,17 @@ fun SystemStatsApp() {
     
     val navController = rememberNavController()
     val bottomNavItems = listOf(
-            Screen.Dashboard,
-            Screen.Tasks,
-            Screen.Hardware,
-            Screen.Overlay
-        )
+        Screen.Dashboard,
+        Screen.Tasks,
+        Screen.Hardware,
+        Screen.Overlay
+    )
 
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background)
-        ) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+    ) {
             // Constant ambient background glows for all screens
             Box(
                 modifier = Modifier
