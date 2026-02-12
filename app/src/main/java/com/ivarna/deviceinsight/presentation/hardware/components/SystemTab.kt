@@ -46,38 +46,5 @@ fun SystemTab(info: HardwareInfo) {
                 InfoRow(feature.replace("android.hardware.", "").replace("android.software.", ""), "Yes")
             }
         }
-
-        val android = info.androidDetailedInfo
-
-        InfoSection(title = "Android OS") {
-            InfoRow("Android Version", android.androidVersion)
-            InfoRow("API Level", android.apiLevel.toString())
-            InfoRow("Security Patch", android.securityPatch)
-            InfoRow("Rooted Device", if (android.isRooted) "Yes" else "No")
-            InfoRow("Android ID", android.androidId)
-            InfoRow("Baseband", android.baseband)
-            InfoRow("Build ID", android.buildId)
-            InfoRow("Codename", android.codename)
-            InfoRow("Fingerprint", android.fingerprint)
-            InfoRow("ID", android.id)
-            InfoRow("Incremental", android.incremental)
-            InfoRow("Java Runtime", android.javaRuntimeVersion)
-            InfoRow("Java VM", android.javaVmVersion)
-            InfoRow("Java VM Heap", android.javaVmHeapSize)
-            InfoRow("Kernel Arch", android.kernelArchitecture)
-            InfoRow("Kernel Version", android.kernelVersion)
-            InfoRow("Tags", android.tags)
-            InfoRow("Type", android.type)
-            InfoRow("Google Play Services", android.gmsVersion)
-            InfoRow("Huawei Services", android.hmsVersion)
-            InfoRow("OpenSSL Version", android.openSslVersion)
-            InfoRow("ZLib Version", android.zLibVersion)
-            InfoRow("ICU CLDR Version", android.icuCldrVersion)
-            InfoRow("ICU Library Version", android.icuLibraryVersion)
-            InfoRow("ICU Unicode Version", android.icuUnicodeVersion)
-            InfoRow("Android Language", android.androidLanguage)
-            InfoRow("Time Zone", android.configuredTimeZone)
-            InfoRow("UpTime", android.upTime)
-        }
     }
 }
