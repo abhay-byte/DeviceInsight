@@ -20,20 +20,39 @@ class CameraProvider @Inject constructor(
 
     fun getCameraInfo(): List<CameraInfo> {
         val cameras = mutableListOf<CameraInfo>()
+        val rearCounter = mutableMapOf<Int, Int>() // Track index per facing
+        
         try {
             val ids = cameraManager.cameraIdList
+            val facingCounts = mutableMapOf<String, Int>()
+
             for (id in ids) {
                 val chars = cameraManager.getCameraCharacteristics(id)
                 
-                val facing = when (chars.get(CameraCharacteristics.LENS_FACING)) {
+                val facingType = when (chars.get(CameraCharacteristics.LENS_FACING)) {
                     CameraCharacteristics.LENS_FACING_FRONT -> "Front-Facing"
                     CameraCharacteristics.LENS_FACING_BACK -> "Rear-Facing"
                     CameraCharacteristics.LENS_FACING_EXTERNAL -> "External"
                     else -> "Unknown"
                 }
 
+                // Increment counter for this facing type
+                val currentCount = (facingCounts[facingType] ?: 0) + 1
+                facingCounts[facingType] = currentCount
+                
+                val displayName = if (currentCount == 1) {
+                    "$facingType Camera"
+                } else {
+                    "$facingType Camera #$currentCount"
+                }
+
                 val configs = chars.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
-                val resolution = configs?.getOutputSizes(ImageFormat.JPEG)?.maxByOrNull { it.width * it.height }?.let {
+                val jpegSizes = configs?.getOutputSizes(ImageFormat.JPEG)
+                
+                // Skip cameras that don't support JPEG (internal/logical-only often don't)
+                if (jpegSizes.isNullOrEmpty()) continue
+
+                val resolution = jpegSizes.maxByOrNull { it.width * it.height }?.let {
                     val mp = (it.width * it.height / 1_000_000f).roundToInt()
                     "$mp MP (${it.width} × ${it.height})"
                 } ?: "Unknown"
@@ -74,7 +93,7 @@ class CameraProvider @Inject constructor(
                 cameras.add(
                     CameraInfo(
                         id = id,
-                        facing = facing,
+                        facing = displayName,
                         resolution = resolution,
                         videoResolution = videoResolution,
                         focalLength = focalLengthStr,
