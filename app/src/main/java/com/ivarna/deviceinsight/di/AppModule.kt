@@ -13,6 +13,7 @@ import com.ivarna.deviceinsight.data.fps.FpsMonitor
 import com.ivarna.deviceinsight.data.mapper.GpuMapper
 import com.ivarna.deviceinsight.data.mapper.SocMapper
 import com.ivarna.deviceinsight.data.provider.BatteryProvider
+import com.ivarna.deviceinsight.data.provider.CameraProvider
 import com.ivarna.deviceinsight.data.provider.CpuProvider
 import com.ivarna.deviceinsight.data.provider.DeviceProvider
 import com.ivarna.deviceinsight.data.provider.DisplayProvider
@@ -25,6 +26,7 @@ import com.ivarna.deviceinsight.data.provider.SecurityProvider
 import com.ivarna.deviceinsight.data.provider.SensorProvider
 import com.ivarna.deviceinsight.data.provider.StorageProvider
 import com.ivarna.deviceinsight.data.provider.ThermalProvider
+import com.ivarna.deviceinsight.data.provider.UsbProvider
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
