@@ -16,7 +16,7 @@ fun DevicesTab(info: HardwareInfo) {
     Column(modifier = Modifier.padding(bottom = 16.dp)) {
         // Camera Section
         info.cameras.forEach { camera ->
-            InfoSection(title = "<< ${camera.facing} >>") {
+            InfoSection(title = camera.facing) {
                 InfoRow("Resolution", camera.resolution)
                 InfoRow("Video Resolution", camera.videoResolution)
                 InfoRow("Focal Length", camera.focalLength)
@@ -33,7 +33,7 @@ fun DevicesTab(info: HardwareInfo) {
 
         // USB Section
         info.usbDevices.forEach { usb ->
-            InfoSection(title = "<< USB Device - ${usb.productName} >>") {
+            InfoSection(title = "USB Device - ${usb.productName}") {
                 InfoRow("Manufacturer", usb.manufacturerName)
                 InfoRow("Product", usb.productName)
                 InfoRow("Serial", usb.serialNumber)
