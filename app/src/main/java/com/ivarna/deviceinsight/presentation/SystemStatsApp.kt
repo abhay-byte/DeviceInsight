@@ -204,7 +204,6 @@ fun SystemStatsApp() {
                 )
             }
         }
-    }
 }
 
 @Composable

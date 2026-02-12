@@ -9,11 +9,11 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.core.app.ActivityCompat
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ivarna.deviceinsight.presentation.SystemStatsApp
 import com.ivarna.deviceinsight.presentation.settings.SettingsViewModel
 import com.ivarna.deviceinsight.presentation.theme.SystemStatsTheme
@@ -31,7 +31,7 @@ class MainActivity : ComponentActivity() {
         requestPermissions()
         
         setContent {
-            val currentTheme by settingsViewModel.theme.collectAsState()
+            val currentTheme by settingsViewModel.theme.collectAsStateWithLifecycle()
 
             SystemStatsTheme(theme = currentTheme) {
                 Surface(

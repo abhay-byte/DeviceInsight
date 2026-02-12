@@ -16,7 +16,12 @@ enum class AppTheme {
     Cyberpunk,
     DeepOcean,
     Matrix,
-    Dracula
+    Dracula,
+    SunsetMirage,
+    ForestSpirit,
+    NeonNights,
+    NordicIce,
+    GoldenLuxe
 }
 
 // Tech Noir Scheme
@@ -69,6 +74,56 @@ private val DraculaScheme = darkColorScheme(
     error = TechNoirError
 )
 
+// Sunset Mirage Scheme
+private val SunsetScheme = darkColorScheme(
+    primary = SunsetPrimary,
+    secondary = SunsetSecondary,
+    tertiary = SunsetTertiary,
+    background = SunsetBackground,
+    surface = SunsetSurface,
+    error = TechNoirError
+)
+
+// Forest Spirit Scheme
+private val ForestScheme = darkColorScheme(
+    primary = ForestPrimary,
+    secondary = ForestSecondary,
+    tertiary = ForestTertiary,
+    background = ForestBackground,
+    surface = ForestSurface,
+    error = TechNoirError
+)
+
+// Neon Nights Scheme
+private val NeonNightsScheme = darkColorScheme(
+    primary = NeonNightsPrimary,
+    secondary = NeonNightsSecondary,
+    tertiary = NeonNightsTertiary,
+    background = NeonNightsBackground,
+    surface = NeonNightsSurface,
+    error = TechNoirError
+)
+
+// Nordic Ice Scheme
+private val NordicScheme = darkColorScheme(
+    primary = NordicPrimary,
+    secondary = NordicSecondary,
+    tertiary = NordicTertiary,
+    background = NordicBackground,
+    surface = NordicSurface,
+    error = TechNoirError
+)
+
+// Golden Luxe Scheme
+private val LuxeScheme = darkColorScheme(
+    primary = LuxePrimary,
+    secondary = LuxeSecondary,
+    tertiary = LuxeTertiary,
+    background = LuxeBackground,
+    surface = LuxeSurface,
+    error = TechNoirError
+)
+
 @Composable
 fun SystemStatsTheme(
     theme: AppTheme = AppTheme.TechNoir, // Default to TechNoir
@@ -80,6 +135,11 @@ fun SystemStatsTheme(
         AppTheme.DeepOcean -> OceanScheme
         AppTheme.Matrix -> MatrixScheme
         AppTheme.Dracula -> DraculaScheme
+        AppTheme.SunsetMirage -> SunsetScheme
+        AppTheme.ForestSpirit -> ForestScheme
+        AppTheme.NeonNights -> NeonNightsScheme
+        AppTheme.NordicIce -> NordicScheme
+        AppTheme.GoldenLuxe -> LuxeScheme
     }
     
     val view = LocalView.current

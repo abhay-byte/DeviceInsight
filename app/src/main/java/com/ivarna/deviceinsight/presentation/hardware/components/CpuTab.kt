@@ -3,12 +3,11 @@ package com.ivarna.deviceinsight.presentation.hardware.components
 import androidx.compose.foundation.layout.Column
 import androidx.compose.runtime.Composable
 import com.ivarna.deviceinsight.domain.model.HardwareInfo
-import com.ivarna.deviceinsight.utils.FormattingUtils
 
 @Composable
 fun CpuTab(info: HardwareInfo) {
     Column {
-        InfoSection(title = "SoC (System on Chip)") {
+        InfoSection(title = "SoC System on Chip") {
             InfoRow("SoC Model", info.socModel)
             InfoRow("Core Architecture", info.cpuArchitecture)
             InfoRow("Manufacturing Process", info.manufacturingProcess)

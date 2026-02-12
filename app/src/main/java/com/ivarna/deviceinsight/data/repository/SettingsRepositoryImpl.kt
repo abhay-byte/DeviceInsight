@@ -23,17 +23,30 @@ class SettingsRepositoryImpl @Inject constructor(
         val listener = SharedPreferences.OnSharedPreferenceChangeListener { sharedPreferences, key ->
             if (key == "app_theme") {
                 val themeName = sharedPreferences.getString(key, AppTheme.TechNoir.name)
-                trySend(AppTheme.valueOf(themeName ?: AppTheme.TechNoir.name))
+                val theme = try {
+                    AppTheme.valueOf(themeName ?: AppTheme.TechNoir.name)
+                } catch (e: Exception) {
+                    AppTheme.TechNoir
+                }
+                trySend(theme)
             }
         }
+        
         prefs.registerOnSharedPreferenceChangeListener(listener)
+        
+        // Initial value
+        val initialThemeName = prefs.getString("app_theme", AppTheme.TechNoir.name)
+        val initialTheme = try {
+            AppTheme.valueOf(initialThemeName ?: AppTheme.TechNoir.name)
+        } catch (e: Exception) {
+            AppTheme.TechNoir
+        }
+        trySend(initialTheme)
+        
         awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
-    }.onStart {
-        val themeName = prefs.getString("app_theme", AppTheme.TechNoir.name)
-        emit(AppTheme.valueOf(themeName ?: AppTheme.TechNoir.name))
     }
 
     override suspend fun setTheme(theme: AppTheme) {
-        prefs.edit().putString("app_theme", theme.name).apply()
+        prefs.edit().putString("app_theme", theme.name).commit()
     }
 }

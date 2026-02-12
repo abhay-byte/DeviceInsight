@@ -1,18 +1,23 @@
 package com.ivarna.deviceinsight.presentation.settings
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.ivarna.deviceinsight.presentation.components.GlassCard
-import com.ivarna.deviceinsight.presentation.theme.AppTheme
+import com.ivarna.deviceinsight.presentation.theme.*
 
 @Composable
 fun SettingsScreen(
@@ -51,7 +56,7 @@ fun SettingsScreen(
                         Row(
                             Modifier
                                 .fillMaxWidth()
-                                .height(56.dp)
+                                .height(64.dp)
                                 .clip(MaterialTheme.shapes.medium)
                                 .selectable(
                                     selected = (theme == currentTheme),
@@ -63,14 +68,27 @@ fun SettingsScreen(
                         ) {
                             RadioButton(
                                 selected = (theme == currentTheme),
-                                onClick = null
+                                onClick = null,
+                                colors = RadioButtonDefaults.colors(
+                                    selectedColor = MaterialTheme.colorScheme.primary
+                                )
                             )
-                            Text(
-                                text = formatThemeName(theme),
-                                style = MaterialTheme.typography.bodyLarge,
-                                modifier = Modifier.padding(start = 16.dp),
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
+                            
+                            Column(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .padding(start = 12.dp)
+                            ) {
+                                Text(
+                                    text = formatThemeName(theme),
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    fontWeight = if (theme == currentTheme) FontWeight.Bold else FontWeight.Normal
+                                )
+                            }
+
+                            // Color Palette Preview
+                            ThemePalettePreview(theme = theme)
                         }
                     }
                 }
@@ -111,6 +129,40 @@ fun SettingsScreen(
     }
 }
 
+@Composable
+fun ThemePalettePreview(theme: AppTheme) {
+    val colors = getThemeColors(theme)
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = Modifier.padding(end = 8.dp)
+    ) {
+        colors.forEach { color ->
+            Box(
+                modifier = Modifier
+                    .size(18.dp)
+                    .clip(CircleShape)
+                    .background(color)
+                    .border(1.dp, Color.White.copy(alpha = 0.1f), CircleShape)
+            )
+        }
+    }
+}
+
+fun getThemeColors(theme: AppTheme): List<Color> {
+    return when(theme) {
+        AppTheme.TechNoir -> listOf(TechNoirPrimary, TechNoirSecondary, TechNoirTertiary)
+        AppTheme.Cyberpunk -> listOf(CyberpunkPrimary, CyberpunkSecondary, CyberpunkTertiary)
+        AppTheme.DeepOcean -> listOf(OceanPrimary, OceanSecondary, OceanTertiary)
+        AppTheme.Matrix -> listOf(MatrixPrimary, MatrixSecondary, MatrixTertiary)
+        AppTheme.Dracula -> listOf(DraculaPrimary, DraculaSecondary, DraculaTertiary)
+        AppTheme.SunsetMirage -> listOf(SunsetPrimary, SunsetSecondary, SunsetTertiary)
+        AppTheme.ForestSpirit -> listOf(ForestPrimary, ForestSecondary, ForestTertiary)
+        AppTheme.NeonNights -> listOf(NeonNightsPrimary, NeonNightsSecondary, NeonNightsTertiary)
+        AppTheme.NordicIce -> listOf(NordicPrimary, NordicSecondary, NordicTertiary)
+        AppTheme.GoldenLuxe -> listOf(LuxePrimary, LuxeSecondary, LuxeTertiary)
+    }
+}
+
 fun formatThemeName(theme: AppTheme): String {
     return when(theme) {
         AppTheme.TechNoir -> "Tech Noir"
@@ -118,5 +170,10 @@ fun formatThemeName(theme: AppTheme): String {
         AppTheme.DeepOcean -> "Deep Ocean"
         AppTheme.Matrix -> "Matrix"
         AppTheme.Dracula -> "Dracula"
+        AppTheme.SunsetMirage -> "Sunset Mirage"
+        AppTheme.ForestSpirit -> "Forest Spirit"
+        AppTheme.NeonNights -> "Neon Nights"
+        AppTheme.NordicIce -> "Nordic Ice"
+        AppTheme.GoldenLuxe -> "Golden Luxe"
     }
 }

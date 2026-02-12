@@ -3,28 +3,33 @@ package com.ivarna.deviceinsight.presentation.settings
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.viewModels
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ivarna.deviceinsight.presentation.theme.AppTheme
 import com.ivarna.deviceinsight.presentation.theme.SystemStatsTheme
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
 class SettingsActivity : ComponentActivity() {
+
+    private val viewModel: SettingsViewModel by viewModels()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
         setContent {
-            var currentTheme by remember { mutableStateOf(AppTheme.TechNoir) }
+            val currentTheme by viewModel.theme.collectAsStateWithLifecycle()
             
             SystemStatsTheme(theme = currentTheme) {
                 SettingsActivityContent(
                     currentTheme = currentTheme,
-                    onThemeSelected = { newTheme -> currentTheme = newTheme },
+                    onThemeSelected = { newTheme -> viewModel.setTheme(newTheme) },
                     onBackPressed = { finish() }
                 )
             }
