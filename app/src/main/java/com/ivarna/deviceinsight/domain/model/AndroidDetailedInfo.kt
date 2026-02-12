@@ -1,0 +1,32 @@
+package com.ivarna.deviceinsight.domain.model
+
+data class AndroidDetailedInfo(
+    val androidVersion: String,
+    val apiLevel: Int,
+    val securityPatch: String,
+    val isRooted: Boolean,
+    val androidId: String,
+    val baseband: String,
+    val buildId: String,
+    val codename: String,
+    val fingerprint: String,
+    val id: String,
+    val incremental: String,
+    val javaRuntimeVersion: String,
+    val javaVmVersion: String,
+    val javaVmHeapSize: String,
+    val kernelArchitecture: String,
+    val kernelVersion: String,
+    val tags: String,
+    val type: String,
+    val gmsVersion: String,
+    val hmsVersion: String,
+    val openSslVersion: String,
+    val zLibVersion: String,
+    val icuCldrVersion: String,
+    val icuLibraryVersion: String,
+    val icuUnicodeVersion: String,
+    val androidLanguage: String,
+    val configuredTimeZone: String,
+    val upTime: String
+)

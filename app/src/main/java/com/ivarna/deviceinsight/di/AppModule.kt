@@ -60,7 +60,10 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideDeviceProvider(@ApplicationContext context: Context): DeviceProvider = DeviceProvider(context)
+    fun provideDeviceProvider(
+        @ApplicationContext context: Context,
+        securityProvider: SecurityProvider
+    ): DeviceProvider = DeviceProvider(context, securityProvider)
 
     @Provides
     @Singleton

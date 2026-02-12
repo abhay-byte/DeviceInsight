@@ -110,7 +110,8 @@ class HardwareRepositoryImpl @Inject constructor(
             
             gpuDetailedInfo = gpuProvider.getGpuDetailedInfo(),
             networkDetailedInfo = networkProvider.getNetworkDetailedInfo(),
-            batteryDetailedInfo = batteryProvider.getBatteryDetailedInfo()
+            batteryDetailedInfo = batteryProvider.getBatteryDetailedInfo(),
+            androidDetailedInfo = deviceProvider.getAndroidDetailedInfo()
         )
     }
 }

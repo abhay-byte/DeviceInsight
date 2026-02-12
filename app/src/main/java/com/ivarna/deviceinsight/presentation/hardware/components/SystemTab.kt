@@ -47,13 +47,37 @@ fun SystemTab(info: HardwareInfo) {
             }
         }
 
+        val android = info.androidDetailedInfo
+
         InfoSection(title = "Android OS") {
-            InfoRow("Version", info.androidVersion)
-            InfoRow("API Level", info.apiLevel.toString())
-            InfoRow("Security Patch", info.securityPatch)
-            InfoRow("Kernel Version", info.kernelVersion)
-            InfoRow("Rooted", if (info.isRooted) "Yes" else "No")
-            InfoRow("Uptime", info.upTime)
+            InfoRow("Android Version", android.androidVersion)
+            InfoRow("API Level", android.apiLevel.toString())
+            InfoRow("Security Patch", android.securityPatch)
+            InfoRow("Rooted Device", if (android.isRooted) "Yes" else "No")
+            InfoRow("Android ID", android.androidId)
+            InfoRow("Baseband", android.baseband)
+            InfoRow("Build ID", android.buildId)
+            InfoRow("Codename", android.codename)
+            InfoRow("Fingerprint", android.fingerprint)
+            InfoRow("ID", android.id)
+            InfoRow("Incremental", android.incremental)
+            InfoRow("Java Runtime", android.javaRuntimeVersion)
+            InfoRow("Java VM", android.javaVmVersion)
+            InfoRow("Java VM Heap", android.javaVmHeapSize)
+            InfoRow("Kernel Arch", android.kernelArchitecture)
+            InfoRow("Kernel Version", android.kernelVersion)
+            InfoRow("Tags", android.tags)
+            InfoRow("Type", android.type)
+            InfoRow("Google Play Services", android.gmsVersion)
+            InfoRow("Huawei Services", android.hmsVersion)
+            InfoRow("OpenSSL Version", android.openSslVersion)
+            InfoRow("ZLib Version", android.zLibVersion)
+            InfoRow("ICU CLDR Version", android.icuCldrVersion)
+            InfoRow("ICU Library Version", android.icuLibraryVersion)
+            InfoRow("ICU Unicode Version", android.icuUnicodeVersion)
+            InfoRow("Android Language", android.androidLanguage)
+            InfoRow("Time Zone", android.configuredTimeZone)
+            InfoRow("UpTime", android.upTime)
         }
     }
 }
