@@ -55,9 +55,18 @@ data class HardwareInfo(
     
     // Display
     val resolution: String,
+    val displayTechnology: String,
+    val physicalSize: String,
+    val diagonalSize: String,
     val density: String,
     val densityDpi: Int,
+    val xdpi: Float,
+    val ydpi: Float,
+    val gpuVendor: String,
+    val gpuRenderer: String,
+    val gpuCores: Int,
     val refreshRate: Float,
+    val defaultOrientation: String,
     
     // Battery
     val batteryTechnology: String,
@@ -76,5 +85,9 @@ data class HardwareInfo(
     
     // Additional System Info
     val bluetoothVersion: String,
-    val deviceFeatures: List<String>
+    val deviceFeatures: List<String>,
+    
+    // Detailed Info
+    val gpuDetailedInfo: GpuDetailedInfo,
+    val networkDetailedInfo: NetworkDetailedInfo
 )

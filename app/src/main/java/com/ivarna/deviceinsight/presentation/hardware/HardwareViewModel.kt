@@ -5,9 +5,11 @@ import androidx.lifecycle.viewModelScope
 import com.ivarna.deviceinsight.domain.model.HardwareInfo
 import com.ivarna.deviceinsight.domain.repository.HardwareRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -20,7 +22,16 @@ class HardwareViewModel @Inject constructor(
     val hardwareInfo: StateFlow<HardwareInfo?> = _hardwareInfo.asStateFlow()
 
     init {
-        loadHardwareInfo()
+        startHardwareInfoRefresh()
+    }
+
+    private fun startHardwareInfoRefresh() {
+        viewModelScope.launch {
+            while (isActive) {
+                _hardwareInfo.value = repository.getHardwareInfo()
+                delay(1000) // Refresh every second
+            }
+        }
     }
 
     fun loadHardwareInfo() {

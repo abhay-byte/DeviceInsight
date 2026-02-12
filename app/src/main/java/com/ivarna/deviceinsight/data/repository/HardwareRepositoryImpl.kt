@@ -18,7 +18,8 @@ class HardwareRepositoryImpl @Inject constructor(
     private val displayProvider: DisplayProvider,
     private val sensorProvider: SensorProvider,
     private val securityProvider: SecurityProvider,
-    private val cpuProvider: CpuProvider
+    private val cpuProvider: CpuProvider,
+    private val gpuProvider: GpuProvider
 ) : HardwareRepository {
 
     override fun getHardwareInfo(): HardwareInfo {
@@ -78,9 +79,18 @@ class HardwareRepositoryImpl @Inject constructor(
             hasSha2 = cpuFeatures["sha2"] == true,
             
             resolution = displayProvider.getScreenResolution(),
+            displayTechnology = displayProvider.getDisplayTechnology(),
+            physicalSize = displayProvider.getPhysicalSize(),
+            diagonalSize = displayProvider.getDiagonalSize(),
             density = displayProvider.getDensityString(),
             densityDpi = context.resources.displayMetrics.densityDpi,
+            xdpi = displayProvider.getXDPI(),
+            ydpi = displayProvider.getYDPI(),
+            gpuVendor = displayProvider.getGpuInfo().vendor,
+            gpuRenderer = displayProvider.getGpuInfo().renderer,
+            gpuCores = displayProvider.getGpuInfo().cores,
             refreshRate = displayProvider.getRefreshRate(),
+            defaultOrientation = displayProvider.getDefaultOrientation(),
             
             batteryTechnology = batteryInfo.technology,
             batteryHealth = batteryInfo.health,
@@ -96,7 +106,10 @@ class HardwareRepositoryImpl @Inject constructor(
             fingerprintSensorPresent = sensorProvider.hasFingerprintSensor(),
             
             bluetoothVersion = deviceProvider.getBluetoothVersion(),
-            deviceFeatures = deviceProvider.getDeviceFeatures()
+            deviceFeatures = deviceProvider.getDeviceFeatures(),
+            
+            gpuDetailedInfo = gpuProvider.getGpuDetailedInfo(),
+            networkDetailedInfo = networkProvider.getNetworkDetailedInfo()
         )
     }
 }

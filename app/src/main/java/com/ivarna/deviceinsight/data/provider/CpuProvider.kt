@@ -1,53 +1,81 @@
 package com.ivarna.deviceinsight.data.provider
 
 import android.util.Log
+import com.ivarna.deviceinsight.data.mapper.SocMapper
 import com.ivarna.deviceinsight.utils.CpuUtilizationUtils
 import java.io.File
-import java.io.RandomAccessFile
 import javax.inject.Inject
 
 class CpuProvider @Inject constructor(
-    private val cpuUtilizationUtils: CpuUtilizationUtils
+    private val cpuUtilizationUtils: CpuUtilizationUtils,
+    private val socMapper: SocMapper
 ) {
     fun getSocModel(): String {
-        return try {
+        val hardware = try {
             val cpuInfo = File("/proc/cpuinfo").readLines()
-            var hardware = ""
-            var model = ""
+            var hw = ""
             for (line in cpuInfo) {
-                if (line.startsWith("Hardware")) hardware = line.split(":")[1].trim()
-                if (line.startsWith("Model")) model = line.split(":")[1].trim()
+                if (line.startsWith("Hardware")) hw = line.split(":")[1].trim()
             }
-            if (hardware.isNotEmpty()) hardware else if (model.isNotEmpty()) model else android.os.Build.HARDWARE
+            if (hw.isEmpty()) android.os.Build.HARDWARE else hw
         } catch (e: Exception) {
             android.os.Build.HARDWARE
         }
+
+        return socMapper.mapHardwareToMarketingName(hardware)
     }
 
     fun getCpuArchitecture(): String {
+        // ...Existing implementation for core detail parsing...
         return try {
-            System.getProperty("os.arch") ?: "Unknown"
+            val cpuInfo = File("/proc/cpuinfo").readLines()
+            val cores = mutableMapOf<String, Int>()
+            var currentPart = ""
+            
+            for (line in cpuInfo) {
+                if (line.startsWith("CPU part")) {
+                    val part = line.split(":")[1].trim().lowercase()
+                    val name = when (part) {
+                        "0xd4e" -> "Cortex-X3"
+                        "0xd4f" -> "Cortex-A715"
+                        "0xd41" -> "Cortex-A78"
+                        "0xd03" -> "Cortex-A53"
+                        "0xd08" -> "Cortex-A72"
+                        "0xd42" -> "Cortex-A78C"
+                        "0xd44" -> "Cortex-X2"
+                        "0xd46" -> "Cortex-A510"
+                        "0xd4b" -> "Cortex-A710"
+                        "0xd47" -> "Cortex-A715"
+                        "0xd4d" -> "Cortex-A715"
+                        else -> "Cortex (Part $part)"
+                    }
+                    cores[name] = cores.getOrDefault(name, 0) + 1
+                }
+            }
+            
+            if (cores.isNotEmpty()) {
+                cores.entries.joinToString(" + ") { "${it.value}x ${it.key}" }
+            } else {
+                System.getProperty("os.arch") ?: "aarch64"
+            }
         } catch (e: Exception) {
-            "Unknown"
+            System.getProperty("os.arch") ?: "Unknown"
         }
     }
 
     fun getManufacturingProcess(): String {
-        // This is extremely hardware specific and often not exposed in system files.
-        // Returning a placeholder or trying to map common SoCs could work, 
-        // but for now, we'll try to look at common SoC names.
-        val soc = getSocModel().lowercase()
-        return when {
-            soc.contains("sm8650") -> "4 nm" // Snapdragon 8 Gen 3
-            soc.contains("sm8550") -> "4 nm" // Snapdragon 8 Gen 2
-            soc.contains("sm8450") -> "4 nm" // Snapdragon 8 Gen 1
-            soc.contains("sm8350") -> "5 nm" // Snapdragon 888
-            soc.contains("sm8250") -> "7 nm" // Snapdragon 865
-            soc.contains("msm8998") -> "10 nm" // Snapdragon 835
-            soc.contains("msm8996") -> "14 nm" // Snapdragon 820
-            soc.contains("msm8974") -> "28 nm" // Snapdragon 800
-            else -> "Unknown"
+        val hardware = try {
+            val cpuInfo = File("/proc/cpuinfo").readLines()
+            var hw = ""
+            for (line in cpuInfo) {
+                if (line.startsWith("Hardware")) hw = line.split(":")[1].trim()
+            }
+            if (hw.isEmpty()) android.os.Build.HARDWARE else hw
+        } catch (e: Exception) {
+            android.os.Build.HARDWARE
         }
+        
+        return socMapper.getProcessNode(hardware)
     }
 
     fun getCpuRevision(): String {

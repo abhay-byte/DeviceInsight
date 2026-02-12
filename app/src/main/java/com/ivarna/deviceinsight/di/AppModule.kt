@@ -10,10 +10,13 @@ import com.ivarna.deviceinsight.domain.repository.TaskRepository
 import com.ivarna.deviceinsight.utils.CpuUtilizationUtils
 import com.ivarna.deviceinsight.utils.DisplayRefreshRateUtils
 import com.ivarna.deviceinsight.data.fps.FpsMonitor
+import com.ivarna.deviceinsight.data.mapper.GpuMapper
+import com.ivarna.deviceinsight.data.mapper.SocMapper
 import com.ivarna.deviceinsight.data.provider.BatteryProvider
 import com.ivarna.deviceinsight.data.provider.CpuProvider
 import com.ivarna.deviceinsight.data.provider.DeviceProvider
 import com.ivarna.deviceinsight.data.provider.DisplayProvider
+import com.ivarna.deviceinsight.data.provider.GpuProvider
 import com.ivarna.deviceinsight.data.provider.MemoryProvider
 import com.ivarna.deviceinsight.data.provider.NetworkProvider
 import com.ivarna.deviceinsight.data.provider.NetworkTrafficProvider
@@ -69,11 +72,28 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideCpuProvider(cpuUtilizationUtils: CpuUtilizationUtils): CpuProvider = CpuProvider(cpuUtilizationUtils)
+    fun provideCpuProvider(
+        cpuUtilizationUtils: CpuUtilizationUtils,
+        socMapper: SocMapper
+    ): CpuProvider = CpuProvider(cpuUtilizationUtils, socMapper)
 
     @Provides
     @Singleton
-    fun provideDisplayProvider(@ApplicationContext context: Context): DisplayProvider = DisplayProvider(context)
+    fun provideGpuMapper(): GpuMapper = GpuMapper()
+
+    @Provides
+    @Singleton
+    fun provideGpuProvider(
+        @ApplicationContext context: Context,
+        gpuMapper: GpuMapper
+    ): GpuProvider = GpuProvider(context, gpuMapper)
+
+    @Provides
+    @Singleton
+    fun provideDisplayProvider(
+        @ApplicationContext context: Context,
+        gpuMapper: GpuMapper
+    ): DisplayProvider = DisplayProvider(context, gpuMapper)
 
     @Provides
     @Singleton
@@ -131,7 +151,8 @@ object AppModule {
         displayProvider: DisplayProvider,
         sensorProvider: SensorProvider,
         securityProvider: SecurityProvider,
-        cpuProvider: CpuProvider
+        cpuProvider: CpuProvider,
+        gpuProvider: GpuProvider
     ): HardwareRepository {
         return HardwareRepositoryImpl(
             context,
@@ -143,7 +164,8 @@ object AppModule {
             displayProvider,
             sensorProvider,
             securityProvider,
-            cpuProvider
+            cpuProvider,
+            gpuProvider
         )
     }
 
