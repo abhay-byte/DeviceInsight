@@ -19,7 +19,7 @@
 ## 🛠 Tech Stack
 
 *   **Language**: Kotlin
-*   **UI Framework**: Jetpack Compose (Material3)
+*   **UI Framework**: Jetpack Compose with a custom Glassmorphism UI system (Haze-powered, with selective Material components)
 *   **Architecture**: MVVM + Clean Architecture
 *   **Dependency Injection**: Hilt
 *   **Asynchrony**: Coroutines & Flow
