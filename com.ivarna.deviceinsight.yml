@@ -1,0 +1,31 @@
+Categories:
+  - System
+  - Development
+License: GPL-3.0-or-later
+AuthorName: Abhay Raj
+AuthorWebSite: https://github.com/abhay-byte
+SourceCode: https://github.com/abhay-byte/DeviceInsight
+IssueTracker: https://github.com/abhay-byte/DeviceInsight/issues
+
+Name: DeviceInsight
+AutoName: DeviceInsight
+
+RepoType: git
+Repo: https://github.com/abhay-byte/DeviceInsight
+
+Builds:
+  - versionName: '1.0.0'
+    versionCode: 1
+    commit: f29792d9b8e06f8df13003916be7698bed334408
+    subdir: app
+    sudo:
+      - apt-get update
+      - apt-get install -y cmake
+      - update-alternatives --auto java
+    gradle:
+      - yes
+
+AutoUpdateMode: Version
+UpdateCheckMode: Tags
+CurrentVersion: '1.0.0'
+CurrentVersionCode: 1

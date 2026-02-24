@@ -1,0 +1,1 @@
+Initial release of DeviceInsight with real-time CPU, RAM, storage, battery, and network monitoring, plus historical charts and multi-theme Material 3 UI.

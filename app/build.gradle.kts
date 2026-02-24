@@ -1,3 +1,6 @@
+// F-Droid reproducible builds: disable baseline profiles using Groovy script
+apply(from = "fix-baseline-profiles.gradle")
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -28,6 +31,12 @@ android {
         }
     }
 
+    // Disable dependency metadata block for F-Droid
+    dependenciesInfo {
+        includeInApk = false
+        includeInBundle = false
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
@@ -35,6 +44,12 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            // Disable baseline profiles for F-Droid reproducible builds
+            packaging {
+                resources.excludes.add("META-INF/**")
+                resources.excludes.add("**.prof")
+                resources.excludes.add("assets/dexopt/baseline.prof")
+            }
         }
         debug {
             isMinifyEnabled = false
