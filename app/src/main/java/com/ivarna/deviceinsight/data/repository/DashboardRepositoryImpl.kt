@@ -42,7 +42,8 @@ class DashboardRepositoryImpl @Inject constructor(
     private val deviceProvider: DeviceProvider,
     private val powerProvider: PowerProvider,
     private val thermalProvider: ThermalProvider,
-    private val cpuProvider: CpuProvider
+    private val cpuProvider: CpuProvider,
+    private val gpuUsageProvider: GpuUsageProvider
 ) : DashboardRepository {
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
@@ -147,6 +148,8 @@ class DashboardRepositoryImpl @Inject constructor(
         val storageInfo = storageProvider.getInternalStorageInfo()
         val storageUsedPerc = (storageInfo.first - storageInfo.second).toFloat() / storageInfo.first.toFloat()
 
+        val gpuMetrics = gpuUsageProvider.getMetrics()
+
         return DashboardMetrics(
             cpuUsage = cpu,
             ramUsage = ramUsage,
@@ -154,8 +157,12 @@ class DashboardRepositoryImpl @Inject constructor(
             ramTotalBytes = ramTotal,
             swapUsedBytes = swapUsed,
             swapTotalBytes = swapTotal,
-            gpuUsage = 0.25f,
-            gpuModel = "Adreno GPU",
+            gpuUsage = gpuMetrics.usage,
+            gpuModel = gpuMetrics.renderer,
+            gpuTemp = gpuMetrics.temperatureC,
+            gpuFreqMhz = gpuMetrics.curFreqMhz,
+            gpuMaxFreqMhz = gpuMetrics.maxFreqMhz,
+            gpuVendor = gpuMetrics.vendor.name,
             batteryLevel = batteryInfo.level,
             batteryStatus = batteryInfo.status,
             temperature = batteryInfo.temperature,

@@ -43,7 +43,7 @@ fun CircularGauge(
 ) {
     val animatedValue by animateFloatAsState(
         targetValue = value.coerceIn(0f, 1f),
-        animationSpec = tween(durationMillis = 1500),
+        animationSpec = tween(durationMillis = 1000),
         label = "gauge"
     )
 
@@ -52,8 +52,8 @@ fun CircularGauge(
         contentAlignment = Alignment.Center
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
-            val sweepAngle = 240f
-            val startAngle = 150f
+            val sweepAngle = 270f
+            val startAngle = 135f
             val canvasStrokeWidth = strokeWidth.toPx()
             
             // Add internal padding to the drawing logic to prevent glow cutoff

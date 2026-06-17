@@ -21,6 +21,7 @@ import com.ivarna.deviceinsight.data.provider.DeviceProvider
 import com.ivarna.deviceinsight.data.provider.DirectoryProvider
 import com.ivarna.deviceinsight.data.provider.DisplayProvider
 import com.ivarna.deviceinsight.data.provider.GpuProvider
+import com.ivarna.deviceinsight.data.provider.GpuUsageProvider
 import com.ivarna.deviceinsight.data.provider.MemoryProvider
 import com.ivarna.deviceinsight.data.provider.NetworkProvider
 import com.ivarna.deviceinsight.data.provider.NetworkTrafficProvider
@@ -91,6 +92,12 @@ object AppModule {
 
     @Provides
     @Singleton
+    fun provideGpuUsageProvider(
+        @ApplicationContext context: Context
+    ): GpuUsageProvider = GpuUsageProvider(context)
+
+    @Provides
+    @Singleton
     fun provideGpuProvider(
         @ApplicationContext context: Context,
         gpuMapper: GpuMapper
@@ -129,7 +136,8 @@ object AppModule {
         deviceProvider: DeviceProvider,
         powerProvider: PowerProvider,
         thermalProvider: ThermalProvider,
-        cpuProvider: CpuProvider
+        cpuProvider: CpuProvider,
+        gpuUsageProvider: GpuUsageProvider
     ): DashboardRepository {
         return DashboardRepositoryImpl(
             context,
@@ -143,7 +151,8 @@ object AppModule {
             deviceProvider,
             powerProvider,
             thermalProvider,
-            cpuProvider
+            cpuProvider,
+            gpuUsageProvider
         )
     }
 

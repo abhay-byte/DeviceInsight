@@ -11,6 +11,16 @@
     
     <!-- Dashboard -->
     <string name="dashboard_title">System Monitor</string>
+    <string name="dashboard_header_title">Command Center</string>
+    <string name="dashboard_status_online">System Online</string>
+    <string name="dashboard_uptime_label">Uptime</string>
+    <string name="dashboard_live_badge">Live</string>
+    <string name="dashboard_usage_label">Usage</string>
+    <string name="dashboard_gpu_thermal_title">GPU &amp; Thermal</string>
+    <string name="dashboard_system_resources">System Resources</string>
+    <string name="dashboard_power_draw">Power Draw</string>
+    <string name="dashboard_fps">FPS</string>
+    <string name="dashboard_device_chip">SoC</string>
     <string name="cpu_label">CPU</string>
     <string name="ram_label">RAM</string>
     <string name="gpu_label">GPU</string>
@@ -20,6 +30,38 @@
     <string name="display_label">Display</string>
     <string name="power_consumption">Power Consumption</string>
     <string name="uptime">Uptime: %s</string>
+
+    <!-- Dashboard Stats -->
+    <string name="stat_temp">Temp</string>
+    <string name="stat_freq">Freq</string>
+    <string name="stat_cores">Cores</string>
+    <string name="stat_used">Used</string>
+    <string name="stat_total">Total</string>
+    <string name="stat_swap">Swap</string>
+    <string name="stat_gpu_load">GPU Load</string>
+    <string name="stat_gpu_temp">GPU Temp</string>
+    <string name="stat_gpu_freq">GPU Freq</string>
+    <string name="stat_cpu_temp">CPU Temp</string>
+    <string name="stat_battery_temp">Battery Temp</string>
+
+    <!-- Common placeholders -->
+    <string name="common_dash">--</string>
+    <string name="common_dash_long">—</string>
+    <string name="common_off">Off</string>
+    <string name="common_celsius_unknown">--°C</string>
+
+    <!-- Format strings -->
+    <string name="format_temp_celsius">%1$.0f°C</string>
+    <string name="format_temp_celsius_one">%1$.1f°C</string>
+    <string name="format_gb">%1$.1fG</string>
+    <string name="format_mb">%1$dM</string>
+    <string name="format_watts_pos">+%1$.2f W</string>
+    <string name="format_watts">%1$.2f W</string>
+    <string name="format_watts_unknown">-- W</string>
+    <string name="format_percent_value">%1$d%%</string>
+    <string name="format_fps">%1$d</string>
+    <string name="format_up_speed">↑ %1$s</string>
+    <string name="format_storage_free">%1$s GB free</string>
     
     <!-- Task Manager -->
     <string name="tasks_title">Task Manager</string>

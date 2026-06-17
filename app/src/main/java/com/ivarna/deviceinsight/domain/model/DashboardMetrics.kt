@@ -9,6 +9,10 @@ data class DashboardMetrics(
     val swapTotalBytes: Long,
     val gpuUsage: Float,       // 0.0 - 1.0
     val gpuModel: String,
+    val gpuTemp: Float = 0f,   // °C; 0 = unavailable
+    val gpuFreqMhz: Int = 0,
+    val gpuMaxFreqMhz: Int = 0,
+    val gpuVendor: String = "Unknown",
     val batteryLevel: Int,     // 0 - 100
     val batteryStatus: String, // Charging, Discharging, etc.
     val temperature: Float,    // Battery temperature in Celsius
