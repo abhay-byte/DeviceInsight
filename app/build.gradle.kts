@@ -1,3 +1,6 @@
+import java.util.Properties
+import java.io.FileInputStream
+
 // F-Droid reproducible builds: disable baseline profiles using Groovy script
 apply(from = "fix-baseline-profiles.gradle")
 
@@ -12,6 +15,27 @@ plugins {
 android {
     namespace = "com.ivarna.deviceinsight"
     compileSdk = 36
+
+    val keystorePropsFile = rootProject.file("../keys/deviceinsight-key.properties")
+    val keystoreProps = Properties().apply {
+        if (keystorePropsFile.exists()) load(FileInputStream(keystorePropsFile))
+    }
+    val hasKeystore = keystorePropsFile.exists() &&
+        keystoreProps.containsKey("storeFile") &&
+        keystoreProps.containsKey("storePassword") &&
+        keystoreProps.containsKey("keyAlias") &&
+        keystoreProps.containsKey("keyPassword")
+
+    signingConfigs {
+        if (hasKeystore) {
+            create("release") {
+                storeFile = file(keystoreProps.getProperty("storeFile"))
+                storePassword = keystoreProps.getProperty("storePassword")
+                keyAlias = keystoreProps.getProperty("keyAlias")
+                keyPassword = keystoreProps.getProperty("keyPassword")
+            }
+        }
+    }
 
     buildFeatures {
         compose = true
@@ -42,6 +66,9 @@ android {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
+            if (hasKeystore) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -122,6 +149,9 @@ dependencies {
 
     // Haze (Glassmorphism)
     implementation("dev.chrisbanes.haze:haze:0.7.3")
+
+    // Image loading (Coil for Compose)
+    implementation("io.coil-kt:coil-compose:2.7.0")
 
     // Shizuku (System API access)
     implementation("dev.rikka.shizuku:api:13.1.5")
