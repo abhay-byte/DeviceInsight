@@ -34,12 +34,12 @@ class SocLogoRepository @Inject constructor() {
 
     companion object {
         const val SNAPDRAGON =
-            "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5c/Snapdragon_Logo.svg/500px-Snapdragon_Logo.svg.png"
+            "https://www.freelogovectors.net/wp-content/uploads/2023/09/snapdragon-logo-07-freelogovectors.net_.png"
         const val MEDIATEK =
-            "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1a/MediaTek_Logo_wiki.svg/500px-MediaTek_Logo_wiki.svg.png"
+            "https://www.mediatek.com/hubfs/Mediatek_Corporate_Assets_June2025/Brand_Logos_Chips_june2025/Png%20Images/MediaTek%20Logo_Primary%20Logo_Orange.png"
         const val TENSOR =
-            "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7b/Representaci%C3%B3n_vectorial_referencial_del_chip_google_tensor.svg/500px-Representaci%C3%B3n_vectorial_referencial_del_chip_google_tensor.svg.png"
+            "https://developers.google.com/static/edge/tensor-sdk/images/tensor-logo.png"
         const val EXYNOS =
-            "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6f/Exynos_Logo.svg/500px-Exynos_Logo.svg.png"
+            "https://image.semiconductor.samsung.com/image/samsung/p6/semiconductor/sustainability_p5/exynos-processor-the-brains-of-a-smartphone-with-eyes-on-a-better-life/article03_sec_full1.png?\$ORIGIN_PNG\$"
     }
 }

@@ -3,6 +3,11 @@
   <h1>DeviceInsight</h1>
 </div>
 
+<p align="center">
+  <img src="docs/storelisting/store_listing_promo.gif" width="100%" style="background: url('https://raw.githubusercontent.com/Codelessly/FlutterLoadingGIFs/master/packages/cupertino_activity_indicator.gif') center center no-repeat; min-height: 250px;" alt="DeviceInsight Promo Animation (Loading...)" loading="lazy" />
+</p>
+
+
 **DeviceInsight** is a premium, high-performance system monitoring application for Android. It provides real-time analytics for CPU, RAM, Storage, Network, and Battery usage, presented in a stunning, futuristic "Glassmorphism" interface.
 
 ## ✨ Key Features

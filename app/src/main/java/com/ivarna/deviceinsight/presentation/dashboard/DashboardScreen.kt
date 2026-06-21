@@ -34,19 +34,22 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import coil.compose.AsyncImage
 import com.ivarna.deviceinsight.R
+import com.ivarna.deviceinsight.data.mapper.SocLogoRepository
 import com.ivarna.deviceinsight.domain.model.DashboardMetrics
 import com.ivarna.deviceinsight.presentation.components.CircularGauge
 import com.ivarna.deviceinsight.presentation.components.GlassCard
@@ -141,6 +144,9 @@ private fun DeviceCard(
 ) {
     val primary = MaterialTheme.colorScheme.primary
     val tertiary = MaterialTheme.colorScheme.tertiary
+    val socLogoUrl = remember(info.cpuModel) {
+        SocLogoRepository().logoUrlFor(info.cpuModel)
+    }
     GlassCard(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
@@ -152,7 +158,7 @@ private fun DeviceCard(
                 .fillMaxWidth()
                 .padding(horizontal = 14.dp, vertical = 12.dp)
         ) {
-            // ── Top row: status chip · device name · uptime ──
+            // ── Top row: SoC logo · device name · uptime ──
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -160,19 +166,28 @@ private fun DeviceCard(
             ) {
                 Box(
                     modifier = Modifier
-                        .size(36.dp)
+                        .size(44.dp)
                         .background(
                             color = primary.copy(alpha = 0.14f),
                             shape = RoundedCornerShape(10.dp)
                         ),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        imageVector = Icons.Filled.Memory,
-                        contentDescription = null,
-                        tint = primary,
-                        modifier = Modifier.size(20.dp)
-                    )
+                    if (socLogoUrl != null) {
+                        AsyncImage(
+                            model = socLogoUrl,
+                            contentDescription = "SoC logo",
+                            contentScale = ContentScale.Fit,
+                            modifier = Modifier.size(34.dp)
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Filled.Memory,
+                            contentDescription = null,
+                            tint = primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
                 }
                 Column(
                     modifier = Modifier.weight(1f),
@@ -235,7 +250,10 @@ private fun DeviceCard(
                     value = info.cpuModel.takeIf { it.isNotBlank() }
                         ?: stringResource(R.string.common_dash),
                     color = primary,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
+                    logoUrl = remember(info.cpuModel) {
+                        SocLogoRepository().logoUrlFor(info.cpuModel)
+                    }
                 )
                 DetailPill(
                     icon = Icons.Filled.Memory,
@@ -287,7 +305,8 @@ private fun DetailPill(
     value: String,
     color: Color,
     modifier: Modifier = Modifier,
-    maxLines: Int = 1
+    maxLines: Int = 1,
+    logoUrl: String? = null
 ) {
     Column(
         modifier = modifier
@@ -315,16 +334,30 @@ private fun DetailPill(
                 color = color
             )
         }
-        Text(
-            text = value,
-            style = MaterialTheme.typography.labelLarge.copy(
-                fontWeight = FontWeight.ExtraBold,
-                fontFamily = FontFamily.Monospace
-            ),
-            color = MaterialTheme.colorScheme.onSurface,
-            maxLines = maxLines,
-            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            if (logoUrl != null) {
+                AsyncImage(
+                    model = logoUrl,
+                    contentDescription = null,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+            Text(
+                text = value,
+                style = MaterialTheme.typography.labelLarge.copy(
+                    fontWeight = FontWeight.ExtraBold,
+                    fontFamily = FontFamily.Monospace
+                ),
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = maxLines,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false)
+            )
+        }
     }
 }
 
