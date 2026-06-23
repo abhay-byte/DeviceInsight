@@ -96,7 +96,7 @@ fun SettingsScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         androidx.compose.foundation.Image(
-                            painter = androidx.compose.ui.res.painterResource(id = com.ivarna.deviceinsight.R.drawable.logo),
+                            painter = androidx.compose.ui.res.painterResource(id = com.ivarna.deviceinsight.R.mipmap.ic_launcher_round),
                             contentDescription = "DeviceInsight Logo",
                             modifier = Modifier.size(56.dp)
                         )
