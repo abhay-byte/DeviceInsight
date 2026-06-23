@@ -1,7 +1,6 @@
 package com.ivarna.deviceinsight.presentation.settings
 
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -10,24 +9,23 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.ColorLens
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.RadioButtonUnchecked
-import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ivarna.deviceinsight.presentation.theme.*
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     currentTheme: AppTheme,
@@ -40,44 +38,54 @@ fun SettingsScreen(
         contentPadding = PaddingValues(top = 16.dp, bottom = 48.dp),
         verticalArrangement = Arrangement.spacedBy(24.dp)
     ) {
-        // Appearance Section
+        // Appearance & Display Section
         item {
-            SettingsSectionHeader(title = "Appearance", icon = Icons.Filled.ColorLens)
+            SettingsSectionHeader(title = "Appearance & Display", icon = Icons.Filled.Palette)
             Spacer(modifier = Modifier.height(12.dp))
             
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(
-                                MaterialTheme.colorScheme.primary.copy(alpha = 0.05f),
-                                MaterialTheme.colorScheme.surface.copy(alpha = 0.3f)
-                            )
-                        )
-                    )
-                    .border(
-                        1.dp,
-                        Brush.linearGradient(
-                            listOf(
-                                MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
-                                MaterialTheme.colorScheme.secondary.copy(alpha = 0.05f)
-                            )
-                        ),
-                        RoundedCornerShape(20.dp)
-                    )
-                    .padding(8.dp)
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    AppTheme.values().forEach { theme ->
-                        ThemeItem(
-                            theme = theme,
-                            isSelected = theme == currentTheme,
-                            onClick = { onThemeSelected(theme) }
-                        )
-                    }
-                }
+            SettingsCard {
+                // Theme Dropdown
+                ThemeDropdownSelector(
+                    currentTheme = currentTheme,
+                    onThemeSelected = onThemeSelected
+                )
+                
+                SettingsDivider()
+                
+                // Dark Mode Toggle (Mock)
+                SettingsSwitchRow(
+                    title = "Dark Mode",
+                    subtitle = "Always use dark background",
+                    icon = Icons.Filled.DarkMode,
+                    isChecked = true,
+                    onCheckedChange = {}
+                )
+            }
+        }
+
+        // General Settings Section
+        item {
+            SettingsSectionHeader(title = "General", icon = Icons.Filled.SettingsApplications)
+            Spacer(modifier = Modifier.height(12.dp))
+
+            SettingsCard {
+                SettingsActionRow(
+                    title = "Notifications",
+                    subtitle = "Manage alerts and updates",
+                    icon = Icons.Filled.Notifications
+                )
+                SettingsDivider()
+                SettingsActionRow(
+                    title = "Language",
+                    subtitle = "English (United States)",
+                    icon = Icons.Filled.Language
+                )
+                SettingsDivider()
+                SettingsActionRow(
+                    title = "Privacy & Security",
+                    subtitle = "App permissions and data",
+                    icon = Icons.Filled.Security
+                )
             }
         }
 
@@ -122,10 +130,10 @@ fun SettingsScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            imageVector = Icons.Filled.Star,
+                            imageVector = Icons.Filled.QueryStats,
                             contentDescription = null,
                             tint = Color.White,
-                            modifier = Modifier.size(32.dp)
+                            modifier = Modifier.size(36.dp)
                         )
                     }
                     
@@ -159,7 +167,7 @@ fun SettingsScreen(
                         text = "A premium system monitoring tool built with Jetpack Compose.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        textAlign = TextAlign.Center,
                         modifier = Modifier.padding(horizontal = 16.dp)
                     )
                 }
@@ -169,7 +177,230 @@ fun SettingsScreen(
 }
 
 @Composable
-fun SettingsSectionHeader(title: String, icon: androidx.compose.ui.graphics.vector.ImageVector) {
+fun SettingsCard(content: @Composable ColumnScope.() -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(20.dp))
+            .background(
+                Brush.verticalGradient(
+                    listOf(
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.05f),
+                        MaterialTheme.colorScheme.surface.copy(alpha = 0.3f)
+                    )
+                )
+            )
+            .border(
+                1.dp,
+                Brush.linearGradient(
+                    listOf(
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
+                        MaterialTheme.colorScheme.secondary.copy(alpha = 0.05f)
+                    )
+                ),
+                RoundedCornerShape(20.dp)
+            )
+            .padding(vertical = 8.dp)
+    ) {
+        Column(content = content)
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ThemeDropdownSelector(
+    currentTheme: AppTheme,
+    onThemeSelected: (AppTheme) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val rotation by animateFloatAsState(if (expanded) 180f else 0f, label = "arrowRotation")
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+    ) {
+        ExposedDropdownMenuBox(
+            expanded = expanded,
+            onExpandedChange = { expanded = !expanded }
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.5f))
+                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+                    .clickable { expanded = true }
+                    .padding(16.dp)
+                    .menuAnchor(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Filled.ColorLens,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column {
+                        Text(
+                            text = "App Theme",
+                            style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = formatThemeName(currentTheme),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+                
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    ThemePalettePreview(theme = currentTheme)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Icon(
+                        imageVector = Icons.Filled.KeyboardArrowDown,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.rotate(rotation)
+                    )
+                }
+            }
+
+            ExposedDropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false },
+                modifier = Modifier.background(MaterialTheme.colorScheme.surface)
+            ) {
+                AppTheme.values().forEach { theme ->
+                    DropdownMenuItem(
+                        text = {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = formatThemeName(theme),
+                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                        fontWeight = if (theme == currentTheme) FontWeight.Bold else FontWeight.Normal
+                                    ),
+                                    color = if (theme == currentTheme) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                )
+                                ThemePalettePreview(theme = theme)
+                            }
+                        },
+                        onClick = {
+                            onThemeSelected(theme)
+                            expanded = false
+                        },
+                        modifier = Modifier.background(
+                            if (theme == currentTheme) MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                            else Color.Transparent
+                        )
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun SettingsActionRow(title: String, subtitle: String, icon: ImageVector) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { /* mock action */ }
+            .padding(horizontal = 24.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(24.dp)
+        )
+        Spacer(modifier = Modifier.width(16.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Icon(
+            imageVector = Icons.Filled.ChevronRight,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+        )
+    }
+}
+
+@Composable
+fun SettingsSwitchRow(
+    title: String,
+    subtitle: String,
+    icon: ImageVector,
+    isChecked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(24.dp)
+        )
+        Spacer(modifier = Modifier.width(16.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Switch(
+            checked = isChecked,
+            onCheckedChange = onCheckedChange,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
+                checkedTrackColor = MaterialTheme.colorScheme.primary,
+                uncheckedThumbColor = MaterialTheme.colorScheme.outline,
+                uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant
+            )
+        )
+    }
+}
+
+@Composable
+fun SettingsDivider() {
+    HorizontalDivider(
+        modifier = Modifier.padding(horizontal = 24.dp),
+        thickness = 1.dp,
+        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+    )
+}
+
+@Composable
+fun SettingsSectionHeader(title: String, icon: ImageVector) {
     val primary = MaterialTheme.colorScheme.primary
     val secondary = MaterialTheme.colorScheme.secondary
 
@@ -206,59 +437,6 @@ fun SettingsSectionHeader(title: String, icon: androidx.compose.ui.graphics.vect
 }
 
 @Composable
-fun ThemeItem(
-    theme: AppTheme,
-    isSelected: Boolean,
-    onClick: () -> Unit
-) {
-    val primary = MaterialTheme.colorScheme.primary
-
-    val bgColor by animateColorAsState(
-        targetValue = if (isSelected) primary.copy(alpha = 0.12f) else Color.Transparent,
-        animationSpec = tween(300),
-        label = "themeBgColor"
-    )
-    val borderColor by animateColorAsState(
-        targetValue = if (isSelected) primary.copy(alpha = 0.5f) else Color.Transparent,
-        animationSpec = tween(300),
-        label = "themeBorderColor"
-    )
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(bgColor)
-            .border(1.dp, borderColor, RoundedCornerShape(16.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                imageVector = if (isSelected) Icons.Filled.CheckCircle else Icons.Filled.RadioButtonUnchecked,
-                contentDescription = null,
-                tint = if (isSelected) primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                modifier = Modifier.size(22.dp)
-            )
-            
-            Spacer(modifier = Modifier.width(16.dp))
-            
-            Text(
-                text = formatThemeName(theme),
-                style = MaterialTheme.typography.bodyLarge.copy(
-                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
-                ),
-                color = if (isSelected) primary else MaterialTheme.colorScheme.onSurface
-            )
-        }
-
-        ThemePalettePreview(theme = theme)
-    }
-}
-
-@Composable
 fun ThemePalettePreview(theme: AppTheme) {
     val colors = getThemeColors(theme)
     Row(
@@ -268,10 +446,10 @@ fun ThemePalettePreview(theme: AppTheme) {
         colors.reversed().forEach { color ->
             Box(
                 modifier = Modifier
-                    .size(24.dp)
+                    .size(20.dp)
                     .clip(CircleShape)
                     .background(color)
-                    .border(2.dp, MaterialTheme.colorScheme.surface, CircleShape)
+                    .border(1.5.dp, MaterialTheme.colorScheme.surface, CircleShape)
             )
         }
     }
