@@ -9,7 +9,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.Analytics
+import androidx.compose.material.icons.filled.ColorLens
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -25,7 +29,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ivarna.deviceinsight.presentation.theme.*
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     currentTheme: AppTheme,
@@ -38,53 +41,15 @@ fun SettingsScreen(
         contentPadding = PaddingValues(top = 16.dp, bottom = 48.dp),
         verticalArrangement = Arrangement.spacedBy(24.dp)
     ) {
-        // Appearance & Display Section
+        // Appearance Section
         item {
-            SettingsSectionHeader(title = "Appearance & Display", icon = Icons.Filled.Palette)
+            SettingsSectionHeader(title = "Appearance", icon = Icons.Filled.Palette)
             Spacer(modifier = Modifier.height(12.dp))
             
             SettingsCard {
-                // Theme Dropdown
                 ThemeDropdownSelector(
                     currentTheme = currentTheme,
                     onThemeSelected = onThemeSelected
-                )
-                
-                SettingsDivider()
-                
-                // Dark Mode Toggle (Mock)
-                SettingsSwitchRow(
-                    title = "Dark Mode",
-                    subtitle = "Always use dark background",
-                    icon = Icons.Filled.DarkMode,
-                    isChecked = true,
-                    onCheckedChange = {}
-                )
-            }
-        }
-
-        // General Settings Section
-        item {
-            SettingsSectionHeader(title = "General", icon = Icons.Filled.SettingsApplications)
-            Spacer(modifier = Modifier.height(12.dp))
-
-            SettingsCard {
-                SettingsActionRow(
-                    title = "Notifications",
-                    subtitle = "Manage alerts and updates",
-                    icon = Icons.Filled.Notifications
-                )
-                SettingsDivider()
-                SettingsActionRow(
-                    title = "Language",
-                    subtitle = "English (United States)",
-                    icon = Icons.Filled.Language
-                )
-                SettingsDivider()
-                SettingsActionRow(
-                    title = "Privacy & Security",
-                    subtitle = "App permissions and data",
-                    icon = Icons.Filled.Security
                 )
             }
         }
@@ -130,7 +95,7 @@ fun SettingsScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            imageVector = Icons.Filled.QueryStats,
+                            imageVector = Icons.Filled.Analytics,
                             contentDescription = null,
                             tint = Color.White,
                             modifier = Modifier.size(36.dp)
@@ -306,97 +271,6 @@ fun ThemeDropdownSelector(
             }
         }
     }
-}
-
-@Composable
-fun SettingsActionRow(title: String, subtitle: String, icon: ImageVector) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { /* mock action */ }
-            .padding(horizontal = 24.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(24.dp)
-        )
-        Spacer(modifier = Modifier.width(16.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Text(
-                text = subtitle,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-        Icon(
-            imageVector = Icons.Filled.ChevronRight,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-        )
-    }
-}
-
-@Composable
-fun SettingsSwitchRow(
-    title: String,
-    subtitle: String,
-    icon: ImageVector,
-    isChecked: Boolean,
-    onCheckedChange: (Boolean) -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 24.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(24.dp)
-        )
-        Spacer(modifier = Modifier.width(16.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Text(
-                text = subtitle,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-        Switch(
-            checked = isChecked,
-            onCheckedChange = onCheckedChange,
-            colors = SwitchDefaults.colors(
-                checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
-                checkedTrackColor = MaterialTheme.colorScheme.primary,
-                uncheckedThumbColor = MaterialTheme.colorScheme.outline,
-                uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant
-            )
-        )
-    }
-}
-
-@Composable
-fun SettingsDivider() {
-    HorizontalDivider(
-        modifier = Modifier.padding(horizontal = 24.dp),
-        thickness = 1.dp,
-        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
-    )
 }
 
 @Composable
