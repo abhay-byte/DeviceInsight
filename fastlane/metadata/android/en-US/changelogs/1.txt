@@ -1,1 +1,5 @@
-Initial release of DeviceInsight with real-time CPU, RAM, storage, battery, and network monitoring, plus historical charts and multi-theme Material 3 UI.
+• Initial release of DeviceInsight with sleek Glassmorphism & Material 3 UI.
+• Real-time dashboard for CPU, RAM, storage, battery, and network telemetry.
+• Added high-resolution 512x512 app logo icon.
+• Redesigned Settings screen with interactive dropdowns and accurate app info.
+• Floating Performance HUD overlay and customizable home screen widgets.

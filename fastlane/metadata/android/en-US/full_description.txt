@@ -1,1 +1,40 @@
-DeviceInsight is a high-performance Android system monitor with a modern Glassmorphism interface. Track CPU usage with live graphs, monitor RAM and storage, view upload/download network speed, and estimate battery power draw in real time. Includes historical charts, multiple visual themes, and smooth Material 3 UI built with Jetpack Compose. Designed for API 26+ with responsive performance and clear diagnostics for everyday monitoring.
+Take complete control of your Android device with DeviceInsight — the ultimate real-time system monitor, hardware analyzer, and advanced task manager designed for power users, developers, and tech enthusiasts.
+
+Built natively with Jetpack Compose and featuring a stunning "Elegant Glassmorphism" and Material 3 design, DeviceInsight gives you a transparent window into what is happening under the hood of your smartphone or tablet. Whether you are gaming, developing apps, or troubleshooting performance issues, DeviceInsight delivers desktop-class system analytics right to your fingertips.
+
+🔥 KEY FEATURES & HIGHLIGHTS 🔥
+
+📊 Real-Time System Dashboard
+• CPU Monitoring: Track live core usage, frequency scaling, and thermal performance across all processor cores with smooth sparkline graphs.
+• Memory & RAM: Monitor active RAM utilization, cached processes, and available system memory in real time.
+• Storage Breakdown: Get precise insights into internal storage partitions, free space, and high-speed memory metrics.
+• Network Activity: Watch live upload and download bandwidth speeds, network connection types, and data throughput.
+• Battery Diagnostics: Track real-time power draw (in mA), voltage, battery health, temperature, and charging rates.
+
+⚙️ Advanced Task Manager & Process Controller
+• Inspect active background services, running apps, and system processes.
+• View detailed resource consumption per app, including CPU and RAM footprint.
+• Gain full visibility over process IDs (PID) and system behaviors to identify rogue battery drainers or performance bottlenecks.
+
+📱 Floating Performance Overlay (HUD)
+• Overlay critical system metrics directly on top of your games or apps.
+• Keep an eye on real-time FPS, CPU load, RAM usage, and battery temperature while playing demanding mobile games or benchmark testing.
+• Fully customizable overlay positioning, opacity, and refresh rates.
+
+🧰 Deep Hardware & Software Specifications
+• Processor (SoC): Detailed architecture specs, ARM instruction sets, core cluster configurations, and ABI support.
+• Graphics (GPU): GPU vendor, OpenGL ES version, Vulkan capabilities, and rendering extensions.
+• Display Metrics: Screen resolution, pixel density (DPI), refresh rate (Hz), HDR support, and display panel info.
+• Sensors Suite: Live diagnostic readouts from your accelerometer, gyroscope, magnetometer, proximity sensor, ambient light, and more.
+• Camera & Media Capabilities: Deep analysis of hardware supported codecs, sensor resolutions, and physical capabilities.
+• System & Security: Android OS version, API level, security patch level, kernel version, build ID, and bootloader status.
+
+🏠 Home Screen Widgets
+• Bring at-a-glance system telemetry directly to your home screen.
+• Highly customizable widgets designed to complement modern Android themes.
+
+🛡️ Privacy-First & Lightweight
+• Zero Telemetry: Your device data stays on your device. DeviceInsight operates locally with zero bloatware, tracking ads, or unnecessary cloud connections.
+• Responsive Performance: Built for high efficiency with minimal background overhead.
+
+Experience the next level of Android system diagnostics. Download DeviceInsight today and discover what your device is truly capable of!
