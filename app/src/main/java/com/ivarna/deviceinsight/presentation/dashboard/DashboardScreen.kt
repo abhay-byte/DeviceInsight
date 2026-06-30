@@ -156,20 +156,20 @@ private fun DeviceCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 12.dp)
+                .padding(horizontal = 18.dp, vertical = 16.dp)
         ) {
             // ── Top row: SoC logo · device name · uptime ──
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                horizontalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 Box(
                     modifier = Modifier
-                        .size(44.dp)
+                        .size(96.dp)
                         .background(
                             color = primary.copy(alpha = 0.14f),
-                            shape = RoundedCornerShape(10.dp)
+                            shape = RoundedCornerShape(14.dp)
                         ),
                     contentAlignment = Alignment.Center
                 ) {
@@ -178,7 +178,7 @@ private fun DeviceCard(
                             model = socLogoUrl,
                             contentDescription = "SoC logo",
                             contentScale = ContentScale.Fit,
-                            modifier = Modifier.size(34.dp)
+                            modifier = Modifier.size(82.dp)
                         )
                     } else {
                         Icon(
@@ -237,7 +237,7 @@ private fun DeviceCard(
                 }
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
             // ── Detail row: SoC chip · CPU · GPU · RAM · Swap ──
             Row(
@@ -250,10 +250,7 @@ private fun DeviceCard(
                     value = info.cpuModel.takeIf { it.isNotBlank() }
                         ?: stringResource(R.string.common_dash),
                     color = primary,
-                    modifier = Modifier.weight(1f),
-                    logoUrl = remember(info.cpuModel) {
-                        SocLogoRepository().logoUrlFor(info.cpuModel)
-                    }
+                    modifier = Modifier.weight(1f)
                 )
                 DetailPill(
                     icon = Icons.Filled.Memory,
@@ -278,7 +275,7 @@ private fun DeviceCard(
                 )
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -305,8 +302,7 @@ private fun DetailPill(
     value: String,
     color: Color,
     modifier: Modifier = Modifier,
-    maxLines: Int = 1,
-    logoUrl: String? = null
+    maxLines: Int = 1
 ) {
     Column(
         modifier = modifier
@@ -338,14 +334,6 @@ private fun DetailPill(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            if (logoUrl != null) {
-                AsyncImage(
-                    model = logoUrl,
-                    contentDescription = null,
-                    contentScale = ContentScale.Fit,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
             Text(
                 text = value,
                 style = MaterialTheme.typography.labelLarge.copy(
