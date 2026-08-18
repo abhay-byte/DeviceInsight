@@ -1,5 +1,19 @@
 package com.ivarna.deviceinsight.domain.model
 
+data class SensorDetail(
+    val name: String,
+    val type: Int,
+    val typeName: String,
+    val category: String,
+    val vendor: String,
+    val version: Int,
+    val resolution: Float,
+    val maximumRange: Float,
+    val power: Float,
+    val minDelay: Int,
+    val isWakeUpSensor: Boolean
+)
+
 data class HardwareInfo(
     val deviceName: String, // e.g. "duchamp"
     val deviceModelName: String, // e.g. "Poco X6 Pro"
@@ -81,6 +95,7 @@ data class HardwareInfo(
     // Sensors
     val sensorCount: Int,
     val availableSensors: List<String>,
+    val sensorDetails: List<SensorDetail>,
     val fingerprintSensorPresent: Boolean,
     
     // Additional System Info

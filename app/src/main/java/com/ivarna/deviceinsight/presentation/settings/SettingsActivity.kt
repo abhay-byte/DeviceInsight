@@ -1,5 +1,6 @@
 package com.ivarna.deviceinsight.presentation.settings
 
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -22,6 +23,7 @@ class SettingsActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableHighRefreshRate()
         
         setContent {
             val currentTheme by viewModel.theme.collectAsStateWithLifecycle()
@@ -32,6 +34,27 @@ class SettingsActivity : ComponentActivity() {
                     onThemeSelected = { newTheme -> viewModel.setTheme(newTheme) },
                     onBackPressed = { finish() }
                 )
+            }
+        }
+    }
+
+    private fun enableHighRefreshRate() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val supportedModes = display?.supportedModes
+            val maxMode = supportedModes?.maxByOrNull { it.refreshRate }
+            if (maxMode != null && maxMode.refreshRate >= 90f) {
+                val params = window.attributes
+                params.preferredDisplayModeId = maxMode.modeId
+                window.attributes = params
+            }
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            @Suppress("DEPRECATION")
+            val supportedModes = windowManager.defaultDisplay.supportedModes
+            val maxMode = supportedModes?.maxByOrNull { it.refreshRate }
+            if (maxMode != null && maxMode.refreshRate >= 90f) {
+                val params = window.attributes
+                params.preferredDisplayModeId = maxMode.modeId
+                window.attributes = params
             }
         }
     }

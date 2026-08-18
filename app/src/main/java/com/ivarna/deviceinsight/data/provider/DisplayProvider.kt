@@ -12,41 +12,63 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import kotlin.math.sqrt
 
+@javax.inject.Singleton
 class DisplayProvider @Inject constructor(
     @ApplicationContext private val context: Context,
     private val gpuMapper: GpuMapper
 ) {
+    @Volatile private var cachedResolution: String? = null
+    @Volatile private var cachedTechnology: String? = null
+    @Volatile private var cachedPhysicalSize: String? = null
+    @Volatile private var cachedDiagonalSize: String? = null
+    @Volatile private var cachedDensityString: String? = null
+    @Volatile private var cachedXDpi: Float? = null
+    @Volatile private var cachedYDpi: Float? = null
+    @Volatile private var cachedGpuInfo: GpuMapper.GpuInfo? = null
+
     fun getScreenResolution(): String {
+        cachedResolution?.let { return it }
         val metrics = context.resources.displayMetrics
-        return "${metrics.widthPixels} \u00D7 ${metrics.heightPixels}"
+        val res = "${metrics.widthPixels} \u00D7 ${metrics.heightPixels}"
+        cachedResolution = res
+        return res
     }
 
     fun getDisplayTechnology(): String {
-        // Most high-end Xiaomi/Poco devices use AMOLED
+        cachedTechnology?.let { return it }
         val hardware = Build.HARDWARE.lowercase()
-        return if (hardware.contains("mt6897") || hardware.contains("sm8")) "AMOLED" else "LCD"
+        val tech = if (hardware.contains("mt6897") || hardware.contains("sm8")) "AMOLED" else "LCD"
+        cachedTechnology = tech
+        return tech
     }
 
     fun getPhysicalSize(): String {
+        cachedPhysicalSize?.let { return it }
         val metrics = context.resources.displayMetrics
         val xdpi = if (metrics.xdpi > 1) metrics.xdpi else metrics.densityDpi.toFloat()
         val ydpi = if (metrics.ydpi > 1) metrics.ydpi else metrics.densityDpi.toFloat()
         val widthMm = (metrics.widthPixels / xdpi * 25.4).toInt()
         val heightMm = (metrics.heightPixels / ydpi * 25.4).toInt()
-        return "$widthMm mm \u00D7 $heightMm mm"
+        val size = "$widthMm mm \u00D7 $heightMm mm"
+        cachedPhysicalSize = size
+        return size
     }
 
     fun getDiagonalSize(): String {
+        cachedDiagonalSize?.let { return it }
         val metrics = context.resources.displayMetrics
         val xdpi = if (metrics.xdpi > 1) metrics.xdpi else metrics.densityDpi.toFloat()
         val ydpi = if (metrics.ydpi > 1) metrics.ydpi else metrics.densityDpi.toFloat()
         val x = Math.pow(metrics.widthPixels.toDouble() / xdpi, 2.0)
         val y = Math.pow(metrics.heightPixels.toDouble() / ydpi, 2.0)
         val screenInches = sqrt(x + y)
-        return String.format("%.2f inches", screenInches)
+        val diag = String.format("%.2f inches", screenInches)
+        cachedDiagonalSize = diag
+        return diag
     }
 
     fun getDensityString(): String {
+        cachedDensityString?.let { return it }
         val dpi = context.resources.displayMetrics.densityDpi
         val bucket = when {
             dpi >= 640 -> "xxxhdpi"
@@ -56,21 +78,32 @@ class DisplayProvider @Inject constructor(
             dpi >= 160 -> "mdpi"
             else -> "ldpi"
         }
-        return "$dpi dpi ($bucket)"
+        val str = "$dpi dpi ($bucket)"
+        cachedDensityString = str
+        return str
     }
 
     fun getXDPI(): Float {
-        val xdpi = context.resources.displayMetrics.xdpi
-        return if (xdpi > 1) xdpi else context.resources.displayMetrics.densityDpi.toFloat()
+        cachedXDpi?.let { return it }
+        val metrics = context.resources.displayMetrics
+        val xdpi = if (metrics.xdpi > 1) metrics.xdpi else metrics.densityDpi.toFloat()
+        cachedXDpi = xdpi
+        return xdpi
     }
 
     fun getYDPI(): Float {
-        val ydpi = context.resources.displayMetrics.ydpi
-        return if (ydpi > 1) ydpi else context.resources.displayMetrics.densityDpi.toFloat()
+        cachedYDpi?.let { return it }
+        val metrics = context.resources.displayMetrics
+        val ydpi = if (metrics.ydpi > 1) metrics.ydpi else metrics.densityDpi.toFloat()
+        cachedYDpi = ydpi
+        return ydpi
     }
 
     fun getGpuInfo(): GpuMapper.GpuInfo {
-        return gpuMapper.mapHardwareToGpuInfo(Build.HARDWARE)
+        cachedGpuInfo?.let { return it }
+        val info = gpuMapper.mapHardwareToGpuInfo(Build.HARDWARE)
+        cachedGpuInfo = info
+        return info
     }
 
     fun getRefreshRate(): Float {

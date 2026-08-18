@@ -17,8 +17,11 @@ class CameraProvider @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
     private val cameraManager = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
+    @Volatile
+    private var cachedCameras: List<CameraInfo>? = null
 
     fun getCameraInfo(): List<CameraInfo> {
+        cachedCameras?.let { return it }
         val cameras = mutableListOf<CameraInfo>()
         val rearCounter = mutableMapOf<Int, Int>() // Track index per facing
         
@@ -107,6 +110,9 @@ class CameraProvider @Inject constructor(
                         flashSupported = flashSupported
                     )
                 )
+            }
+            if (cameras.isNotEmpty()) {
+                cachedCameras = cameras
             }
         } catch (e: Exception) {
             e.printStackTrace()

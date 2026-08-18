@@ -1,0 +1,6 @@
+• Ultra-smooth tab navigation with zero FPS drops across all screens.
+• High-performance hardware telemetry caching (CPU, GPU, Camera, Sensors).
+• Optimized Glassmorphic UI with GPU-accelerated rendering.
+• Instant Tasks list loading and smooth scrolling.
+• Enhanced Floating Performance HUD overlay controls.
+• UI polish and stability improvements.

@@ -96,7 +96,7 @@ fun SettingsScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         androidx.compose.foundation.Image(
-                            painter = androidx.compose.ui.res.painterResource(id = com.ivarna.deviceinsight.R.mipmap.ic_launcher_round),
+                            painter = androidx.compose.ui.res.painterResource(id = com.ivarna.deviceinsight.R.drawable.logo),
                             contentDescription = "DeviceInsight Logo",
                             modifier = Modifier.size(56.dp)
                         )
@@ -119,7 +119,7 @@ fun SettingsScreen(
                         modifier = Modifier.padding(vertical = 8.dp)
                     ) {
                         Text(
-                            text = "Version 1.0.0",
+                            text = "Version ${com.ivarna.deviceinsight.BuildConfig.VERSION_NAME}",
                             style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
                             color = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)

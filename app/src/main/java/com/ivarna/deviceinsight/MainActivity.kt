@@ -2,7 +2,9 @@ package com.ivarna.deviceinsight
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
+import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -27,6 +29,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        enableHighRefreshRate()
 
         requestPermissions()
         
@@ -55,6 +58,27 @@ class MainActivity : ComponentActivity() {
 
         if (permissionsToRequest.isNotEmpty()) {
             ActivityCompat.requestPermissions(this, permissionsToRequest.toTypedArray(), 100)
+        }
+    }
+
+    private fun enableHighRefreshRate() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val supportedModes = display?.supportedModes
+            val maxMode = supportedModes?.maxByOrNull { it.refreshRate }
+            if (maxMode != null && maxMode.refreshRate >= 90f) {
+                val params = window.attributes
+                params.preferredDisplayModeId = maxMode.modeId
+                window.attributes = params
+            }
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            @Suppress("DEPRECATION")
+            val supportedModes = windowManager.defaultDisplay.supportedModes
+            val maxMode = supportedModes?.maxByOrNull { it.refreshRate }
+            if (maxMode != null && maxMode.refreshRate >= 90f) {
+                val params = window.attributes
+                params.preferredDisplayModeId = maxMode.modeId
+                window.attributes = params
+            }
         }
     }
 }

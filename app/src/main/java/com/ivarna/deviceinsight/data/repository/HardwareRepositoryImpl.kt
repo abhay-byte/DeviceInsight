@@ -107,6 +107,7 @@ class HardwareRepositoryImpl @Inject constructor(
             
             sensorCount = sensorProvider.getSensorCount(),
             availableSensors = sensorProvider.getSensorList(),
+            sensorDetails = sensorProvider.getSensorDetails(),
             fingerprintSensorPresent = sensorProvider.hasFingerprintSensor(),
             
             bluetoothVersion = deviceProvider.getBluetoothVersion(),

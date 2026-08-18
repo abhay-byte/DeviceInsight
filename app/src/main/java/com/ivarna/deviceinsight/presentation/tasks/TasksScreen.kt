@@ -20,7 +20,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.viewinterop.AndroidView
+import coil.compose.AsyncImage
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -96,15 +96,9 @@ fun AppItem(app: AppProcessInfo) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             // Icon
-            AndroidView(
-                factory = { ctx ->
-                    ImageView(ctx).apply {
-                        scaleType = ImageView.ScaleType.FIT_CENTER
-                    }
-                },
-                update = { view ->
-                    view.setImageDrawable(app.icon)
-                },
+            AsyncImage(
+                model = app.icon,
+                contentDescription = app.appName,
                 modifier = Modifier.size(48.dp)
             )
             

@@ -82,28 +82,16 @@ fun CircularGauge(
                 center = Offset(size.toPx() / 2, size.toPx() / 2)
             )
 
-            // Draw Glow (using native canvas for blur)
-            drawIntoCanvas { canvas ->
-                val glowPaint = NativePaint().apply {
-                    isAntiAlias = true
-                    this.color = color.toArgb()
-                    style = NativePaint.Style.STROKE
-                    this.strokeWidth = canvasStrokeWidth * 1.5f
-                    strokeCap = NativePaint.Cap.ROUND
-                    maskFilter = BlurMaskFilter(20f, BlurMaskFilter.Blur.NORMAL)
-                }
-                
-                canvas.nativeCanvas.drawArc(
-                    centerOffset,
-                    centerOffset,
-                    size.toPx() - centerOffset,
-                    size.toPx() - centerOffset,
-                    startAngle,
-                    sweepAngle * animatedValue,
-                    false,
-                    glowPaint
-                )
-            }
+            // Draw Glow using hardware-accelerated alpha stroke
+            drawArc(
+                color = color.copy(alpha = 0.25f),
+                startAngle = startAngle,
+                sweepAngle = sweepAngle * animatedValue,
+                useCenter = false,
+                topLeft = Offset(centerOffset, centerOffset),
+                size = Size(gaugeSize - canvasStrokeWidth, gaugeSize - canvasStrokeWidth),
+                style = Stroke(width = canvasStrokeWidth * 1.4f, cap = StrokeCap.Round)
+            )
 
             // Draw progress arc
             drawArc(

@@ -14,9 +14,12 @@ import javax.inject.Singleton
 class DirectoryProvider @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
+    @Volatile
+    private var cachedDirectoryInfo: DirectoryInfo? = null
 
     fun getDirectoryInfo(): DirectoryInfo {
-        return DirectoryInfo(
+        cachedDirectoryInfo?.let { return it }
+        val info = DirectoryInfo(
             data = Environment.getDataDirectory().absolutePath,
             root = Environment.getRootDirectory().absolutePath,
             javaHome = System.getProperty("java.home") ?: "/apex/com.android.art",
@@ -24,6 +27,8 @@ class DirectoryProvider @Inject constructor(
             externalStorage = getExternalStorageInfo(),
             mountPoints = getMountPoints()
         )
+        cachedDirectoryInfo = info
+        return info
     }
 
     private fun getExternalStorageInfo(): ExternalStorageInfo {

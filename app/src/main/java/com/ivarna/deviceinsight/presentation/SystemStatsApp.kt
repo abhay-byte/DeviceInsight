@@ -2,6 +2,8 @@ package com.ivarna.deviceinsight.presentation
 
 import android.content.Intent
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
@@ -187,7 +189,11 @@ fun SystemStatsApp() {
                     startDestination = Screen.Dashboard.route,
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(top = innerPadding.calculateTopPadding())
+                        .padding(top = innerPadding.calculateTopPadding()),
+                    enterTransition = { fadeIn(animationSpec = tween(150)) },
+                    exitTransition = { fadeOut(animationSpec = tween(150)) },
+                    popEnterTransition = { fadeIn(animationSpec = tween(150)) },
+                    popExitTransition = { fadeOut(animationSpec = tween(150)) }
                 ) {
                     composable(Screen.Dashboard.route) { DashboardScreen() }
                     composable(Screen.Tasks.route) { TasksScreen() }
@@ -196,7 +202,20 @@ fun SystemStatsApp() {
                 }
             }
 
-            Box(modifier = Modifier.align(Alignment.BottomCenter)) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                Color.Transparent,
+                                MaterialTheme.colorScheme.background.copy(alpha = 0.5f),
+                                MaterialTheme.colorScheme.background.copy(alpha = 0.85f)
+                            )
+                        )
+                    )
+            ) {
                 GlassBottomNav(
                     navController = navController,
                     items = bottomNavItems,
@@ -219,15 +238,14 @@ fun GlassBottomNav(
         modifier = Modifier
             .fillMaxWidth()
             .navigationBarsPadding()
-            .padding(horizontal = 24.dp, vertical = 8.dp)
+            .padding(start = 24.dp, end = 24.dp, top = 8.dp, bottom = 20.dp)
             .height(72.dp)
             .hazeChild(
                 state = hazeState,
                 shape = RoundedCornerShape(24.dp),
                 style = HazeStyle(
-                    tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.2f),
-                    blurRadius = 30.dp,
-                    noiseFactor = 0.05f
+                    tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.65f),
+                    blurRadius = 16.dp
                 )
             )
             .border(

@@ -6,10 +6,16 @@ import java.io.File
 import java.io.InputStreamReader
 import javax.inject.Inject
 
+@javax.inject.Singleton
 class SecurityProvider @Inject constructor() {
+    @Volatile
+    private var cachedIsRooted: Boolean? = null
     
     fun isRooted(): Boolean {
-        return checkRootMethod1() || checkRootMethod2() || checkRootMethod3()
+        cachedIsRooted?.let { return it }
+        val rooted = checkRootMethod1() || checkRootMethod2() || checkRootMethod3()
+        cachedIsRooted = rooted
+        return rooted
     }
 
     private fun checkRootMethod1(): Boolean {

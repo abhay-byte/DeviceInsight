@@ -205,11 +205,11 @@ fun InfoSection(
  * (e.g., GPU Cores, API level) in a pill-shaped chip.
  */
 @Composable
-fun StatBadge(label: String, value: String, color: Color? = null) {
+fun StatBadge(label: String, value: String, color: Color? = null, modifier: Modifier = Modifier) {
     val resolvedColor = color ?: MaterialTheme.colorScheme.primary
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier
+        modifier = modifier
             .clip(RoundedCornerShape(12.dp))
             .background(resolvedColor.copy(alpha = 0.08f))
             .border(1.dp, resolvedColor.copy(alpha = 0.2f), RoundedCornerShape(12.dp))

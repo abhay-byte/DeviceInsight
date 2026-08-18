@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.ivarna.deviceinsight.domain.model.HardwareInfo
 import com.ivarna.deviceinsight.domain.repository.HardwareRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -26,16 +27,17 @@ class HardwareViewModel @Inject constructor(
     }
 
     private fun startHardwareInfoRefresh() {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             while (isActive) {
-                _hardwareInfo.value = repository.getHardwareInfo()
+                val info = repository.getHardwareInfo()
+                _hardwareInfo.value = info
                 delay(1000) // Refresh every second
             }
         }
     }
 
     fun loadHardwareInfo() {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             _hardwareInfo.value = repository.getHardwareInfo()
         }
     }

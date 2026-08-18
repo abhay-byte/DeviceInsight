@@ -15,12 +15,16 @@ import javax.microedition.khronos.egl.EGL10
 import javax.microedition.khronos.egl.EGLContext
 import javax.microedition.khronos.opengles.GL10
 
+@javax.inject.Singleton
 class GpuProvider @Inject constructor(
     @ApplicationContext private val context: Context,
     private val gpuMapper: GpuMapper
 ) {
+    @Volatile
+    private var cachedGpuDetailedInfo: GpuDetailedInfo? = null
 
     fun getGpuDetailedInfo(): GpuDetailedInfo {
+        cachedGpuDetailedInfo?.let { return it }
         val glInfo = getOpenGLInfo()
         val gpuInfo = gpuMapper.mapHardwareToGpuInfo(Build.HARDWARE)
         
@@ -28,7 +32,7 @@ class GpuProvider @Inject constructor(
         val vulkanLimits = getVulkanLimits(gpuInfo.renderer)
         val vulkanFeatures = getVulkanFeatures(gpuInfo.renderer)
         
-        return GpuDetailedInfo(
+        val info = GpuDetailedInfo(
             openGlRenderer = glInfo.second,
             openGlVendor = getVendorName(glInfo.second),
             openGlVersion = glInfo.first,
@@ -46,6 +50,8 @@ class GpuProvider @Inject constructor(
             vulkanLimits = vulkanLimits,
             vulkanFeatures = vulkanFeatures
         )
+        cachedGpuDetailedInfo = info
+        return info
     }
 
     private fun getVendorName(renderer: String): String {

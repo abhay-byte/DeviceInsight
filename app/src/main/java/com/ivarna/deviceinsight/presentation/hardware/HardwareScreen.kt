@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.DeveloperBoard
 import androidx.compose.material.icons.filled.DeviceThermostat
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Memory
+import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Monitor
 import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.Sensors
@@ -32,6 +33,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -55,7 +57,7 @@ private val hardwareTabs = listOf(
     HardwareTab("Android",    Icons.Filled.Android),
     HardwareTab("Hardware",   Icons.Filled.DataObject),
     HardwareTab("Thermal",    Icons.Filled.DeviceThermostat),
-    HardwareTab("Dirs",       Icons.Filled.Folder),
+    HardwareTab("Storage",    Icons.Filled.Storage),
     HardwareTab("Sensors",    Icons.Filled.Sensors),
 )
 
@@ -73,59 +75,42 @@ fun HardwareScreen(
         )
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
+    Box(modifier = Modifier.fillMaxSize()) {
 
-        // ── Premium pill-style horizontal tab bar ──────────────────────────
-        LazyRow(
-            state = listState,
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            itemsIndexed(hardwareTabs) { index, tab ->
-                PillTab(
-                    label = tab.label,
-                    icon = tab.icon,
-                    selected = selectedTabIndex == index,
-                    onClick = { selectedTabIndex = index }
-                )
-            }
-        }
-
-        // ── Tab content ────────────────────────────────────────────────────
-        Box(
+        // ── Scrollable tab content (back layer) ────────────────────────────
+        Column(
             modifier = Modifier
                 .fillMaxSize()
-                .weight(1f)
+                .verticalScroll(rememberScrollState())
         ) {
-            if (hardwareInfo == null) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        CircularProgressIndicator(
-                            color = MaterialTheme.colorScheme.primary,
-                            strokeWidth = 2.dp,
-                            modifier = Modifier.size(36.dp)
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text(
-                            text = "Loading hardware info…",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                        )
-                    }
-                }
-            } else {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 16.dp)
-                        .verticalScroll(rememberScrollState())
-                ) {
-                    Spacer(modifier = Modifier.height(4.dp))
+            // Reserve space for the overlaid tab bar
+            Spacer(modifier = Modifier.height(60.dp))
 
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 16.dp)
+            ) {
+                if (hardwareInfo == null) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            CircularProgressIndicator(
+                                color = MaterialTheme.colorScheme.primary,
+                                strokeWidth = 2.dp,
+                                modifier = Modifier.size(36.dp)
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text(
+                                text = "Loading hardware info…",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                            )
+                        }
+                    }
+                } else {
                     hardwareInfo?.let { info ->
                         when (selectedTabIndex) {
                             0  -> SystemTab(info)
@@ -137,12 +122,50 @@ fun HardwareScreen(
                             6  -> AndroidTab(info)
                             7  -> DevicesTab(info)
                             8  -> ThermalTab(info)
-                            9  -> DirectoriesTab(info)
+                            9  -> StorageTab(info)
                             10 -> SensorsTab(info)
                         }
                     }
+                }
+            }
 
-                    Spacer(modifier = Modifier.height(100.dp))
+            Spacer(modifier = Modifier.height(120.dp))
+        }
+
+        // ── Premium pill-style horizontal tab bar (overlay) ────────────────
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .align(Alignment.TopStart)
+        ) {
+            // Translucent backdrop so content reads under the tabs
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(60.dp)
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                MaterialTheme.colorScheme.background.copy(alpha = 0.92f),
+                                MaterialTheme.colorScheme.background.copy(alpha = 0.7f),
+                                Color.Transparent
+                            )
+                        )
+                    )
+            )
+            LazyRow(
+                state = listState,
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                itemsIndexed(hardwareTabs) { index, tab ->
+                    PillTab(
+                        label = tab.label,
+                        icon = tab.icon,
+                        selected = selectedTabIndex == index,
+                        onClick = { selectedTabIndex = index }
+                    )
                 }
             }
         }

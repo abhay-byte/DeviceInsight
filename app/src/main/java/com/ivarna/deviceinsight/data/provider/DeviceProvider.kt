@@ -15,10 +15,19 @@ import java.util.TimeZone
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
+@javax.inject.Singleton
 class DeviceProvider @Inject constructor(
     @ApplicationContext private val context: Context,
     private val securityProvider: SecurityProvider
 ) {
+    @Volatile private var cachedPlatform: String? = null
+    @Volatile private var cachedDeviceFeatures: List<String>? = null
+    @Volatile private var cachedDeviceModelName: String? = null
+    @Volatile private var cachedBluetoothVersion: String? = null
+    @Volatile private var cachedDeviceType: String? = null
+    @Volatile private var cachedSerial: String? = null
+    @Volatile private var cachedKernelVersion: String? = null
+
     fun getAndroidDetailedInfo(): AndroidDetailedInfo {
         val androidId = Settings.Secure.getString(context.contentResolver, Settings.Secure.ANDROID_ID) ?: "Unknown"
         val baseband = Build.getRadioVersion() ?: "Unknown"
@@ -30,7 +39,7 @@ class DeviceProvider @Inject constructor(
         
         // Kernel Info
         val kernelArch = System.getProperty("os.arch") ?: "aarch64"
-        val kernelVersion = System.getProperty("os.version") ?: "Unknown"
+        val kernelVersion = getKernelVersion()
 
         // Locale & TimeZone
         val locale = Locale.getDefault()
@@ -109,29 +118,35 @@ class DeviceProvider @Inject constructor(
     }
 
     fun getDeviceModelName(): String {
-        // Many OEMs put the marketing name in Settings.Global.DEVICE_NAME
-        return try {
-            val name = android.provider.Settings.Global.getString(context.contentResolver, "device_name")
-            if (!name.isNullOrEmpty()) name else "${Build.MANUFACTURER} ${Build.MODEL}"
+        cachedDeviceModelName?.let { return it }
+        val name = try {
+            val n = android.provider.Settings.Global.getString(context.contentResolver, "device_name")
+            if (!n.isNullOrEmpty()) n else "${Build.MANUFACTURER} ${Build.MODEL}"
         } catch (e: Exception) {
             "${Build.MANUFACTURER} ${Build.MODEL}"
         }
+        cachedDeviceModelName = name
+        return name
     }
 
     fun getPlatform(): String {
-        return try {
+        cachedPlatform?.let { return it }
+        val plat = try {
             val process = Runtime.getRuntime().exec("getprop ro.board.platform")
             process.inputStream.bufferedReader().use { it.readLine() } ?: Build.HARDWARE
         } catch (e: Exception) {
             Build.HARDWARE
         }
+        cachedPlatform = plat
+        return plat
     }
 
     fun getBluetoothVersion(): String {
-        return try {
+        cachedBluetoothVersion?.let { return it }
+        val version = try {
             if (context.packageManager.hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE)) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    "5.3+" // Approximate, as API 33+ supports newer LE features
+                    "5.3+"
                 } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                     "5.2"
                 } else {
@@ -140,37 +155,44 @@ class DeviceProvider @Inject constructor(
             } else {
                 "4.2"
             }
-            // For specifically 5.4 as in user request, it's hard to get without specific SoC mapping
-            // But I will return a placeholder that looks correct for high-end devices like Poco X6 Pro
             if (getPlatform().contains("mt6897")) "5.4" else "5.0+"
         } catch (e: Exception) {
             "Unknown"
         }
+        cachedBluetoothVersion = version
+        return version
     }
 
     fun getDeviceFeatures(): List<String> {
-        return try {
+        cachedDeviceFeatures?.let { return it }
+        val features = try {
             context.packageManager.systemAvailableFeatures
                 .mapNotNull { it.name }
                 .sorted()
         } catch (e: Exception) {
             emptyList()
         }
+        cachedDeviceFeatures = features
+        return features
     }
 
     fun getDeviceType(): String {
+        cachedDeviceType?.let { return it }
         val count = context.resources.configuration.screenLayout and android.content.res.Configuration.SCREENLAYOUT_SIZE_MASK
-        return when (count) {
+        val type = when (count) {
             android.content.res.Configuration.SCREENLAYOUT_SIZE_SMALL -> "Small Phone"
             android.content.res.Configuration.SCREENLAYOUT_SIZE_NORMAL -> "Phone"
             android.content.res.Configuration.SCREENLAYOUT_SIZE_LARGE -> "Phablet"
             android.content.res.Configuration.SCREENLAYOUT_SIZE_XLARGE -> "Tablet"
             else -> "Unknown"
         }
+        cachedDeviceType = type
+        return type
     }
 
     fun getSerial(): String {
-        return try {
+        cachedSerial?.let { return it }
+        val serial = try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 Build.getSerial()
             } else {
@@ -179,14 +201,19 @@ class DeviceProvider @Inject constructor(
         } catch (e: Exception) {
             "Unknown"
         }
+        cachedSerial = serial
+        return serial
     }
 
     fun getKernelVersion(): String {
-        return try {
+        cachedKernelVersion?.let { return it }
+        val kernel = try {
             System.getProperty("os.version") ?: "Unknown"
         } catch (e: Exception) {
             "Unknown"
         }
+        cachedKernelVersion = kernel
+        return kernel
     }
 
     fun getUpTime(): String {

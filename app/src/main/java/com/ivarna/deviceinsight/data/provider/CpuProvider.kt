@@ -6,11 +6,21 @@ import com.ivarna.deviceinsight.utils.CpuUtilizationUtils
 import java.io.File
 import javax.inject.Inject
 
+@javax.inject.Singleton
 class CpuProvider @Inject constructor(
     private val cpuUtilizationUtils: CpuUtilizationUtils,
     private val socMapper: SocMapper
 ) {
+    @Volatile private var cachedSocModel: String? = null
+    @Volatile private var cachedCpuArchitecture: String? = null
+    @Volatile private var cachedManufacturingProcess: String? = null
+    @Volatile private var cachedCpuRevision: String? = null
+    @Volatile private var cachedCpuClockRange: String? = null
+    @Volatile private var cachedFeatures: Map<String, Boolean>? = null
+    @Volatile private var cachedMaxCpuFreq: Int? = null
+
     fun getSocModel(): String {
+        cachedSocModel?.let { return it }
         val hardware = try {
             val cpuInfo = File("/proc/cpuinfo").readLines()
             var hw = ""
@@ -22,15 +32,16 @@ class CpuProvider @Inject constructor(
             android.os.Build.HARDWARE
         }
 
-        return socMapper.mapHardwareToMarketingName(hardware)
+        val result = socMapper.mapHardwareToMarketingName(hardware)
+        cachedSocModel = result
+        return result
     }
 
     fun getCpuArchitecture(): String {
-        // ...Existing implementation for core detail parsing...
-        return try {
+        cachedCpuArchitecture?.let { return it }
+        val result = try {
             val cpuInfo = File("/proc/cpuinfo").readLines()
             val cores = mutableMapOf<String, Int>()
-            var currentPart = ""
             
             for (line in cpuInfo) {
                 if (line.startsWith("CPU part")) {
@@ -61,9 +72,12 @@ class CpuProvider @Inject constructor(
         } catch (e: Exception) {
             System.getProperty("os.arch") ?: "Unknown"
         }
+        cachedCpuArchitecture = result
+        return result
     }
 
     fun getManufacturingProcess(): String {
+        cachedManufacturingProcess?.let { return it }
         val hardware = try {
             val cpuInfo = File("/proc/cpuinfo").readLines()
             var hw = ""
@@ -75,25 +89,35 @@ class CpuProvider @Inject constructor(
             android.os.Build.HARDWARE
         }
         
-        return socMapper.getProcessNode(hardware)
+        val result = socMapper.getProcessNode(hardware)
+        cachedManufacturingProcess = result
+        return result
     }
 
     fun getCpuRevision(): String {
-        return try {
+        cachedCpuRevision?.let { return it }
+        val result = try {
             val cpuInfo = File("/proc/cpuinfo").readLines()
+            var rev = "Unknown"
             for (line in cpuInfo) {
-                if (line.contains("CPU revision")) return line.split(":")[1].trim()
+                if (line.contains("CPU revision")) {
+                    rev = line.split(":")[1].trim()
+                    break
+                }
             }
-            "Unknown"
+            rev
         } catch (e: Exception) {
             "Unknown"
         }
+        cachedCpuRevision = result
+        return result
     }
 
     fun getCpuClockRange(): String {
+        cachedCpuClockRange?.let { return it }
         var minFreq = Long.MAX_VALUE
         var maxFreq = 0L
-        try {
+        val result = try {
             for (i in 0 until Runtime.getRuntime().availableProcessors()) {
                 val minFile = File("/sys/devices/system/cpu/cpu$i/cpufreq/cpuinfo_min_freq")
                 val maxFile = File("/sys/devices/system/cpu/cpu$i/cpufreq/cpuinfo_max_freq")
@@ -108,10 +132,17 @@ class CpuProvider @Inject constructor(
                 }
             }
             if (maxFreq > 0) {
-                return "${minFreq / 1000} MHz - ${maxFreq / 1000} MHz"
+                "${minFreq / 1000} MHz - ${maxFreq / 1000} MHz"
+            } else {
+                "Unknown"
             }
-        } catch (e: Exception) { }
-        return "Unknown"
+        } catch (e: Exception) {
+            "Unknown"
+        }
+        if (result != "Unknown") {
+            cachedCpuClockRange = result
+        }
+        return result
     }
 
     fun getCpuUtilization(): Float {
@@ -119,6 +150,7 @@ class CpuProvider @Inject constructor(
     }
 
     fun getFeatures(): Map<String, Boolean> {
+        cachedFeatures?.let { return it }
         val features = mutableMapOf(
             "aes" to false,
             "neon" to false,
@@ -134,10 +166,12 @@ class CpuProvider @Inject constructor(
             features["sha1"] = cpuInfo.contains("sha1")
             features["sha2"] = cpuInfo.contains("sha2")
         } catch (e: Exception) { }
+        cachedFeatures = features
         return features
     }
 
     fun getMaxCpuFrequency(): Int {
+        cachedMaxCpuFreq?.let { return it }
         var maxFreq = 0
         try {
             for (i in 0 until 16) {
@@ -154,7 +188,9 @@ class CpuProvider @Inject constructor(
         } catch (e: Exception) {
             Log.e("CpuProvider", "Error reading max CPU freq: ${e.message}")
         }
-        return if (maxFreq > 0) maxFreq / 1000 else 3000
+        val result = if (maxFreq > 0) maxFreq / 1000 else 3000
+        cachedMaxCpuFreq = result
+        return result
     }
 
     fun getCpuCoreFrequencies(): List<Int> {
