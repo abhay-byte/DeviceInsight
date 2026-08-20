@@ -43,7 +43,8 @@ class DashboardRepositoryImpl @Inject constructor(
     private val powerProvider: PowerProvider,
     private val thermalProvider: ThermalProvider,
     private val cpuProvider: CpuProvider,
-    private val gpuUsageProvider: GpuUsageProvider
+    private val gpuUsageProvider: GpuUsageProvider,
+    private val gpuMapper: com.ivarna.deviceinsight.data.mapper.GpuMapper
 ) : DashboardRepository {
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
@@ -128,6 +129,11 @@ class DashboardRepositoryImpl @Inject constructor(
         addToHistory(fpsHistory, com.ivarna.deviceinsight.domain.model.FpsDataPoint(x, now, fps))
 
         val coreFrequencies = cpuProvider.getCpuCoreFrequencies()
+        val coreMaxFrequencies = cpuProvider.getCpuCoreMaxFrequencies()
+        val cpuClockRange = cpuProvider.getCpuClockRange()
+        val cpuArch = cpuProvider.getCpuArchitecture()
+        val totalCores = if (coreFrequencies.isNotEmpty()) coreFrequencies.size else Runtime.getRuntime().availableProcessors()
+
         while (cpuCoreHistoryList.size < coreFrequencies.size) {
             val list = java.util.LinkedList<com.ivarna.deviceinsight.domain.model.CpuCoreDataPoint>()
             val innerNow = System.currentTimeMillis()
@@ -146,9 +152,36 @@ class DashboardRepositoryImpl @Inject constructor(
 
         val batteryInfo = batteryProvider.getBatteryInfo()
         val storageInfo = storageProvider.getInternalStorageInfo()
-        val storageUsedPerc = (storageInfo.first - storageInfo.second).toFloat() / storageInfo.first.toFloat()
+        val storageUsedPerc = if (storageInfo.first > 0) (storageInfo.first - storageInfo.second).toFloat() / storageInfo.first.toFloat() else 0f
+        val storageFreeFormatted = FormattingUtils.formatFileSize(storageInfo.second)
+        val storageTotalFormatted = FormattingUtils.formatFileSize(storageInfo.first)
+        val storageUsedFormatted = FormattingUtils.formatFileSize(storageInfo.first - storageInfo.second)
 
         val gpuMetrics = gpuUsageProvider.getMetrics()
+        val socTarget = "${android.os.Build.HARDWARE} ${cpuProvider.getSocModel()} ${android.os.Build.BOARD} ${if (android.os.Build.VERSION.SDK_INT >= 31) android.os.Build.SOC_MODEL else ""}"
+        val gpuInfo = gpuMapper.mapHardwareToGpuInfo(socTarget)
+        val gpuModel = if (gpuMetrics.renderer.isNotBlank() && !gpuMetrics.renderer.contains("Unknown", ignoreCase = true)) {
+            gpuMetrics.renderer
+        } else {
+            gpuInfo.renderer
+        }
+        var gpuCores = gpuInfo.cores
+        if (gpuCores == 0) {
+            val mcMatch = Regex("MC(\\d+)|MP(\\d+)", RegexOption.IGNORE_CASE).find(gpuModel)
+            if (mcMatch != null) {
+                val group1 = mcMatch.groupValues[1]
+                val group2 = mcMatch.groupValues[2]
+                gpuCores = (if (group1.isNotBlank()) group1 else group2).toIntOrNull() ?: 0
+            }
+        }
+        val gpuMin = gpuInfo.baseFreqMhz
+        val gpuMax = if (gpuMetrics.maxFreqMhz > 0) gpuMetrics.maxFreqMhz else gpuInfo.maxFreqMhz
+        val gpuCur = if (gpuMetrics.curFreqMhz > 0) {
+            gpuMetrics.curFreqMhz
+        } else if (gpuMax > 0) {
+            (gpuMin + (gpuMax - gpuMin) * (gpuMetrics.usage.coerceIn(0.05f, 1f))).toInt()
+        } else 0
+        val screenHz = displayRefreshRateUtils.getRefreshRate()
 
         return DashboardMetrics(
             cpuUsage = cpu,
@@ -158,25 +191,37 @@ class DashboardRepositoryImpl @Inject constructor(
             swapUsedBytes = swapUsed,
             swapTotalBytes = swapTotal,
             gpuUsage = gpuMetrics.usage,
-            gpuModel = gpuMetrics.renderer,
+            gpuModel = gpuModel,
             gpuTemp = gpuMetrics.temperatureC,
-            gpuFreqMhz = gpuMetrics.curFreqMhz,
-            gpuMaxFreqMhz = gpuMetrics.maxFreqMhz,
-            gpuVendor = gpuMetrics.vendor.name,
+            gpuFreqMhz = gpuCur,
+            gpuMaxFreqMhz = gpuMax,
+            gpuMinFreqMhz = gpuMin,
+            gpuCores = gpuCores,
+            gpuVendor = if (gpuMetrics.vendor.name != "UNKNOWN") gpuMetrics.vendor.name else gpuInfo.vendor,
             batteryLevel = batteryInfo.level,
             batteryStatus = batteryInfo.status,
+            batteryVoltage = batteryInfo.voltage,
+            batteryHealth = batteryInfo.health,
+            isCharging = batteryInfo.isCharging,
             temperature = batteryInfo.temperature,
             cpuTemperature = thermalProvider.getCpuTemperature(),
             powerConsumption = power,
             cpuCoreFrequencies = coreFrequencies,
+            cpuCoreMaxFrequencies = coreMaxFrequencies,
+            cpuClockRange = cpuClockRange,
+            cpuArchitecture = cpuArch,
+            cpuTotalCores = totalCores,
             storageUsedPerc = storageUsedPerc,
-            storageFreeGb = FormattingUtils.formatFileSize(storageInfo.second) + " Free",
+            storageFreeGb = storageFreeFormatted + " Free",
+            storageTotalGb = storageTotalFormatted,
+            storageUsedGb = storageUsedFormatted,
             networkSpeed = totalSpeed,
             networkDownloadSpeed = rxSpeed,
             networkUploadSpeed = txSpeed,
             uptime = deviceProvider.getUpTime(),
             cpuGovernor = cpuUtilizationUtils.getCurrentCpuGovernor(),
             maxCpuFrequency = maxCpuFreqCache,
+            screenRefreshRate = screenHz,
             cpuHistory = ArrayList(cpuHistory),
             cpuCoreHistory = cpuCoreHistoryList.map { ArrayList(it) },
             ramHistory = ArrayList(ramHistory),

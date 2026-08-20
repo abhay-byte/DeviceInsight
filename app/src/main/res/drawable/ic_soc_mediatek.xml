@@ -1,0 +1,13 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+  <path
+      android:fillColor="#FF7900"
+      android:pathData="M8,6h32c2.2,0 4,1.8 4,4v28c0,2.2 -1.8,4 -4,4H8c-2.2,0 -4,-1.8 -4,-4V10C4,7.8 5.8,6 8,6z"/>
+  <!-- MediaTek Geometric Shape -->
+  <path
+      android:fillColor="#FFFFFF"
+      android:pathData="M14,14h9.5c4.5,0 7.5,2.5 7.5,6.5 0,2.2 -1.1,4.1 -2.9,5.2 2.5,0.9 4.1,3.2 4.1,6.1 0,4.4 -3.4,7.2 -8.2,7.2H14V14zm5.5,9.5h3.6c1.6,0 2.7,-1 2.7,-2.4 0,-1.4 -1.1,-2.4 -2.7,-2.4h-3.6v4.8zm0,11h4.1c1.8,0 3,-1 3,-2.6 0,-1.6 -1.2,-2.6 -3,-2.6h-4.1v5.2z"/>
+</vector>

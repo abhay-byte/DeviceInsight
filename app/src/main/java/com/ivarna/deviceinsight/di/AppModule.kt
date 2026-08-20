@@ -137,7 +137,8 @@ object AppModule {
         powerProvider: PowerProvider,
         thermalProvider: ThermalProvider,
         cpuProvider: CpuProvider,
-        gpuUsageProvider: GpuUsageProvider
+        gpuUsageProvider: GpuUsageProvider,
+        gpuMapper: com.ivarna.deviceinsight.data.mapper.GpuMapper
     ): DashboardRepository {
         return DashboardRepositoryImpl(
             context,
@@ -152,7 +153,8 @@ object AppModule {
             powerProvider,
             thermalProvider,
             cpuProvider,
-            gpuUsageProvider
+            gpuUsageProvider,
+            gpuMapper
         )
     }
 

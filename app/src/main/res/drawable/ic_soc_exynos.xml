@@ -1,0 +1,16 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+  <path
+      android:fillColor="#0057D9"
+      android:pathData="M24,4C12.95,4 4,12.95 4,24c0,11.05 8.95,20 20,20s20,-8.95 20,-20C44,12.95 35.05,4 24,4z"/>
+  <!-- Exynos Dual Orbital Arc -->
+  <path
+      android:fillColor="#FFFFFF"
+      android:pathData="M24,12c-6.6,0 -12,5.4 -12,12s5.4,12 12,12c4.2,0 7.9,-2.2 10.1,-5.5 -1.6,0.6 -3.3,0.9 -5.1,0.9 -6.6,0 -12,-5.4 -12,-12s5.4,-12 12,-12c1.8,0 3.5,0.3 5.1,0.9C31.9,14.2 28.2,12 24,12z"/>
+  <path
+      android:fillColor="#FFFFFF"
+      android:pathData="M28,20c0,2.2 -1.8,4 -4,4s-4,-1.8 -4,-4 1.8,-4 4,-4 4,1.8 4,4z"/>
+</vector>

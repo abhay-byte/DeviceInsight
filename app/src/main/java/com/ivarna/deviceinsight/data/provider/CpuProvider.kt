@@ -19,8 +19,43 @@ class CpuProvider @Inject constructor(
     @Volatile private var cachedFeatures: Map<String, Boolean>? = null
     @Volatile private var cachedMaxCpuFreq: Int? = null
 
+    private fun getSystemProperty(key: String): String {
+        return try {
+            val c = Class.forName("android.os.SystemProperties")
+            val get = c.getMethod("get", String::class.java, String::class.java)
+            get.invoke(null, key, "") as String
+        } catch (_: Exception) {
+            try {
+                val p = Runtime.getRuntime().exec(arrayOf("getprop", key))
+                p.inputStream.bufferedReader().use { it.readLine()?.trim().orEmpty() }
+            } catch (_: Exception) { "" }
+        }
+    }
+
     fun getSocModel(): String {
         cachedSocModel?.let { return it }
+        
+        // 1. Try ro.soc.model
+        var soc = getSystemProperty("ro.soc.model")
+        if (soc.isNotBlank()) {
+            val mapped = socMapper.mapHardwareToMarketingName(soc)
+            if (mapped != soc.uppercase()) {
+                cachedSocModel = mapped
+                return mapped
+            }
+        }
+
+        // 2. Try ro.board.platform
+        val platform = getSystemProperty("ro.board.platform")
+        if (platform.isNotBlank()) {
+            val mapped = socMapper.mapHardwareToMarketingName(platform)
+            if (mapped != platform.uppercase()) {
+                cachedSocModel = mapped
+                return mapped
+            }
+        }
+
+        // 3. Try /proc/cpuinfo Hardware line
         val hardware = try {
             val cpuInfo = File("/proc/cpuinfo").readLines()
             var hw = ""
@@ -32,7 +67,9 @@ class CpuProvider @Inject constructor(
             android.os.Build.HARDWARE
         }
 
-        val result = socMapper.mapHardwareToMarketingName(hardware)
+        val result = socMapper.mapHardwareToMarketingName(
+            if (soc.isNotBlank()) soc else if (platform.isNotBlank()) platform else hardware
+        )
         cachedSocModel = result
         return result
     }
@@ -47,17 +84,25 @@ class CpuProvider @Inject constructor(
                 if (line.startsWith("CPU part")) {
                     val part = line.split(":")[1].trim().lowercase()
                     val name = when (part) {
+                        "0xd85" -> "Cortex-X925"
+                        "0xd87" -> "Cortex-A725"
+                        "0xd80" -> "Cortex-X4"
+                        "0xd81" -> "Cortex-A720"
+                        "0xd82" -> "Cortex-A520"
                         "0xd4e" -> "Cortex-X3"
-                        "0xd4f" -> "Cortex-A715"
-                        "0xd41" -> "Cortex-A78"
-                        "0xd03" -> "Cortex-A53"
-                        "0xd08" -> "Cortex-A72"
-                        "0xd42" -> "Cortex-A78C"
+                        "0xd4f", "0xd47", "0xd4d" -> "Cortex-A715"
                         "0xd44" -> "Cortex-X2"
-                        "0xd46" -> "Cortex-A510"
                         "0xd4b" -> "Cortex-A710"
-                        "0xd47" -> "Cortex-A715"
-                        "0xd4d" -> "Cortex-A715"
+                        "0xd46" -> "Cortex-A510"
+                        "0xd41", "0xd42" -> "Cortex-A78"
+                        "0xd0d" -> "Cortex-A77"
+                        "0xd0b" -> "Cortex-A76"
+                        "0xd0a" -> "Cortex-A75"
+                        "0xd09" -> "Cortex-A73"
+                        "0xd08" -> "Cortex-A72"
+                        "0xd05" -> "Cortex-A55"
+                        "0xd03" -> "Cortex-A53"
+                        "0xd84" -> "Oryon"
                         else -> "Cortex (Part $part)"
                     }
                     cores[name] = cores.getOrDefault(name, 0) + 1
@@ -196,6 +241,12 @@ class CpuProvider @Inject constructor(
     fun getCpuCoreFrequencies(): List<Int> {
         return cpuUtilizationUtils.getAllCoreFrequencies().values.map { 
             (it.first / 1000).toInt()
+        }
+    }
+
+    fun getCpuCoreMaxFrequencies(): List<Int> {
+        return cpuUtilizationUtils.getAllCoreFrequencies().values.map { 
+            (it.second / 1000).toInt()
         }
     }
 }

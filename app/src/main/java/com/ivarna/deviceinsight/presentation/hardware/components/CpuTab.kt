@@ -17,6 +17,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -28,7 +30,7 @@ import com.ivarna.deviceinsight.domain.model.HardwareInfo
 @Composable
 fun CpuTab(info: HardwareInfo) {
     val logoRepo = remember { SocLogoRepository() }
-    val logoUrl = logoRepo.logoUrlFor(info.socModel)
+    val logoRes = remember(info.socModel) { logoRepo.logoDrawableResFor(info.socModel) }
     val primary = MaterialTheme.colorScheme.primary
     val secondary = MaterialTheme.colorScheme.secondary
     val tertiary = MaterialTheme.colorScheme.tertiary
@@ -58,24 +60,14 @@ fun CpuTab(info: HardwareInfo) {
                 modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                if (logoUrl != null) {
-                    AsyncImage(
-                        model = logoUrl,
-                        contentDescription = "${info.socModel} logo",
-                        contentScale = ContentScale.Fit,
-                        modifier = Modifier
-                            .height(60.dp)
-                            .padding(bottom = 8.dp)
-                    )
-                } else {
-                    Icon(
-                        imageVector = Icons.Filled.Memory,
-                        contentDescription = null,
-                        tint = primary,
-                        modifier = Modifier.size(40.dp)
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                }
+                Image(
+                    painter = painterResource(id = logoRes),
+                    contentDescription = "${info.socModel} logo",
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier
+                        .size(56.dp)
+                        .padding(bottom = 8.dp)
+                )
                 Text(
                     text = info.socModel,
                     style = MaterialTheme.typography.titleLarge.copy(

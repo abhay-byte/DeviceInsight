@@ -17,7 +17,11 @@ import javax.inject.Inject
 data class DeviceCardInfo(
     val deviceName: String,
     val cpuModel: String,
-    val gpuModel: String
+    val gpuModel: String,
+    val manufacturer: String = "",
+    val androidVersion: String = "",
+    val cpuArchitecture: String = "",
+    val totalCores: Int = 8
 )
 
 @HiltViewModel
@@ -40,7 +44,11 @@ class DashboardViewModel @Inject constructor(
     private val staticDeviceInfo = DeviceCardInfo(
         deviceName = deviceProvider.getDeviceModelName(),
         cpuModel = cpuProvider.getSocModel(),
-        gpuModel = ""
+        gpuModel = "",
+        manufacturer = android.os.Build.MANUFACTURER.replaceFirstChar { it.uppercase() },
+        androidVersion = "Android ${android.os.Build.VERSION.RELEASE}",
+        cpuArchitecture = cpuProvider.getCpuArchitecture(),
+        totalCores = Runtime.getRuntime().availableProcessors()
     )
 
     /**
@@ -51,8 +59,9 @@ class DashboardViewModel @Inject constructor(
         combine(uiState, MutableStateFlow(staticDeviceInfo)) { m, info ->
             info.copy(
                 deviceName = info.deviceName,
-                cpuModel = info.cpuModel,
-                gpuModel = m?.gpuModel?.takeIf { it.isNotBlank() } ?: info.gpuModel
+                cpuModel = if (info.cpuModel.isNotBlank() && info.cpuModel != "QCOM" && info.cpuModel != "UNKNOWN") info.cpuModel else cpuProvider.getSocModel(),
+                gpuModel = m?.gpuModel?.takeIf { it.isNotBlank() } ?: info.gpuModel,
+                cpuArchitecture = if (m?.cpuArchitecture?.isNotBlank() == true) m.cpuArchitecture else info.cpuArchitecture
             )
         }.stateIn(
             scope = viewModelScope,

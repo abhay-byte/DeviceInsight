@@ -1,0 +1,26 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+  <path
+      android:fillColor="#1E293B"
+      android:pathData="M10,4h28c3.3,0 6,2.7 6,6v28c0,3.3 -2.7,6 -6,6H10c-3.3,0 -6,-2.7 -6,-6V10c0,-3.3 2.7,-6 6,-6z"/>
+  <!-- Tensor Geometric Multi-Colored Prism Blocks -->
+  <path
+      android:fillColor="#4285F4"
+      android:pathData="M12,12h11v11h-11z"/>
+  <path
+      android:fillColor="#EA4335"
+      android:pathData="M25,12h11v11h-11z"/>
+  <path
+      android:fillColor="#34A853"
+      android:pathData="M12,25h11v11h-11z"/>
+  <path
+      android:fillColor="#FBBC05"
+      android:pathData="M25,25h11v11h-11z"/>
+  <!-- Center Core Accent -->
+  <path
+      android:fillColor="#00E5FF"
+      android:pathData="M21,21h6v6h-6z"/>
+</vector>
