@@ -14,6 +14,18 @@ class UsbProvider @Inject constructor(
 ) {
     private val usbManager = context.getSystemService(Context.USB_SERVICE) as UsbManager
 
+    fun getUsbVersion(): String {
+        return try {
+            getUsbDevices()
+                .mapNotNull { it.usbVersion.toDoubleOrNull() }
+                .maxOrNull()
+                ?.let { "${it} USB" }
+                ?: "Unknown"
+        } catch (e: Exception) {
+            "Unknown"
+        }
+    }
+
     fun getUsbDevices(): List<UsbDeviceInfo> {
         val devices = mutableListOf<UsbDeviceInfo>()
         try {

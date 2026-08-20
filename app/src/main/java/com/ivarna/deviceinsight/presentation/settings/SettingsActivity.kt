@@ -5,17 +5,20 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
-import androidx.compose.foundation.layout.*
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.ivarna.deviceinsight.presentation.theme.AppTheme
 import com.ivarna.deviceinsight.presentation.theme.SystemStatsTheme
 import dagger.hilt.android.AndroidEntryPoint
 
+/**
+ * Thin wrapper around the №05 SETTINGS Compose route (intent compatibility).
+ * The primary entry is the in-app NavHost destination reached from the
+ * Masthead gear HardKey.
+ */
 @AndroidEntryPoint
 class SettingsActivity : ComponentActivity() {
 
@@ -24,16 +27,20 @@ class SettingsActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableHighRefreshRate()
-        
+
         setContent {
-            val currentTheme by viewModel.theme.collectAsStateWithLifecycle()
-            
-            SystemStatsTheme(theme = currentTheme) {
-                SettingsActivityContent(
-                    currentTheme = currentTheme,
-                    onThemeSelected = { newTheme -> viewModel.setTheme(newTheme) },
-                    onBackPressed = { finish() }
-                )
+            val currentMedium by viewModel.medium.collectAsStateWithLifecycle()
+
+            SystemStatsTheme(medium = currentMedium) {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
+                    SettingsScreen(
+                        currentMedium = currentMedium,
+                        onMediumSelected = { newMedium -> viewModel.setMedium(newMedium) }
+                    )
+                }
             }
         }
     }
@@ -56,37 +63,6 @@ class SettingsActivity : ComponentActivity() {
                 params.preferredDisplayModeId = maxMode.modeId
                 window.attributes = params
             }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun SettingsActivityContent(
-    currentTheme: AppTheme,
-    onThemeSelected: (AppTheme) -> Unit,
-    onBackPressed: () -> Unit
-) {
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Settings") },
-                navigationIcon = {
-                    IconButton(onClick = onBackPressed) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back"
-                        )
-                    }
-                }
-            )
-        }
-    ) { paddingValues ->
-        Box(modifier = Modifier.padding(paddingValues)) {
-            SettingsScreen(
-                currentTheme = currentTheme,
-                onThemeSelected = onThemeSelected
-            )
         }
     }
 }

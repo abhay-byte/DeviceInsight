@@ -29,5 +29,6 @@ data class NetworkDetailedInfo(
     val leaseDuration: String,
     val is5GHzSupported: Boolean,
     val isWifiAwareSupported: Boolean,
-    val isWifiDirectSupported: Boolean
+    val isWifiDirectSupported: Boolean,
+    val wifiStandard: String
 )

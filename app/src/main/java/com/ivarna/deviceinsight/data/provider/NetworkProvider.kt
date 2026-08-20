@@ -17,9 +17,10 @@ import android.text.format.Formatter
 class NetworkProvider @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
+    private val wifiManager: WifiManager by lazy { context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager }
+
     fun getNetworkDetailedInfo(): NetworkDetailedInfo {
         val telephonyManager = context.getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
-        val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
         val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
 
         // Telephony info
@@ -94,7 +95,8 @@ class NetworkProvider @Inject constructor(
             leaseDuration = dhcpInfo?.let { "${it.leaseDuration / 3600} hours" } ?: "Unknown",
             is5GHzSupported = wifiManager.is5GHzBandSupported,
             isWifiAwareSupported = context.packageManager.hasSystemFeature("android.hardware.wifi.aware"),
-            isWifiDirectSupported = context.packageManager.hasSystemFeature("android.hardware.wifi.direct")
+            isWifiDirectSupported = context.packageManager.hasSystemFeature("android.hardware.wifi.direct"),
+            wifiStandard = getWifiStandard()
         )
     }
 
@@ -126,6 +128,24 @@ class NetworkProvider @Inject constructor(
             caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> "Cellular"
             caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> "Ethernet"
             else -> "Other"
+        }
+    }
+
+    fun getWifiStandard(): String {
+        return try {
+            val wifiInfo = wifiManager.connectionInfo ?: return "Unknown"
+            val std = wifiInfo.wifiStandard
+            when (std) {
+                android.net.wifi.ScanResult.WIFI_STANDARD_LEGACY -> "Legacy (802.11a/b/g)"
+                android.net.wifi.ScanResult.WIFI_STANDARD_11N -> "WiFi 4 (802.11n)"
+                android.net.wifi.ScanResult.WIFI_STANDARD_11AC -> "WiFi 5 (802.11ac)"
+                android.net.wifi.ScanResult.WIFI_STANDARD_11AX -> "WiFi 6 (802.11ax)"
+                android.net.wifi.ScanResult.WIFI_STANDARD_11AD -> "WiGig (802.11ad)"
+                android.net.wifi.ScanResult.WIFI_STANDARD_11BE -> "WiFi 7 (802.11be)"
+                else -> "Unspecified (0x${std.toString(16)})"
+            }
+        } catch (e: Exception) {
+            "Unknown"
         }
     }
 

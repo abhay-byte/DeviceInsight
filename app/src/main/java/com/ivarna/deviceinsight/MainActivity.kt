@@ -34,9 +34,9 @@ class MainActivity : ComponentActivity() {
         requestPermissions()
         
         setContent {
-            val currentTheme by settingsViewModel.theme.collectAsStateWithLifecycle()
+            val currentMedium by settingsViewModel.medium.collectAsStateWithLifecycle()
 
-            SystemStatsTheme(theme = currentTheme) {
+            SystemStatsTheme(medium = currentMedium) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background

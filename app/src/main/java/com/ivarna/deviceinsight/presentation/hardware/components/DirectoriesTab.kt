@@ -148,7 +148,7 @@ private fun StorageHeader(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
+            .clip(RoundedCornerShape(0.dp))
             .background(
                 Brush.linearGradient(
                     colors = listOf(
@@ -166,7 +166,7 @@ private fun StorageHeader(
                         secondary.copy(alpha = 0.1f)
                     )
                 ),
-                shape = RoundedCornerShape(20.dp)
+                shape = RoundedCornerShape(0.dp)
             )
             .padding(20.dp)
     ) {
@@ -178,7 +178,7 @@ private fun StorageHeader(
                 Box(
                     modifier = Modifier
                         .size(64.dp)
-                        .clip(RoundedCornerShape(16.dp))
+                        .clip(RoundedCornerShape(0.dp))
                         .background(
                             Brush.linearGradient(
                                 colors = listOf(
@@ -190,7 +190,7 @@ private fun StorageHeader(
                         .border(
                             width = 1.dp,
                             color = primary.copy(alpha = 0.4f),
-                            shape = RoundedCornerShape(16.dp)
+                            shape = RoundedCornerShape(0.dp)
                         ),
                     contentAlignment = Alignment.Center
                 ) {
@@ -227,7 +227,7 @@ private fun StorageHeader(
                         percent >= 70 -> primary.copy(alpha = 0.18f)
                         else -> primary.copy(alpha = 0.12f)
                     },
-                    shape = RoundedCornerShape(10.dp)
+                    shape = RoundedCornerShape(0.dp)
                 ) {
                     Text(
                         text = "$percent%",
@@ -302,7 +302,7 @@ private fun StorageUsageCard(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(0.dp))
             .background(
                 Brush.verticalGradient(
                     colors = listOf(
@@ -319,7 +319,7 @@ private fun StorageUsageCard(
                         accent.copy(alpha = 0.05f)
                     )
                 ),
-                shape = RoundedCornerShape(14.dp)
+                shape = RoundedCornerShape(0.dp)
             )
             .padding(horizontal = 14.dp, vertical = 14.dp)
     ) {
@@ -331,9 +331,9 @@ private fun StorageUsageCard(
                 Box(
                     modifier = Modifier
                         .size(38.dp)
-                        .clip(RoundedCornerShape(10.dp))
+                        .clip(RoundedCornerShape(0.dp))
                         .background(accent.copy(alpha = 0.14f))
-                        .border(1.dp, accent.copy(alpha = 0.3f), RoundedCornerShape(10.dp)),
+                        .border(1.dp, accent.copy(alpha = 0.3f), RoundedCornerShape(0.dp)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
@@ -424,14 +424,14 @@ private fun StorageProgressBar(fraction: Float, color: Color) {
         modifier = Modifier
             .fillMaxWidth()
             .height(8.dp)
-            .clip(RoundedCornerShape(4.dp))
+            .clip(RoundedCornerShape(0.dp))
             .background(color.copy(alpha = 0.12f))
     ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth(animatedWidth)
                 .height(8.dp)
-                .clip(RoundedCornerShape(4.dp))
+                .clip(RoundedCornerShape(0.dp))
                 .background(
                     Brush.horizontalGradient(
                         listOf(color, color.copy(alpha = 0.6f))
@@ -449,9 +449,9 @@ private fun StorageMetaChip(
 ) {
     Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(8.dp))
+            .clip(RoundedCornerShape(0.dp))
             .background(color.copy(alpha = 0.1f))
-            .border(0.5.dp, color.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
+            .border(0.5.dp, color.copy(alpha = 0.2f), RoundedCornerShape(0.dp))
             .padding(horizontal = 8.dp, vertical = 5.dp)
     ) {
         Column {
@@ -490,7 +490,7 @@ private fun SectionHeader(name: String, count: Int) {
             modifier = Modifier
                 .width(3.dp)
                 .height(18.dp)
-                .clip(RoundedCornerShape(2.dp))
+                .clip(RoundedCornerShape(0.dp))
                 .background(primary)
         )
         Spacer(modifier = Modifier.width(10.dp))
@@ -522,7 +522,7 @@ private fun DirectoryPathCard(label: String, path: String) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(0.dp))
             .background(
                 Brush.verticalGradient(
                     colors = listOf(
@@ -534,7 +534,7 @@ private fun DirectoryPathCard(label: String, path: String) {
             .border(
                 width = 1.dp,
                 color = primary.copy(alpha = 0.12f),
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(0.dp)
             )
             .padding(horizontal = 12.dp, vertical = 10.dp)
     ) {
@@ -587,7 +587,7 @@ private fun MountPointCard(mount: MountPoint) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(0.dp))
             .background(
                 Brush.verticalGradient(
                     colors = listOf(
@@ -604,7 +604,7 @@ private fun MountPointCard(mount: MountPoint) {
                         secondary.copy(alpha = 0.05f)
                     )
                 ),
-                shape = RoundedCornerShape(14.dp)
+                shape = RoundedCornerShape(0.dp)
             )
             .padding(horizontal = 14.dp, vertical = 12.dp)
     ) {
@@ -616,9 +616,9 @@ private fun MountPointCard(mount: MountPoint) {
                 Box(
                     modifier = Modifier
                         .size(38.dp)
-                        .clip(RoundedCornerShape(10.dp))
+                        .clip(RoundedCornerShape(0.dp))
                         .background(accent.copy(alpha = 0.14f))
-                        .border(1.dp, accent.copy(alpha = 0.3f), RoundedCornerShape(10.dp)),
+                        .border(1.dp, accent.copy(alpha = 0.3f), RoundedCornerShape(0.dp)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
@@ -651,7 +651,7 @@ private fun MountPointCard(mount: MountPoint) {
                 if (mount.isReadOnly) {
                     Surface(
                         color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.16f),
-                        shape = RoundedCornerShape(6.dp)
+                        shape = RoundedCornerShape(0.dp)
                     ) {
                         Text(
                             text = "RO",
@@ -686,9 +686,9 @@ private fun MountMetaChip(label: String, value: String) {
     val primary = MaterialTheme.colorScheme.primary
     Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(6.dp))
+            .clip(RoundedCornerShape(0.dp))
             .background(primary.copy(alpha = 0.08f))
-            .border(0.5.dp, primary.copy(alpha = 0.15f), RoundedCornerShape(6.dp))
+            .border(0.5.dp, primary.copy(alpha = 0.15f), RoundedCornerShape(0.dp))
             .padding(horizontal = 8.dp, vertical = 3.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {

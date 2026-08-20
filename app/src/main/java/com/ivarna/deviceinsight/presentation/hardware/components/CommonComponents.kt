@@ -14,10 +14,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -27,8 +23,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -36,12 +30,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.ivarna.deviceinsight.presentation.components.GlassCard
+import com.ivarna.deviceinsight.ui.caliper.Caliper
+import com.ivarna.deviceinsight.ui.caliper.PlexMonoFamily
 
-/**
- * A premium-styled key/value row that uses the active theme's accent color
- * for the value, creating visual hierarchy that pops on OLED displays.
- */
+// CALIPER flat hardware chrome — replaces glass InfoSection/InfoRow/StatBadge.
+
 @Composable
 fun InfoRow(
     label: String,
@@ -49,52 +42,34 @@ fun InfoRow(
     valueColor: Color? = null,
     monospace: Boolean = false
 ) {
-    val primary = MaterialTheme.colorScheme.primary
-    val resolvedColor = valueColor ?: MaterialTheme.colorScheme.onSurface
-
+    val c = Caliper.colors
+    val resolvedColor = valueColor ?: c.ink
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 9.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
+            .padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Accent dot + label
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
+        Box(
+            modifier = Modifier
+                .size(3.dp)
+                .background(c.ink40)
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = label,
+            style = Caliper.type.dataS.copy(fontSize = 12.sp),
+            color = c.ink60,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(0.45f)
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(5.dp)
-                    .clip(CircleShape)
-                    .background(primary.copy(alpha = 0.5f))
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = label,
-                style = MaterialTheme.typography.bodySmall.copy(
-                    letterSpacing = 0.2.sp
-                ),
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-        // Value — accent colored, monospace for numbers
+        )
         Text(
             text = value,
             style = if (monospace)
-                MaterialTheme.typography.bodySmall.copy(
-                    fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 12.sp
-                )
+                Caliper.type.dataS.copy(fontFamily = PlexMonoFamily, fontSize = 12.sp)
             else
-                MaterialTheme.typography.bodySmall.copy(
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 12.sp
-                ),
+                Caliper.type.dataS.copy(fontSize = 12.sp),
             color = resolvedColor,
             textAlign = TextAlign.End,
             modifier = Modifier
@@ -104,147 +79,80 @@ fun InfoRow(
             overflow = TextOverflow.Ellipsis
         )
     }
-    // Subtle separator
-    HorizontalDivider(
-        thickness = 0.5.dp,
-        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.12f)
-    )
 }
 
-/**
- * A themed section card with a gradient left-border accent and a glowing
- * section title to match the active theme's primary color.
- */
 @Composable
 fun InfoSection(
     title: String,
     icon: androidx.compose.ui.graphics.vector.ImageVector? = null,
     content: @Composable () -> Unit
 ) {
-    val primary = MaterialTheme.colorScheme.primary
-    val secondary = MaterialTheme.colorScheme.secondary
-
+    val c = Caliper.colors
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 6.dp)
     ) {
-        // Section header row
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 8.dp)
+                .padding(bottom = 6.dp)
         ) {
-            // Accent gradient pill on left
-            Box(
-                modifier = Modifier
-                    .width(3.dp)
-                    .height(20.dp)
-                    .clip(RoundedCornerShape(2.dp))
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(primary, secondary.copy(alpha = 0.6f))
-                        )
-                    )
-            )
-            Spacer(modifier = Modifier.width(10.dp))
-            if (icon != null) {
-                androidx.compose.material3.Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = primary,
-                    modifier = Modifier.size(14.dp)
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-            }
             Text(
                 text = title.uppercase(),
-                style = MaterialTheme.typography.labelMedium.copy(
-                    fontWeight = FontWeight.ExtraBold,
-                    letterSpacing = 1.5.sp
-                ),
-                color = primary
+                style = Caliper.type.meta,
+                color = c.ink,
+                modifier = Modifier.padding(start = 4.dp)
             )
         }
-
-        // Card containing the rows
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp))
-                .background(
-                    Brush.verticalGradient(
-                        listOf(
-                            primary.copy(alpha = 0.04f),
-                            MaterialTheme.colorScheme.surface.copy(alpha = 0.3f)
-                        )
-                    )
-                )
-                .border(
-                    width = 1.dp,
-                    brush = Brush.linearGradient(
-                        listOf(
-                            primary.copy(alpha = 0.18f),
-                            secondary.copy(alpha = 0.06f)
-                        )
-                    ),
-                    shape = RoundedCornerShape(16.dp)
-                )
+                .background(c.panel)
+                .border(1.dp, c.hairline)
                 .padding(horizontal = 16.dp, vertical = 4.dp)
         ) {
-            Column {
-                content()
-            }
+            content()
         }
     }
 }
 
-/**
- * A compact stat badge — useful for showing a single highlighted value
- * (e.g., GPU Cores, API level) in a pill-shaped chip.
- */
 @Composable
 fun StatBadge(label: String, value: String, color: Color? = null, modifier: Modifier = Modifier) {
-    val resolvedColor = color ?: MaterialTheme.colorScheme.primary
+    val c = Caliper.colors
+    // §4.2: accent is interactive-only, never data — defaults render in ink.
+    val resolvedColor = color ?: c.ink
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(resolvedColor.copy(alpha = 0.08f))
-            .border(1.dp, resolvedColor.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
+            .background(c.panel)
+            .border(1.dp, c.hairline)
             .padding(horizontal = 14.dp, vertical = 10.dp)
     ) {
         Text(
             text = value,
-            style = MaterialTheme.typography.titleMedium.copy(
-                fontWeight = FontWeight.ExtraBold,
-                fontFamily = FontFamily.Monospace,
-                color = resolvedColor
-            )
+            style = Caliper.type.readoutL.copy(fontSize = 20.sp),
+            color = resolvedColor
         )
         Spacer(modifier = Modifier.height(2.dp))
         Text(
             text = label.uppercase(),
-            style = MaterialTheme.typography.labelSmall.copy(
-                letterSpacing = 1.sp,
-                fontSize = 9.sp
-            ),
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+            style = Caliper.type.meta,
+            color = c.ink60
         )
     }
 }
 
-/**
- * An animated progress bar for usage values like CPU utilization.
- */
 @Composable
 fun UsageBar(
     label: String,
     value: Float, // 0.0 - 1.0
     color: Color? = null
 ) {
-    val resolvedColor = color ?: MaterialTheme.colorScheme.primary
+    val c = Caliper.colors
+    // §4.2: accent is interactive-only — bars carry channel color when passed, ink by default.
+    val resolvedColor = color ?: c.ink
     var animTarget by remember { mutableFloatStateOf(0f) }
     val animatedWidth by animateFloatAsState(
         targetValue = animTarget,
@@ -260,15 +168,12 @@ fun UsageBar(
         ) {
             Text(
                 text = label,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                style = Caliper.type.meta,
+                color = c.ink60
             )
             Text(
                 text = "${(value * 100).toInt()}%",
-                style = MaterialTheme.typography.labelSmall.copy(
-                    fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.Bold
-                ),
+                style = Caliper.type.meta.copy(fontFamily = PlexMonoFamily),
                 color = resolvedColor
             )
         }
@@ -276,20 +181,14 @@ fun UsageBar(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(4.dp)
-                .clip(RoundedCornerShape(2.dp))
-                .background(resolvedColor.copy(alpha = 0.12f))
+                .height(6.dp)
+                .background(c.hairline)
         ) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth(animatedWidth)
-                    .height(4.dp)
-                    .clip(RoundedCornerShape(2.dp))
-                    .background(
-                        Brush.horizontalGradient(
-                            listOf(resolvedColor, resolvedColor.copy(alpha = 0.6f))
-                        )
-                    )
+                    .height(6.dp)
+                    .background(resolvedColor)
             )
         }
     }

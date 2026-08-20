@@ -45,7 +45,7 @@ fun GpuTab(info: HardwareInfo) {
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(vertical = 6.dp)
-                .clip(RoundedCornerShape(20.dp))
+                .clip(RoundedCornerShape(0.dp))
                 .background(
                     Brush.verticalGradient(
                         listOf(primary.copy(alpha = 0.12f), secondary.copy(alpha = 0.04f))
@@ -56,7 +56,7 @@ fun GpuTab(info: HardwareInfo) {
                     Brush.linearGradient(
                         listOf(primary.copy(alpha = 0.3f), secondary.copy(alpha = 0.1f))
                     ),
-                    RoundedCornerShape(20.dp)
+                    RoundedCornerShape(0.dp)
                 )
                 .padding(horizontal = 20.dp, vertical = 18.dp)
         ) {
@@ -156,9 +156,9 @@ fun SummaryItem(label: String, value: String, color: Color? = null) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(0.dp))
             .background(resolvedColor.copy(alpha = 0.08f))
-            .border(1.dp, resolvedColor.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
+            .border(1.dp, resolvedColor.copy(alpha = 0.2f), RoundedCornerShape(0.dp))
             .padding(horizontal = 18.dp, vertical = 10.dp)
     ) {
         Text(
@@ -205,7 +205,7 @@ fun FeatureRow(label: String, supported: Boolean) {
         )
         Surface(
             color = resolvedColor.copy(alpha = 0.12f),
-            shape = RoundedCornerShape(6.dp)
+            shape = RoundedCornerShape(0.dp)
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -253,7 +253,7 @@ fun DetailedListHeader(title: String, count: Int) {
         Spacer(modifier = Modifier.width(6.dp))
         Surface(
             color = primary.copy(alpha = 0.14f),
-            shape = RoundedCornerShape(4.dp)
+            shape = RoundedCornerShape(0.dp)
         ) {
             Text(
                 text = count.toString(),

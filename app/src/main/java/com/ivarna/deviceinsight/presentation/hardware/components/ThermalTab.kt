@@ -129,7 +129,7 @@ private fun ThermalHeader(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
+            .clip(RoundedCornerShape(0.dp))
             .background(
                 Brush.linearGradient(
                     colors = listOf(
@@ -147,7 +147,7 @@ private fun ThermalHeader(
                         secondary.copy(alpha = 0.1f)
                     )
                 ),
-                shape = RoundedCornerShape(20.dp)
+                shape = RoundedCornerShape(0.dp)
             )
             .padding(20.dp)
     ) {
@@ -158,7 +158,7 @@ private fun ThermalHeader(
             Box(
                 modifier = Modifier
                     .size(64.dp)
-                    .clip(RoundedCornerShape(16.dp))
+                    .clip(RoundedCornerShape(0.dp))
                     .background(
                         Brush.linearGradient(
                             colors = listOf(
@@ -167,7 +167,7 @@ private fun ThermalHeader(
                             )
                         )
                     )
-                    .border(1.dp, tempColor.copy(alpha = 0.4f), RoundedCornerShape(16.dp)),
+                    .border(1.dp, tempColor.copy(alpha = 0.4f), RoundedCornerShape(0.dp)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
@@ -278,7 +278,7 @@ private fun ThermalSensorCard(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(0.dp))
             .background(
                 Brush.verticalGradient(
                     colors = listOf(
@@ -295,7 +295,7 @@ private fun ThermalSensorCard(
                         primary.copy(alpha = 0.05f)
                     )
                 ),
-                shape = RoundedCornerShape(14.dp)
+                shape = RoundedCornerShape(0.dp)
             )
             .padding(horizontal = 14.dp, vertical = 12.dp)
     ) {
@@ -307,9 +307,9 @@ private fun ThermalSensorCard(
                 Box(
                     modifier = Modifier
                         .size(38.dp)
-                        .clip(RoundedCornerShape(10.dp))
+                        .clip(RoundedCornerShape(0.dp))
                         .background(tempColor.copy(alpha = 0.14f))
-                        .border(1.dp, tempColor.copy(alpha = 0.3f), RoundedCornerShape(10.dp)),
+                        .border(1.dp, tempColor.copy(alpha = 0.3f), RoundedCornerShape(0.dp)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
@@ -373,14 +373,14 @@ private fun TempProgressBar(fraction: Float, color: Color) {
         modifier = Modifier
             .fillMaxWidth()
             .height(6.dp)
-            .clip(RoundedCornerShape(3.dp))
+            .clip(RoundedCornerShape(0.dp))
             .background(color.copy(alpha = 0.12f))
     ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth(animatedWidth)
                 .height(6.dp)
-                .clip(RoundedCornerShape(3.dp))
+                .clip(RoundedCornerShape(0.dp))
                 .background(
                     Brush.horizontalGradient(
                         listOf(color, color.copy(alpha = 0.6f))
@@ -396,9 +396,9 @@ private fun EmptyThermalState() {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(0.dp))
             .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.3f))
-            .border(1.dp, primary.copy(alpha = 0.2f), RoundedCornerShape(16.dp))
+            .border(1.dp, primary.copy(alpha = 0.2f), RoundedCornerShape(0.dp))
             .padding(32.dp),
         contentAlignment = Alignment.Center
     ) {

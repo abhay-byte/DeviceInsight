@@ -18,6 +18,8 @@ class CpuProvider @Inject constructor(
     @Volatile private var cachedCpuClockRange: String? = null
     @Volatile private var cachedFeatures: Map<String, Boolean>? = null
     @Volatile private var cachedMaxCpuFreq: Int? = null
+    @Volatile private var cachedCoreParts: List<String>? = null
+    @Volatile private var cachedCoreTypes: List<String>? = null
 
     private fun getSystemProperty(key: String): String {
         return try {
@@ -77,38 +79,11 @@ class CpuProvider @Inject constructor(
     fun getCpuArchitecture(): String {
         cachedCpuArchitecture?.let { return it }
         val result = try {
-            val cpuInfo = File("/proc/cpuinfo").readLines()
             val cores = mutableMapOf<String, Int>()
-            
-            for (line in cpuInfo) {
-                if (line.startsWith("CPU part")) {
-                    val part = line.split(":")[1].trim().lowercase()
-                    val name = when (part) {
-                        "0xd85" -> "Cortex-X925"
-                        "0xd87" -> "Cortex-A725"
-                        "0xd80" -> "Cortex-X4"
-                        "0xd81" -> "Cortex-A720"
-                        "0xd82" -> "Cortex-A520"
-                        "0xd4e" -> "Cortex-X3"
-                        "0xd4f", "0xd47", "0xd4d" -> "Cortex-A715"
-                        "0xd44" -> "Cortex-X2"
-                        "0xd4b" -> "Cortex-A710"
-                        "0xd46" -> "Cortex-A510"
-                        "0xd41", "0xd42" -> "Cortex-A78"
-                        "0xd0d" -> "Cortex-A77"
-                        "0xd0b" -> "Cortex-A76"
-                        "0xd0a" -> "Cortex-A75"
-                        "0xd09" -> "Cortex-A73"
-                        "0xd08" -> "Cortex-A72"
-                        "0xd05" -> "Cortex-A55"
-                        "0xd03" -> "Cortex-A53"
-                        "0xd84" -> "Oryon"
-                        else -> "Cortex (Part $part)"
-                    }
-                    cores[name] = cores.getOrDefault(name, 0) + 1
-                }
+            for (part in readCpuParts()) {
+                val name = partToName(part)
+                cores[name] = cores.getOrDefault(name, 0) + 1
             }
-            
             if (cores.isNotEmpty()) {
                 cores.entries.joinToString(" + ") { "${it.value}x ${it.key}" }
             } else {
@@ -119,6 +94,66 @@ class CpuProvider @Inject constructor(
         }
         cachedCpuArchitecture = result
         return result
+    }
+
+    /** Ordered CPU-part IDs from /proc/cpuinfo, one per logical core. */
+    fun getCoreParts(): List<String> {
+        cachedCoreParts?.let { return it }
+        val result = try {
+            readCpuParts()
+        } catch (e: Exception) {
+            emptyList()
+        }
+        cachedCoreParts = result
+        return result
+    }
+
+    /** Type name per logical core, aligned with /proc/cpuinfo order. */
+    fun getCoreTypes(): List<String> {
+        cachedCoreTypes?.let { return it }
+        val parts = getCoreParts()
+        val result = if (parts.isEmpty()) {
+            List(Runtime.getRuntime().availableProcessors()) { "CPU" }
+        } else {
+            parts.map { partToName(it) }
+        }
+        cachedCoreTypes = result
+        return result
+    }
+
+    private fun readCpuParts(): List<String> {
+        val cpuInfo = File("/proc/cpuinfo").readLines()
+        val parts = mutableListOf<String>()
+        for (line in cpuInfo) {
+            if (line.trim().startsWith("CPU part")) {
+                val part = line.split(":")[1].trim().lowercase()
+                parts.add(part)
+            }
+        }
+        return parts
+    }
+
+    private fun partToName(part: String): String = when (part) {
+        "0xd85" -> "Cortex-X925"
+        "0xd87" -> "Cortex-A725"
+        "0xd80" -> "Cortex-X4"
+        "0xd81" -> "Cortex-A720"
+        "0xd82" -> "Cortex-A520"
+        "0xd4e" -> "Cortex-X3"
+        "0xd4f", "0xd47", "0xd4d" -> "Cortex-A715"
+        "0xd44" -> "Cortex-X2"
+        "0xd4b" -> "Cortex-A710"
+        "0xd46" -> "Cortex-A510"
+        "0xd41", "0xd42" -> "Cortex-A78"
+        "0xd0d" -> "Cortex-A77"
+        "0xd0b" -> "Cortex-A76"
+        "0xd0a" -> "Cortex-A75"
+        "0xd09" -> "Cortex-A73"
+        "0xd08" -> "Cortex-A72"
+        "0xd05" -> "Cortex-A55"
+        "0xd03" -> "Cortex-A53"
+        "0xd84" -> "Oryon"
+        else -> "Cortex (Part $part)"
     }
 
     fun getManufacturingProcess(): String {

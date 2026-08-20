@@ -1,363 +1,228 @@
 package com.ivarna.deviceinsight.presentation
 
-import android.content.Intent
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Icon
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.IconButton
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
+import androidx.compose.foundation.layout.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.asComposeRenderEffect
-import androidx.compose.foundation.Canvas
-import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.haze
-import dev.chrisbanes.haze.hazeChild
-import dev.chrisbanes.haze.HazeStyle
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.wrapContentSize
-import androidx.compose.material3.Surface
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.draw.blur
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.navigation.NavDestination
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import com.ivarna.deviceinsight.R
+import com.ivarna.deviceinsight.presentation.calibration.CalibrationScreen
 import com.ivarna.deviceinsight.presentation.dashboard.DashboardScreen
 import com.ivarna.deviceinsight.presentation.hardware.HardwareScreen
 import com.ivarna.deviceinsight.presentation.overlay.OverlayScreen
-import com.ivarna.deviceinsight.presentation.settings.SettingsActivity
+import com.ivarna.deviceinsight.presentation.settings.SettingsScreen
+import com.ivarna.deviceinsight.presentation.settings.SettingsViewModel
 import com.ivarna.deviceinsight.presentation.tasks.TasksScreen
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.List
-import androidx.compose.material.icons.filled.Memory
-import androidx.compose.material.icons.filled.Layers
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import com.ivarna.deviceinsight.presentation.theme.AppTheme
-import com.ivarna.deviceinsight.presentation.theme.SystemStatsTheme
+import com.ivarna.deviceinsight.ui.caliper.Caliper
+import com.ivarna.deviceinsight.ui.caliper.caliperGrid
+import com.ivarna.deviceinsight.ui.caliper.caliperMigratedFlow
+import com.ivarna.deviceinsight.ui.caliper.markCaliperMigrated
+import com.ivarna.deviceinsight.ui.caliper.components.MarginNote
+import com.ivarna.deviceinsight.ui.caliper.components.Masthead
+import com.ivarna.deviceinsight.ui.caliper.components.ModeRail
+import com.ivarna.deviceinsight.ui.caliper.components.RailKey
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.launch
 
-sealed class Screen(val route: String, val titleRes: Int, val icon: ImageVector) {
-    data object Dashboard : Screen("dashboard", R.string.nav_dashboard, Icons.Filled.Home)
-    data object Tasks : Screen("tasks", R.string.nav_tasks, Icons.Filled.List)
-    data object Hardware : Screen("hardware", R.string.nav_hardware, Icons.Filled.Memory)
-    data object Overlay : Screen("overlay", R.string.nav_overlay, Icons.Filled.Layers)
+/**
+ * Nav order — PINNED (caliper-001 m2). Task: Tasks (Application Active /
+ * PROCESSES) must be the LAST key. Deviation from design §5.2/§6 IA
+ * (OVERVIEW/ACTIVITY/PROCESSES/DEVICE) is intentional: minimal 4-key diff.
+ * [1] OVERVIEW (Dashboard) · [2] DEVICE (Hardware) · [3] OVERLAY · [4] PROCESSES (Tasks)
+ */
+private const val ROUTE_DASHBOARD = "dashboard"
+private const val ROUTE_HARDWARE = "hardware"
+private const val ROUTE_OVERLAY = "overlay"
+private const val ROUTE_TASKS = "tasks"
+private const val ROUTE_SETTINGS = "settings"
+
+internal sealed class ScreenRoute(val route: String, val number: Int, val label: String) {
+    data object Dashboard : ScreenRoute(ROUTE_DASHBOARD, 1, "OVERVIEW")
+    data object Hardware : ScreenRoute(ROUTE_HARDWARE, 2, "DEVICE")
+    data object Overlay : ScreenRoute(ROUTE_OVERLAY, 3, "OVERLAY")
+    data object Tasks : ScreenRoute(ROUTE_TASKS, 4, "PROCESSES")
+    data object Settings : ScreenRoute(ROUTE_SETTINGS, 5, "SETTINGS")
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+// internal (not private) so [caliperRailOrder] is unit-testable (m5).
+internal val railRoutes = listOf(
+    ScreenRoute.Dashboard,
+    ScreenRoute.Hardware,
+    ScreenRoute.Overlay,
+    ScreenRoute.Tasks,
+)
+
+/** Pinned visual+TalkBack order: [1] OVERVIEW · [2] DEVICE · [3] OVERLAY · [4] PROCESSES (Tasks last). */
+internal val caliperRailOrder: List<Pair<Int, String>> = railRoutes.map { it.number to it.label }
+
+// ≥600dp = WindowWidthSizeClass.Medium/Expanded per §5.2 — switches ModeRail to a
+// left rail. BoxWithConstraints gate keeps the same threshold without a new dep.
+private const val WIDE_MIN_DP = 600
+
 @Composable
 fun SystemStatsApp() {
-    val context = LocalContext.current
-    val hazeState = remember { HazeState() }
-    
     val navController = rememberNavController()
-    val bottomNavItems = listOf(
-        Screen.Dashboard,
-        Screen.Tasks,
-        Screen.Hardware,
-        Screen.Overlay
-    )
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-    ) {
-            // Constant ambient background glows for all screens
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .size(400.dp)
-                    .offset(x = 100.dp, y = (-50).dp)
-                    .background(
-                        brush = Brush.radialGradient(
-                            colors = listOf(
-                                MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
-                                Color.Transparent
-                            )
-                        )
-                    )
-            )
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .size(400.dp)
-                    .offset(x = (-100).dp, y = 100.dp)
-                    .background(
-                        brush = Brush.radialGradient(
-                            colors = listOf(
-                                MaterialTheme.colorScheme.tertiary.copy(alpha = 0.08f),
-                                Color.Transparent
-                            )
-                        )
-                    )
-            )
-
-            Scaffold(
-                modifier = Modifier.haze(hazeState),
-                containerColor = Color.Transparent,
-                topBar = {
-                    TopAppBar(
-                        title = {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    painter = painterResource(id = R.drawable.logo),
-                                    contentDescription = "App Icon",
-                                    modifier = Modifier.size(32.dp),
-                                    tint = Color.Unspecified
-                                )
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Text(
-                                    text = "DeviceInsights",
-                                    style = MaterialTheme.typography.titleMedium.copy(
-                                        fontWeight = FontWeight.Black,
-                                        letterSpacing = 1.sp
-                                    )
-                                )
-                            }
-                        },
-                        colors = TopAppBarDefaults.topAppBarColors(
-                            containerColor = Color.Transparent,
-                            titleContentColor = MaterialTheme.colorScheme.onSurface,
-                            actionIconContentColor = MaterialTheme.colorScheme.onSurface
-                        ),
-                        actions = {
-                            IconButton(onClick = {
-                                context.startActivity(Intent(context, SettingsActivity::class.java))
-                            }) {
-                                Icon(
-                                    imageVector = Icons.Filled.Settings,
-                                    contentDescription = "Settings",
-                                    tint = MaterialTheme.colorScheme.primary
-                                )
-                            }
-                        }
-                    )
-                }
-            ) { innerPadding ->
-                NavHost(
-                    navController = navController,
-                    startDestination = Screen.Dashboard.route,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(top = innerPadding.calculateTopPadding()),
-                    enterTransition = { fadeIn(animationSpec = tween(150)) },
-                    exitTransition = { fadeOut(animationSpec = tween(150)) },
-                    popEnterTransition = { fadeIn(animationSpec = tween(150)) },
-                    popExitTransition = { fadeOut(animationSpec = tween(150)) }
-                ) {
-                    composable(Screen.Dashboard.route) { DashboardScreen() }
-                    composable(Screen.Tasks.route) { TasksScreen() }
-                    composable(Screen.Hardware.route) { HardwareScreen() }
-                    composable(Screen.Overlay.route) { OverlayScreen() }
-                }
-            }
-
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(
-                                Color.Transparent,
-                                MaterialTheme.colorScheme.background.copy(alpha = 0.5f),
-                                MaterialTheme.colorScheme.background.copy(alpha = 0.85f)
-                            )
-                        )
-                    )
-            ) {
-                GlassBottomNav(
-                    navController = navController,
-                    items = bottomNavItems,
-                    hazeState = hazeState
-                )
-            }
-        }
-}
-
-@Composable
-fun GlassBottomNav(
-    navController: androidx.navigation.NavHostController,
-    items: List<Screen>,
-    hazeState: HazeState
-) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
+    val onSettings = { navController.navigate(ScreenRoute.Settings.route) { launchSingleTop = true } }
+    val settingsViewModel: SettingsViewModel = hiltViewModel()
+    val currentMedium by settingsViewModel.medium.collectAsStateWithLifecycle()
 
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .navigationBarsPadding()
-            .padding(start = 24.dp, end = 24.dp, top = 8.dp, bottom = 20.dp)
-            .height(72.dp)
-            .hazeChild(
-                state = hazeState,
-                shape = RoundedCornerShape(24.dp),
-                style = HazeStyle(
-                    tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.65f),
-                    blurRadius = 16.dp
-                )
+    val selectedRail = railRoutes.firstOrNull { route ->
+        currentDestination?.hierarchy?.any { it.route == route.route } == true
+    }?.number
+
+    // S-00 first-launch calibration gate (skippable). After finishing, the
+    // one-time "recalibrated" MarginNote is shown via caliperMigrated flag.
+    val context = LocalContext.current
+    val migrated by context.caliperMigratedFlow.collectAsStateWithLifecycle(initialValue = true)
+    var showCalibration by remember { mutableStateOf(!migrated) }
+    var showMigratedNote by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+
+    if (showCalibration) {
+        Column(Modifier.fillMaxSize().background(Caliper.colors.surface)) {
+            Masthead()
+            CalibrationScreen(
+                initialMedium = currentMedium,
+                onMedium = settingsViewModel::setMedium,
+                onFinish = {
+                    scope.launch { context.markCaliperMigrated() }
+                    showCalibration = false
+                    showMigratedNote = !migrated
+                }
             )
-            .border(
-                BorderStroke(
-                    1.dp,
-                    Brush.verticalGradient(
-                        listOf(
-                            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f),
-                            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.05f)
-                        )
-                    )
-                ),
-                RoundedCornerShape(24.dp)
-            )
-            .clip(RoundedCornerShape(24.dp))
+        }
+        return
+    }
+
+    BoxWithConstraints(
+        Modifier
+            .fillMaxSize()
+            .background(Caliper.colors.surface)
     ) {
-        Row(
-            modifier = Modifier.fillMaxSize(),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            items.forEach { screen ->
-                val selected = currentDestination?.hierarchy?.any { it.route == screen.route } == true
-                GlassNavItem(
-                    screen = screen,
-                    selected = selected,
-                    onClick = {
-                        if (!selected) {
-                            navController.navigate(screen.route) {
-                                popUpTo(navController.graph.findStartDestination().id) {
-                                    saveState = true
-                                }
-                                launchSingleTop = true
-                                restoreState = true
+        // M2: ≥600dp → left instrument rail; Processes/Device screens go two-pane.
+        val wide = maxWidth >= WIDE_MIN_DP.dp
+
+        val rail = @Composable {
+            ModeRail(
+                keys = railRoutes.map { RailKey(it.number, it.label) },
+                selected = selectedRail ?: 0,
+                vertical = wide,
+                onSelect = { key ->
+                    val route = railRoutes.first { it.number == key.number }
+                    if (currentDestination?.hierarchy?.any { it.route == route.route } != true) {
+                        navController.navigate(route.route) {
+                            popUpTo(navController.graph.findStartDestination().id) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    }
+                }
+            )
+        }
+
+        if (wide) {
+            Row(Modifier.fillMaxSize()) {
+                rail()
+                Column(Modifier.weight(1f).fillMaxHeight()) {
+                    Masthead(
+                        onSettingsClick = onSettings
+                        // degraded/rootVerified wired by each screen's ViewModel as needed
+                    )
+                    if (showMigratedNote) {
+                        MarginNote(
+                            message = "Your instrument has been recalibrated to the CALIPER standard.",
+                            title = "NOTE 001",
+                            onDismiss = { showMigratedNote = false }
+                        )
+                    }
+                    Box(
+                        Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                            .caliperGrid()
+                    ) {
+                        NavHost(
+                            navController = navController,
+                            startDestination = ScreenRoute.Dashboard.route,
+                            enterTransition = {
+                                fadeIn(tween(160)) + slideInVertically(tween(160)) { it / 8 }
+                            },
+                            exitTransition = { fadeOut(tween(160)) },
+                            popEnterTransition = { fadeIn(tween(160)) },
+                            popExitTransition = { fadeOut(tween(160)) }
+                        ) {
+                            composable(ScreenRoute.Dashboard.route) { DashboardScreen() }
+                            composable(ScreenRoute.Hardware.route) { HardwareScreen() }
+                            composable(ScreenRoute.Overlay.route) { OverlayScreen() }
+                            composable(ScreenRoute.Tasks.route) { TasksScreen() }
+                            composable(ScreenRoute.Settings.route) {
+                                SettingsScreen(
+                                    currentMedium = currentMedium,
+                                    onMediumSelected = settingsViewModel::setMedium
+                                )
                             }
                         }
                     }
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun GlassNavItem(
-    screen: Screen,
-    selected: Boolean,
-    onClick: () -> Unit
-) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val scale by animateFloatAsState(
-        targetValue = if (selected) 1.15f else 1f,
-        animationSpec = tween(300),
-        label = "scale"
-    )
-    
-    val iconColor by animateColorAsState(
-        targetValue = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-        animationSpec = tween(300),
-        label = "color"
-    )
-
-    Column(
-        modifier = Modifier
-            .wrapContentSize()
-            .clickable(
-                interactionSource = interactionSource,
-                indication = null,
-                onClick = onClick
-            )
-            .padding(horizontal = 12.dp, vertical = 4.dp)
-            .scale(scale),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Box(
-            modifier = Modifier.size(64.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            if (selected) {
-                // Outer glow - constrained to ensure no clipping
-                Canvas(modifier = Modifier.fillMaxSize()) {
-                    val color = iconColor
-                    drawCircle(
-                        brush = Brush.radialGradient(
-                            colors = listOf(color.copy(alpha = 0.45f), Color.Transparent),
-                            center = center,
-                            radius = 28.dp.toPx() // Less than size/2 (32dp) to prevent square clip
-                        ),
-                        radius = 28.dp.toPx(),
-                        center = center
-                    )
                 }
             }
-            Icon(
-                imageVector = screen.icon,
-                contentDescription = null,
-                tint = iconColor,
-                modifier = Modifier.size(24.dp)
-            )
+        } else {
+            Column(Modifier.fillMaxSize()) {
+                Masthead(
+                    onSettingsClick = onSettings
+                    // degraded/rootVerified wired by each screen's ViewModel as needed
+                )
+                if (showMigratedNote) {
+                    MarginNote(
+                        message = "Your instrument has been recalibrated to the CALIPER standard.",
+                        title = "NOTE 001",
+                        onDismiss = { showMigratedNote = false }
+                    )
+                }
+                Box(
+                    Modifier
+                        .weight(1f)
+                        .caliperGrid()
+                ) {
+                    NavHost(
+                        navController = navController,
+                        startDestination = ScreenRoute.Dashboard.route,
+                        enterTransition = {
+                            fadeIn(tween(160)) + slideInVertically(tween(160)) { it / 8 }
+                        },
+                        exitTransition = { fadeOut(tween(160)) },
+                        popEnterTransition = { fadeIn(tween(160)) },
+                        popExitTransition = { fadeOut(tween(160)) }
+                    ) {
+                        composable(ScreenRoute.Dashboard.route) { DashboardScreen() }
+                        composable(ScreenRoute.Hardware.route) { HardwareScreen() }
+                        composable(ScreenRoute.Overlay.route) { OverlayScreen() }
+                        composable(ScreenRoute.Tasks.route) { TasksScreen() }
+                        composable(ScreenRoute.Settings.route) {
+                            SettingsScreen(
+                                currentMedium = currentMedium,
+                                onMediumSelected = settingsViewModel::setMedium
+                            )
+                        }
+                    }
+                }
+                rail()
+            }
         }
-        
-        Spacer(modifier = Modifier.height(0.dp))
-        
-        Text(
-            text = stringResource(screen.titleRes).uppercase(),
-            style = MaterialTheme.typography.labelSmall.copy(
-                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                fontSize = 10.sp,
-                letterSpacing = 0.5.sp
-            ),
-            color = iconColor
-        )
     }
 }

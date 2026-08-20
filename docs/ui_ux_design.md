@@ -1,5 +1,7 @@
 # DeviceInsight - UI/UX Specification
 
+> **SUPERSEDED** — This document is retired. Visual language is now **CALIPER** (DI-DS-002): see `docs/design/CALIPER.md` (adopted, mandatory for all surfaces). The "Elegant Glassmorphism" system described here is obsolete.
+
 > **Note**: This document describes **what exists on each page and what each component does**. Visual styling (colors, gradients, exact spacing values, typography sizes, animation curves) is the responsibility of the design tool and is intentionally omitted here. When implementing, follow the visual design selected in Stitch / Figma.
 
 ---

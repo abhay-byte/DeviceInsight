@@ -43,13 +43,9 @@ class SocLogoRepository @Inject constructor() {
     }
 
     companion object {
-        const val SNAPDRAGON =
-            "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5c/Snapdragon_Logo.svg/500px-Snapdragon_Logo.svg.png"
-        const val MEDIATEK =
-            "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1a/MediaTek_Logo_wiki.svg/500px-MediaTek_Logo_wiki.svg.png"
-        const val TENSOR =
-            "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7b/Representaci%C3%B3n_vectorial_referencial_del_chip_google_tensor.svg/500px-Representaci%C3%B3n_vectorial_referencial_del_chip_google_tensor.svg.png"
-        const val EXYNOS =
-            "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6f/Exynos_Logo.svg/500px-Exynos_Logo.svg.png"
+        const val SNAPDRAGON = "file:///android_asset/soc_snapdragon.png"
+        const val MEDIATEK = "file:///android_asset/soc_mediatek.png"
+        const val TENSOR = "file:///android_asset/soc_tensor.png"
+        const val EXYNOS = "file:///android_asset/soc_exynos.jpg"
     }
 }

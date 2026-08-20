@@ -13,6 +13,7 @@
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.VIBRATE" />
 
     <application
         android:name=".SystemStatsApplication"
@@ -51,37 +52,50 @@
                 android:value="Performance monitoring overlay" />
         </service>
 
+        <!-- M2: Quick Settings tile — cycles CALIPER media (shares "caliper" DataStore). -->
+        <service
+            android:name=".service.MediaTileService"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:icon="@drawable/ic_tile_caliper"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <!-- CALIPER widgets (S-12): 2×2 single channel, 4×2 dual, 4×4 bench -->
         <receiver
-            android:name=".presentation.widgets.BatteryWidgetReceiver"
+            android:name=".ui.caliper.widget.SingleChannelWidgetReceiver"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
-                android:resource="@xml/battery_widget_info" />
+                android:resource="@xml/single_channel_widget_info" />
         </receiver>
 
         <receiver
-            android:name=".presentation.widgets.CpuWidgetReceiver"
+            android:name=".ui.caliper.widget.DualChannelWidgetReceiver"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
-                android:resource="@xml/cpu_widget_info" />
+                android:resource="@xml/dual_channel_widget_info" />
         </receiver>
 
         <receiver
-            android:name=".presentation.widgets.DashboardWidgetReceiver"
+            android:name=".ui.caliper.widget.BenchWidgetReceiver"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
-                android:resource="@xml/dashboard_widget_info" />
+                android:resource="@xml/bench_widget_info" />
         </receiver>
 
     </application>

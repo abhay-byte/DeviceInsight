@@ -92,7 +92,7 @@ private fun SensorHeader(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
+            .clip(RoundedCornerShape(0.dp))
             .background(
                 Brush.linearGradient(
                     colors = listOf(
@@ -110,7 +110,7 @@ private fun SensorHeader(
                         secondary.copy(alpha = 0.1f)
                     )
                 ),
-                shape = RoundedCornerShape(20.dp)
+                shape = RoundedCornerShape(0.dp)
             )
             .padding(20.dp)
     ) {
@@ -122,7 +122,7 @@ private fun SensorHeader(
             Box(
                 modifier = Modifier
                     .size(64.dp)
-                    .clip(RoundedCornerShape(16.dp))
+                    .clip(RoundedCornerShape(0.dp))
                     .background(
                         Brush.linearGradient(
                             colors = listOf(
@@ -134,7 +134,7 @@ private fun SensorHeader(
                     .border(
                         width = 1.dp,
                         color = primary.copy(alpha = 0.4f),
-                        shape = RoundedCornerShape(16.dp)
+                        shape = RoundedCornerShape(0.dp)
                     ),
                 contentAlignment = Alignment.Center
             ) {
@@ -175,7 +175,7 @@ private fun SensorHeader(
             if (hasFingerprint) {
                 Surface(
                     color = primary.copy(alpha = 0.16f),
-                    shape = RoundedCornerShape(10.dp)
+                    shape = RoundedCornerShape(0.dp)
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
@@ -248,9 +248,9 @@ private fun CategoryBadge(
 ) {
     Column(
         modifier = modifier
-            .clip(RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(0.dp))
             .background(color.copy(alpha = 0.08f))
-            .border(1.dp, color.copy(alpha = 0.2f), RoundedCornerShape(14.dp))
+            .border(1.dp, color.copy(alpha = 0.2f), RoundedCornerShape(0.dp))
             .padding(horizontal = 10.dp, vertical = 12.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -295,7 +295,7 @@ private fun SensorList(sensors: List<SensorDetail>) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp))
+                .clip(RoundedCornerShape(0.dp))
                 .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.3f))
                 .padding(32.dp),
             contentAlignment = Alignment.Center
@@ -341,7 +341,7 @@ fun CategoryHeader(name: String, count: Int) {
             modifier = Modifier
                 .width(3.dp)
                 .height(18.dp)
-                .clip(RoundedCornerShape(2.dp))
+                .clip(RoundedCornerShape(0.dp))
                 .background(primary)
         )
         Spacer(modifier = Modifier.width(10.dp))
@@ -374,7 +374,7 @@ private fun SensorCard(sensor: SensorDetail) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(0.dp))
             .background(
                 Brush.verticalGradient(
                     colors = listOf(
@@ -391,7 +391,7 @@ private fun SensorCard(sensor: SensorDetail) {
                         secondary.copy(alpha = 0.05f)
                     )
                 ),
-                shape = RoundedCornerShape(14.dp)
+                shape = RoundedCornerShape(0.dp)
             )
             .padding(horizontal = 14.dp, vertical = 12.dp)
     ) {
@@ -403,9 +403,9 @@ private fun SensorCard(sensor: SensorDetail) {
                 Box(
                     modifier = Modifier
                         .size(38.dp)
-                        .clip(RoundedCornerShape(10.dp))
+                        .clip(RoundedCornerShape(0.dp))
                         .background(accent.copy(alpha = 0.14f))
-                        .border(1.dp, accent.copy(alpha = 0.3f), RoundedCornerShape(10.dp)),
+                        .border(1.dp, accent.copy(alpha = 0.3f), RoundedCornerShape(0.dp)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
@@ -437,7 +437,7 @@ private fun SensorCard(sensor: SensorDetail) {
                 if (sensor.isWakeUpSensor) {
                     Surface(
                         color = primary.copy(alpha = 0.14f),
-                        shape = RoundedCornerShape(6.dp)
+                        shape = RoundedCornerShape(0.dp)
                     ) {
                         Text(
                             text = "WAKE",
@@ -481,9 +481,9 @@ private fun SensorMetaRow(items: List<Pair<String, Boolean>>) {
         items.forEach { (text, mono) ->
             Box(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(6.dp))
+                    .clip(RoundedCornerShape(0.dp))
                     .background(primary.copy(alpha = 0.08f))
-                    .border(0.5.dp, primary.copy(alpha = 0.15f), RoundedCornerShape(6.dp))
+                    .border(0.5.dp, primary.copy(alpha = 0.15f), RoundedCornerShape(0.dp))
                     .padding(horizontal = 6.dp, vertical = 3.dp)
             ) {
                 Text(

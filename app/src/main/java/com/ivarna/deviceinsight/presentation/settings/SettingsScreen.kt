@@ -1,360 +1,131 @@
 package com.ivarna.deviceinsight.presentation.settings
 
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Analytics
-import androidx.compose.material.icons.filled.ColorLens
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.Palette
-import androidx.compose.material3.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.ivarna.deviceinsight.presentation.theme.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.ivarna.deviceinsight.ui.caliper.Medium
+import com.ivarna.deviceinsight.ui.caliper.PaperColors
+import com.ivarna.deviceinsight.ui.caliper.components.*
+import com.ivarna.deviceinsight.ui.caliper.*
+import com.ivarna.deviceinsight.ui.caliper.Caliper
+import kotlinx.coroutines.launch
 
 @Composable
 fun SettingsScreen(
-    currentTheme: AppTheme,
-    onThemeSelected: (AppTheme) -> Unit
+    currentMedium: Medium?,
+    onMediumSelected: (Medium) -> Unit
 ) {
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 16.dp),
-        contentPadding = PaddingValues(top = 16.dp, bottom = 48.dp),
-        verticalArrangement = Arrangement.spacedBy(24.dp)
+    val c = Caliper.colors
+    val resolved = currentMedium ?: Medium.PAPER
+    val haptics = rememberCaliperHaptics()
+    var showColophon by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val showGrid by context.showGridFlow.collectAsStateWithLifecycle(initialValue = true)
+
+    Column(
+        Modifier.fillMaxSize().caliperGrid().verticalScroll(rememberScrollState())
     ) {
-        // Appearance Section
-        item {
-            SettingsSectionHeader(title = "Appearance", icon = Icons.Filled.Palette)
-            Spacer(modifier = Modifier.height(12.dp))
-            
-            SettingsCard {
-                ThemeDropdownSelector(
-                    currentTheme = currentTheme,
-                    onThemeSelected = onThemeSelected
-                )
-            }
-        }
+        if (!showColophon) {
+            ScreenHeader("№ 05 — SETTINGS", "Settings.", "control panel · caliper standard")
 
-        // About Section
-        item {
-            SettingsSectionHeader(title = "About", icon = Icons.Filled.Info)
-            Spacer(modifier = Modifier.height(12.dp))
-            
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(
-                                MaterialTheme.colorScheme.tertiary.copy(alpha = 0.1f),
-                                MaterialTheme.colorScheme.surface.copy(alpha = 0.2f)
-                            )
-                        )
-                    )
-                    .border(
-                        1.dp,
-                        MaterialTheme.colorScheme.tertiary.copy(alpha = 0.2f),
-                        RoundedCornerShape(20.dp)
-                    )
-                    .padding(24.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Box(
-                        modifier = Modifier
-                            .size(72.dp)
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(
-                                Brush.linearGradient(
-                                    listOf(
-                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
-                                        MaterialTheme.colorScheme.tertiary.copy(alpha = 0.1f)
-                                    )
-                                )
-                            )
-                            .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f), RoundedCornerShape(16.dp)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        androidx.compose.foundation.Image(
-                            painter = androidx.compose.ui.res.painterResource(id = com.ivarna.deviceinsight.R.drawable.logo),
-                            contentDescription = "DeviceInsight Logo",
-                            modifier = Modifier.size(56.dp)
-                        )
-                    }
-                    
-                    Spacer(modifier = Modifier.height(16.dp))
-                    
-                    Text(
-                        text = "DeviceInsight",
-                        style = MaterialTheme.typography.titleLarge.copy(
-                            fontWeight = FontWeight.ExtraBold,
-                            letterSpacing = 0.5.sp
-                        ),
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    
-                    Surface(
-                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.padding(vertical = 8.dp)
-                    ) {
-                        Text(
-                            text = "Version ${com.ivarna.deviceinsight.BuildConfig.VERSION_NAME}",
-                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                        )
-                    }
-                    
-                    Spacer(modifier = Modifier.height(8.dp))
-                    
-                    Text(
-                        text = "The Ultimate Android System Monitor & Task Manager.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(horizontal = 16.dp)
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun SettingsCard(content: @Composable ColumnScope.() -> Unit) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
-            .background(
-                Brush.verticalGradient(
-                    listOf(
-                        MaterialTheme.colorScheme.primary.copy(alpha = 0.05f),
-                        MaterialTheme.colorScheme.surface.copy(alpha = 0.3f)
-                    )
-                )
+            // 01 PRESENTATION
+            Text("01 PRESENTATION", style = Caliper.type.meta, color = c.ink60,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+            Spacer(Modifier.height(4.dp))
+            Text("media", style = Caliper.type.label, color = c.ink40,
+                modifier = Modifier.padding(horizontal = 16.dp))
+            Spacer(Modifier.height(6.dp))
+            SegKey(
+                options = listOf(Medium.PAPER, Medium.CARBON, Medium.BLUEPRINT),
+                selected = resolved,
+                onSelect = { onMediumSelected(it); haptics.confirm() },
+                modifier = Modifier.padding(horizontal = 16.dp),
+                labelFor = { it.name }
             )
-            .border(
-                1.dp,
-                Brush.linearGradient(
-                    listOf(
-                        MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
-                        MaterialTheme.colorScheme.secondary.copy(alpha = 0.05f)
-                    )
-                ),
-                RoundedCornerShape(20.dp)
+            Spacer(Modifier.height(8.dp))
+            MediumSwatches(resolved)
+            Spacer(Modifier.height(12.dp))
+
+            // presentation DIPs drive global grid/hatching via DataStore
+            DipSwitch(
+                checked = showGrid,
+                onCheckedChange = { scope.launch { context.setShowGrid(it) } },
+                modifier = Modifier.padding(horizontal = 16.dp),
+                label = "graph-paper grid"
             )
-            .padding(vertical = 8.dp)
-    ) {
-        Column(content = content)
+            Spacer(Modifier.height(10.dp))
+
+            Spacer(Modifier.height(20.dp))
+            DoubleRule(Modifier.padding(horizontal = 16.dp))
+
+            // 05 SYSTEM
+            Text("05 SYSTEM", style = Caliper.type.meta, color = c.ink60,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+            Spacer(Modifier.height(10.dp))
+            HardKey("06 ABOUT → COLOPHON", variant = HardKeyVariant.SECONDARY,
+                modifier = Modifier.padding(horizontal = 16.dp),
+                onClick = { showColophon = true })
+        } else {
+            // № 06 — COLOPHON
+            ScreenHeader("№ 06 — COLOPHON", "Colophon.", "the making of the instrument")
+            Text("Set in Instrument Serif & IBM Plex Mono.", style = Caliper.type.dataS, color = c.ink,
+                modifier = Modifier.padding(horizontal = 16.dp))
+            Spacer(Modifier.height(4.dp))
+            Text("Drawn on a 4pt grid. No gradients were used in", style = Caliper.type.dataS, color = c.ink,
+                modifier = Modifier.padding(horizontal = 16.dp))
+            Text("the making of this instrument.", style = Caliper.type.dataS, color = c.ink,
+                modifier = Modifier.padding(horizontal = 16.dp))
+            Spacer(Modifier.height(16.dp))
+            Text("REVISIONS", style = Caliper.type.meta, color = c.ink60,
+                modifier = Modifier.padding(horizontal = 16.dp))
+            Spacer(Modifier.height(6.dp))
+            SpecRow("REV A", "CALIPER design language adopted", Modifier.padding(horizontal = 16.dp))
+            SpecRow("v1", "Elegant Glassmorphism (retired)", Modifier.padding(horizontal = 16.dp))
+            SpecRow("v0", "first internal build", Modifier.padding(horizontal = 16.dp))
+            Spacer(Modifier.height(16.dp))
+            SpecRow("LICENSE", "GPL-3.0", Modifier.padding(horizontal = 16.dp))
+            SpecRow("BUILT BY", "Ivarna", Modifier.padding(horizontal = 16.dp))
+            Spacer(Modifier.height(20.dp))
+            HardKey("← BACK TO SETTINGS", variant = HardKeyVariant.SECONDARY,
+                modifier = Modifier.padding(horizontal = 16.dp),
+                onClick = { showColophon = false })
+        }
+        EndOfSheet()
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+/** Three paper-sample swatches — real rendered mini-panels, not color dots. */
 @Composable
-fun ThemeDropdownSelector(
-    currentTheme: AppTheme,
-    onThemeSelected: (AppTheme) -> Unit
-) {
-    var expanded by remember { mutableStateOf(false) }
-    val rotation by animateFloatAsState(if (expanded) 180f else 0f, label = "arrowRotation")
-
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
-    ) {
-        ExposedDropdownMenuBox(
-            expanded = expanded,
-            onExpandedChange = { expanded = !expanded }
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.5f))
-                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
-                    .clickable { expanded = true }
-                    .padding(16.dp)
-                    .menuAnchor(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Filled.ColorLens,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Column {
-                        Text(
-                            text = "App Theme",
-                            style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = formatThemeName(currentTheme),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
+private fun MediumSwatches(selected: Medium) {
+    val c = Caliper.colors
+    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        listOf(
+            Triple(Medium.PAPER, PaperColors.surface, PaperColors.ink),
+            Triple(Medium.CARBON, Color(0xFF141310), Color(0xFFEDE7DA)),
+            Triple(Medium.BLUEPRINT, Color(0xFF0C2338), Color(0xFFEAF2FF))
+        ).forEach { (medium, swatch, inkColor) ->
+            Column(Modifier.weight(1f)) {
+                Box(
+                    Modifier.fillMaxWidth().height(48.dp)
+                        .background(swatch)
+                        .border(1.dp, if (medium == selected) c.accent else c.hairline)
+                ) {
+                    Text("A1", style = Caliper.type.meta, color = inkColor,
+                        modifier = Modifier.padding(8.dp))
                 }
-                
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    ThemePalettePreview(theme = currentTheme)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Icon(
-                        imageVector = Icons.Filled.KeyboardArrowDown,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.rotate(rotation)
-                    )
-                }
-            }
-
-            ExposedDropdownMenu(
-                expanded = expanded,
-                onDismissRequest = { expanded = false },
-                modifier = Modifier.background(MaterialTheme.colorScheme.surface)
-            ) {
-                AppTheme.values().forEach { theme ->
-                    DropdownMenuItem(
-                        text = {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = formatThemeName(theme),
-                                    style = MaterialTheme.typography.bodyMedium.copy(
-                                        fontWeight = if (theme == currentTheme) FontWeight.Bold else FontWeight.Normal
-                                    ),
-                                    color = if (theme == currentTheme) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                                )
-                                ThemePalettePreview(theme = theme)
-                            }
-                        },
-                        onClick = {
-                            onThemeSelected(theme)
-                            expanded = false
-                        },
-                        modifier = Modifier.background(
-                            if (theme == currentTheme) MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
-                            else Color.Transparent
-                        )
-                    )
-                }
+                Text(medium.name.uppercase(), style = Caliper.type.meta, color = c.ink60,
+                    modifier = Modifier.padding(top = 4.dp))
             }
         }
-    }
-}
-
-@Composable
-fun SettingsSectionHeader(title: String, icon: ImageVector) {
-    val primary = MaterialTheme.colorScheme.primary
-    val secondary = MaterialTheme.colorScheme.secondary
-
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Box(
-            modifier = Modifier
-                .width(4.dp)
-                .height(24.dp)
-                .clip(RoundedCornerShape(2.dp))
-                .background(
-                    Brush.verticalGradient(listOf(primary, secondary))
-                )
-        )
-        Spacer(modifier = Modifier.width(12.dp))
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = primary,
-            modifier = Modifier.size(20.dp)
-        )
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(
-            text = title.uppercase(),
-            style = MaterialTheme.typography.titleMedium.copy(
-                fontWeight = FontWeight.ExtraBold,
-                letterSpacing = 1.5.sp
-            ),
-            color = primary
-        )
-    }
-}
-
-@Composable
-fun ThemePalettePreview(theme: AppTheme) {
-    val colors = getThemeColors(theme)
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(-6.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        colors.reversed().forEach { color ->
-            Box(
-                modifier = Modifier
-                    .size(20.dp)
-                    .clip(CircleShape)
-                    .background(color)
-                    .border(1.5.dp, MaterialTheme.colorScheme.surface, CircleShape)
-            )
-        }
-    }
-}
-
-fun getThemeColors(theme: AppTheme): List<Color> {
-    return when(theme) {
-        AppTheme.TechNoir -> listOf(TechNoirPrimary, TechNoirSecondary, TechNoirTertiary)
-        AppTheme.Cyberpunk -> listOf(CyberpunkPrimary, CyberpunkSecondary, CyberpunkTertiary)
-        AppTheme.DeepOcean -> listOf(OceanPrimary, OceanSecondary, OceanTertiary)
-        AppTheme.Matrix -> listOf(MatrixPrimary, MatrixSecondary, MatrixTertiary)
-        AppTheme.Dracula -> listOf(DraculaPrimary, DraculaSecondary, DraculaTertiary)
-        AppTheme.SunsetMirage -> listOf(SunsetPrimary, SunsetSecondary, SunsetTertiary)
-        AppTheme.ForestSpirit -> listOf(ForestPrimary, ForestSecondary, ForestTertiary)
-        AppTheme.NeonNights -> listOf(NeonNightsPrimary, NeonNightsSecondary, NeonNightsTertiary)
-        AppTheme.NordicIce -> listOf(NordicPrimary, NordicSecondary, NordicTertiary)
-        AppTheme.GoldenLuxe -> listOf(LuxePrimary, LuxeSecondary, LuxeTertiary)
-    }
-}
-
-fun formatThemeName(theme: AppTheme): String {
-    return when(theme) {
-        AppTheme.TechNoir -> "Tech Noir"
-        AppTheme.Cyberpunk -> "Cyberpunk Edge"
-        AppTheme.DeepOcean -> "Deep Ocean"
-        AppTheme.Matrix -> "Matrix"
-        AppTheme.Dracula -> "Dracula"
-        AppTheme.SunsetMirage -> "Sunset Mirage"
-        AppTheme.ForestSpirit -> "Forest Spirit"
-        AppTheme.NeonNights -> "Neon Nights"
-        AppTheme.NordicIce -> "Nordic Ice"
-        AppTheme.GoldenLuxe -> "Golden Luxe"
     }
 }

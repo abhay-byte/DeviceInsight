@@ -132,11 +132,6 @@ dependencies {
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.1")
 
-    // Charts/Graphs
-    implementation("com.patrykandpatrick.vico:compose:2.0.0-alpha.28")
-    implementation("com.patrykandpatrick.vico:compose-m3:2.0.0-alpha.28")
-    implementation("com.patrykandpatrick.vico:core:2.0.0-alpha.28")
-
     // Jetpack Glance (Widgets)
     implementation("androidx.glance:glance-appwidget:1.1.0")
     implementation("androidx.glance:glance-material3:1.1.0")
@@ -146,9 +141,6 @@ dependencies {
 
     // DataStore for preferences
     implementation("androidx.datastore:datastore-preferences:1.1.1")
-
-    // Haze (Glassmorphism)
-    implementation("dev.chrisbanes.haze:haze:0.7.3")
 
     // Image loading (Coil for Compose)
     implementation("io.coil-kt:coil-compose:2.7.0")

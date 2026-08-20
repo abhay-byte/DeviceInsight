@@ -82,7 +82,7 @@ fun OverlayMetricCard(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(14.dp))
+                .clip(RoundedCornerShape(0.dp))
                 .background(
                     Brush.verticalGradient(
                         colors = listOf(
@@ -99,7 +99,7 @@ fun OverlayMetricCard(
                             secondary.copy(alpha = 0.05f)
                         )
                     ),
-                    shape = RoundedCornerShape(14.dp)
+                    shape = RoundedCornerShape(0.dp)
                 )
                 .padding(horizontal = 14.dp, vertical = 12.dp)
         ) {
@@ -120,9 +120,9 @@ fun OverlayMetricCard(
                 Box(
                     modifier = Modifier
                         .size(36.dp)
-                        .clip(RoundedCornerShape(10.dp))
+                        .clip(RoundedCornerShape(0.dp))
                         .background(accent.copy(alpha = 0.14f))
-                        .border(1.dp, accent.copy(alpha = 0.3f), RoundedCornerShape(10.dp)),
+                        .border(1.dp, accent.copy(alpha = 0.3f), RoundedCornerShape(0.dp)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
@@ -183,9 +183,9 @@ private fun PremiumSwitch(
     Box(
         modifier = Modifier
             .size(width = 44.dp, height = 26.dp)
-            .clip(RoundedCornerShape(13.dp))
+            .clip(RoundedCornerShape(0.dp))
             .background(trackColor)
-            .border(0.5.dp, primary.copy(alpha = 0.2f), RoundedCornerShape(13.dp))
+            .border(0.5.dp, primary.copy(alpha = 0.2f), RoundedCornerShape(0.dp))
             .clickable { onCheckedChange(!checked) }
     ) {
         Box(
@@ -252,12 +252,12 @@ fun FpsModePill(
 
     Column(
         modifier = Modifier
-            .clip(RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(0.dp))
             .background(bgBrush)
             .border(
                 width = if (selected) 1.dp else 0.5.dp,
                 color = borderColor,
-                shape = RoundedCornerShape(14.dp)
+                shape = RoundedCornerShape(0.dp)
             )
             .clickable { onClick() }
             .padding(horizontal = 12.dp, vertical = 10.dp),
@@ -323,7 +323,7 @@ fun PermissionActionCard(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(0.dp))
             .background(
                 Brush.verticalGradient(
                     colors = listOf(
@@ -340,7 +340,7 @@ fun PermissionActionCard(
                         secondary.copy(alpha = 0.1f)
                     )
                 ),
-                shape = RoundedCornerShape(16.dp)
+                shape = RoundedCornerShape(0.dp)
             )
             .padding(16.dp)
     ) {
@@ -358,9 +358,9 @@ fun PermissionActionCard(
                     Box(
                         modifier = Modifier
                             .size(40.dp)
-                            .clip(RoundedCornerShape(10.dp))
+                            .clip(RoundedCornerShape(0.dp))
                             .background(accentColor.copy(alpha = 0.15f))
-                            .border(1.dp, accentColor.copy(alpha = 0.35f), RoundedCornerShape(10.dp)),
+                            .border(1.dp, accentColor.copy(alpha = 0.35f), RoundedCornerShape(0.dp)),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
@@ -385,9 +385,9 @@ fun PermissionActionCard(
                 // Status Badge
                 Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
+                        .clip(RoundedCornerShape(0.dp))
                         .background(accentColor.copy(alpha = 0.15f))
-                        .border(1.dp, accentColor.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+                        .border(1.dp, accentColor.copy(alpha = 0.4f), RoundedCornerShape(0.dp))
                         .padding(horizontal = 8.dp, vertical = 4.dp)
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -437,9 +437,9 @@ fun PermissionActionCard(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(10.dp))
+                        .clip(RoundedCornerShape(0.dp))
                         .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.5f))
-                        .border(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f), RoundedCornerShape(10.dp))
+                        .border(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f), RoundedCornerShape(0.dp))
                         .padding(10.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
@@ -473,7 +473,7 @@ fun PermissionActionCard(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(44.dp)
-                        .clip(RoundedCornerShape(12.dp))
+                        .clip(RoundedCornerShape(0.dp))
                         .background(
                             Brush.horizontalGradient(
                                 colors = listOf(
@@ -482,7 +482,7 @@ fun PermissionActionCard(
                                 )
                             )
                         )
-                        .border(1.dp, accentColor.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+                        .border(1.dp, accentColor.copy(alpha = 0.5f), RoundedCornerShape(0.dp))
                         .clickable { onActionClick() },
                     contentAlignment = Alignment.Center
                 ) {
@@ -548,12 +548,12 @@ fun PermissionChip(
 
     Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(10.dp))
+            .clip(RoundedCornerShape(0.dp))
             .background(accent.copy(alpha = if (granted) 0.12f else 0.18f))
             .border(
                 width = if (granted) 0.8.dp else 1.2.dp,
                 color = accent.copy(alpha = if (granted) 0.4f else 0.7f),
-                shape = RoundedCornerShape(10.dp)
+                shape = RoundedCornerShape(0.dp)
             )
             .clickable(enabled = onClick != null) { onClick?.invoke() }
             .padding(horizontal = 10.dp, vertical = 6.dp)

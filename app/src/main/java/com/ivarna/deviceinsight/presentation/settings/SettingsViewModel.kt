@@ -3,7 +3,7 @@ package com.ivarna.deviceinsight.presentation.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.ivarna.deviceinsight.domain.repository.SettingsRepository
-import com.ivarna.deviceinsight.presentation.theme.AppTheme
+import com.ivarna.deviceinsight.ui.caliper.Medium
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -16,16 +16,16 @@ class SettingsViewModel @Inject constructor(
     private val settingsRepository: SettingsRepository
 ) : ViewModel() {
 
-    val theme: StateFlow<AppTheme> = settingsRepository.getTheme()
+    val medium: StateFlow<Medium?> = settingsRepository.getMedium()
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
-            initialValue = AppTheme.TechNoir
+            initialValue = null
         )
 
-    fun setTheme(theme: AppTheme) {
+    fun setMedium(medium: Medium) {
         viewModelScope.launch {
-            settingsRepository.setTheme(theme)
+            settingsRepository.setMedium(medium)
         }
     }
 }

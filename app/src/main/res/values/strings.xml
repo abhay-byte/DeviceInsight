@@ -2,11 +2,11 @@
 <resources>
     <string name="app_name">DeviceInsights</string>
     
-    <!-- Navigation -->
-    <string name="nav_dashboard">Dashboard</string>
-    <string name="nav_tasks">Tasks</string>
-    <string name="nav_hardware">Hardware</string>
-    <string name="nav_overlay">Overlay</string>
+    <!-- Navigation (CALIPER labels) -->
+    <string name="nav_dashboard">OVERVIEW</string>
+    <string name="nav_tasks">PROCESSES</string>
+    <string name="nav_hardware">DEVICE</string>
+    <string name="nav_overlay">OVERLAY</string>
     <string name="nav_settings">Settings</string>
     
     <!-- Dashboard -->
@@ -50,6 +50,14 @@
     <string name="common_dash_long">—</string>
     <string name="common_off">Off</string>
     <string name="common_celsius_unknown">--°C</string>
+    <string name="hardware_vendor_label">Vendor</string>
+    <string name="dashboard_connectivity">Connectivity</string>
+    <string name="connectivity_wifi">WiFi</string>
+    <string name="connectivity_bluetooth">Bluetooth</string>
+    <string name="connectivity_usb">USB</string>
+    <string name="stat_battery_mah">Capacity</string>
+    <string name="stat_battery_whr">Energy</string>
+    <string name="stat_battery_watts">Power</string>
 
     <!-- Format strings -->
     <string name="format_temp_celsius">%1$.0f°C</string>

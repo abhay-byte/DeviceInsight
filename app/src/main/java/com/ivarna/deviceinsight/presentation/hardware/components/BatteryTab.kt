@@ -44,7 +44,7 @@ fun BatteryTab(info: HardwareInfo) {
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(vertical = 6.dp)
-                .clip(RoundedCornerShape(20.dp))
+                .clip(RoundedCornerShape(0.dp))
                 .background(
                     Brush.verticalGradient(
                         listOf(levelColor.copy(alpha = 0.10f), levelColor.copy(alpha = 0.02f))
@@ -55,7 +55,7 @@ fun BatteryTab(info: HardwareInfo) {
                     Brush.linearGradient(
                         listOf(levelColor.copy(alpha = 0.3f), levelColor.copy(alpha = 0.05f))
                     ),
-                    RoundedCornerShape(20.dp)
+                    RoundedCornerShape(0.dp)
                 )
                 .padding(horizontal = 20.dp, vertical = 18.dp)
         ) {

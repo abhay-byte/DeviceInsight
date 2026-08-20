@@ -103,7 +103,7 @@ private fun DevicesHeader(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
+            .clip(RoundedCornerShape(0.dp))
             .background(
                 Brush.linearGradient(
                     colors = listOf(
@@ -121,7 +121,7 @@ private fun DevicesHeader(
                         secondary.copy(alpha = 0.1f)
                     )
                 ),
-                shape = RoundedCornerShape(20.dp)
+                shape = RoundedCornerShape(0.dp)
             )
             .padding(20.dp)
     ) {
@@ -132,7 +132,7 @@ private fun DevicesHeader(
             Box(
                 modifier = Modifier
                     .size(64.dp)
-                    .clip(RoundedCornerShape(16.dp))
+                    .clip(RoundedCornerShape(0.dp))
                     .background(
                         Brush.linearGradient(
                             colors = listOf(
@@ -141,7 +141,7 @@ private fun DevicesHeader(
                             )
                         )
                     )
-                    .border(1.dp, primary.copy(alpha = 0.4f), RoundedCornerShape(16.dp)),
+                    .border(1.dp, primary.copy(alpha = 0.4f), RoundedCornerShape(0.dp)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
@@ -214,7 +214,7 @@ private fun CameraCard(camera: CameraInfo) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(0.dp))
             .background(
                 Brush.verticalGradient(
                     colors = listOf(
@@ -231,7 +231,7 @@ private fun CameraCard(camera: CameraInfo) {
                         secondary.copy(alpha = 0.05f)
                     )
                 ),
-                shape = RoundedCornerShape(14.dp)
+                shape = RoundedCornerShape(0.dp)
             )
             .padding(horizontal = 14.dp, vertical = 14.dp)
     ) {
@@ -243,9 +243,9 @@ private fun CameraCard(camera: CameraInfo) {
                 Box(
                     modifier = Modifier
                         .size(38.dp)
-                        .clip(RoundedCornerShape(10.dp))
+                        .clip(RoundedCornerShape(0.dp))
                         .background(facingColor.copy(alpha = 0.14f))
-                        .border(1.dp, facingColor.copy(alpha = 0.3f), RoundedCornerShape(10.dp)),
+                        .border(1.dp, facingColor.copy(alpha = 0.3f), RoundedCornerShape(0.dp)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
@@ -276,9 +276,9 @@ private fun CameraCard(camera: CameraInfo) {
                 }
                 Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(6.dp))
+                        .clip(RoundedCornerShape(0.dp))
                         .background(facingColor.copy(alpha = 0.14f))
-                        .border(0.5.dp, facingColor.copy(alpha = 0.3f), RoundedCornerShape(6.dp))
+                        .border(0.5.dp, facingColor.copy(alpha = 0.3f), RoundedCornerShape(0.dp))
                         .padding(horizontal = 8.dp, vertical = 3.dp)
                 ) {
                     Text(
@@ -355,9 +355,9 @@ private fun CameraCard(camera: CameraInfo) {
                     camera.focusModes.take(4).forEach { mode ->
                         Box(
                             modifier = Modifier
-                                .clip(RoundedCornerShape(6.dp))
+                                .clip(RoundedCornerShape(0.dp))
                                 .background(facingColor.copy(alpha = 0.08f))
-                                .border(0.5.dp, facingColor.copy(alpha = 0.2f), RoundedCornerShape(6.dp))
+                                .border(0.5.dp, facingColor.copy(alpha = 0.2f), RoundedCornerShape(0.dp))
                                 .padding(horizontal = 6.dp, vertical = 3.dp)
                         ) {
                             Text(
@@ -385,9 +385,9 @@ private fun CameraSpecChip(
     val primary = MaterialTheme.colorScheme.primary
     Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(8.dp))
+            .clip(RoundedCornerShape(0.dp))
             .background(primary.copy(alpha = 0.08f))
-            .border(0.5.dp, primary.copy(alpha = 0.18f), RoundedCornerShape(8.dp))
+            .border(0.5.dp, primary.copy(alpha = 0.18f), RoundedCornerShape(0.dp))
             .padding(horizontal = 8.dp, vertical = 5.dp)
     ) {
         Column {
@@ -431,9 +431,9 @@ private fun FeaturePill(
     val accent = if (enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
     Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(6.dp))
+            .clip(RoundedCornerShape(0.dp))
             .background(accent.copy(alpha = if (enabled) 0.14f else 0.06f))
-            .border(0.5.dp, accent.copy(alpha = if (enabled) 0.3f else 0.15f), RoundedCornerShape(6.dp))
+            .border(0.5.dp, accent.copy(alpha = if (enabled) 0.3f else 0.15f), RoundedCornerShape(0.dp))
             .padding(horizontal = 7.dp, vertical = 3.dp)
     ) {
         Text(
@@ -457,7 +457,7 @@ private fun UsbCard(usb: UsbDeviceInfo) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(0.dp))
             .background(
                 Brush.verticalGradient(
                     colors = listOf(
@@ -474,7 +474,7 @@ private fun UsbCard(usb: UsbDeviceInfo) {
                         primary.copy(alpha = 0.05f)
                     )
                 ),
-                shape = RoundedCornerShape(14.dp)
+                shape = RoundedCornerShape(0.dp)
             )
             .padding(horizontal = 14.dp, vertical = 14.dp)
     ) {
@@ -486,9 +486,9 @@ private fun UsbCard(usb: UsbDeviceInfo) {
                 Box(
                     modifier = Modifier
                         .size(38.dp)
-                        .clip(RoundedCornerShape(10.dp))
+                        .clip(RoundedCornerShape(0.dp))
                         .background(tertiary.copy(alpha = 0.14f))
-                        .border(1.dp, tertiary.copy(alpha = 0.3f), RoundedCornerShape(10.dp)),
+                        .border(1.dp, tertiary.copy(alpha = 0.3f), RoundedCornerShape(0.dp)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
@@ -519,9 +519,9 @@ private fun UsbCard(usb: UsbDeviceInfo) {
                 }
                 Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(6.dp))
+                        .clip(RoundedCornerShape(0.dp))
                         .background(tertiary.copy(alpha = 0.14f))
-                        .border(0.5.dp, tertiary.copy(alpha = 0.3f), RoundedCornerShape(6.dp))
+                        .border(0.5.dp, tertiary.copy(alpha = 0.3f), RoundedCornerShape(0.dp))
                         .padding(horizontal = 8.dp, vertical = 3.dp)
                 ) {
                     Text(
@@ -564,9 +564,9 @@ private fun UsbSpecChip(
     val primary = MaterialTheme.colorScheme.primary
     Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(6.dp))
+            .clip(RoundedCornerShape(0.dp))
             .background(primary.copy(alpha = 0.08f))
-            .border(0.5.dp, primary.copy(alpha = 0.18f), RoundedCornerShape(6.dp))
+            .border(0.5.dp, primary.copy(alpha = 0.18f), RoundedCornerShape(0.dp))
             .padding(horizontal = 8.dp, vertical = 4.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -598,9 +598,9 @@ private fun EmptyDevicesState() {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(0.dp))
             .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.3f))
-            .border(1.dp, primary.copy(alpha = 0.2f), RoundedCornerShape(16.dp))
+            .border(1.dp, primary.copy(alpha = 0.2f), RoundedCornerShape(0.dp))
             .padding(32.dp),
         contentAlignment = Alignment.Center
     ) {

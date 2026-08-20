@@ -41,7 +41,7 @@ fun CpuTab(info: HardwareInfo) {
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(vertical = 6.dp)
-                .clip(RoundedCornerShape(20.dp))
+                .clip(RoundedCornerShape(0.dp))
                 .background(
                     Brush.verticalGradient(
                         listOf(primary.copy(alpha = 0.10f), secondary.copy(alpha = 0.03f))
@@ -52,7 +52,7 @@ fun CpuTab(info: HardwareInfo) {
                     Brush.linearGradient(
                         listOf(primary.copy(alpha = 0.3f), secondary.copy(alpha = 0.1f))
                     ),
-                    RoundedCornerShape(20.dp)
+                    RoundedCornerShape(0.dp)
                 )
                 .padding(horizontal = 20.dp, vertical = 18.dp)
         ) {
