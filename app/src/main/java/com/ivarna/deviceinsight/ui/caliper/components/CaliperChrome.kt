@@ -28,8 +28,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ivarna.deviceinsight.ui.caliper.*
 import kotlinx.coroutines.delay
-import java.time.LocalTime
-import java.time.ZoneOffset
+import java.time.ZoneId
+import java.time.ZonedDateTime
 import java.util.Locale
 import kotlin.math.roundToInt
 import kotlin.math.sin
@@ -45,7 +45,8 @@ fun Masthead(
     onSettingsClick: (() -> Unit)? = null
 ) {
     val c = Caliper.colors
-    Column(modifier.fillMaxWidth().background(c.surface).windowInsetsPadding(WindowInsets.statusBars)) {
+    // B1: masthead bg is panel not surface, ensure ink text visible on Paper light
+    Column(modifier.fillMaxWidth().background(c.panel).windowInsetsPadding(WindowInsets.statusBars)) {
         Row(
             // §5.1: masthead is exactly 52dp tall (below the status-bar inset).
             Modifier.fillMaxWidth().height(52.dp).padding(horizontal = 16.dp),
@@ -117,16 +118,16 @@ private fun CrosshairMark(modifier: Modifier = Modifier) {
 @Composable
 private fun UtcClock() {
     val c = Caliper.colors
-    var now by remember { mutableStateOf(LocalTime.now(ZoneOffset.UTC)) }
+    var now by remember { mutableStateOf(ZonedDateTime.now(ZoneId.systemDefault())) }
     LaunchedEffect(Unit) {
         while (true) {
             delay(1000 - (System.currentTimeMillis() % 1000))
-            now = LocalTime.now(ZoneOffset.UTC)
+            now = ZonedDateTime.now(ZoneId.systemDefault())
         }
     }
     val colon = if (now.second % 2 == 0) ":" else " "   // the heartbeat
     Text(
-        String.format(java.util.Locale.US, "%02d%s%02d%s%02d UTC",
+        String.format(java.util.Locale.US, "%02d%s%02d%s%02d",
             now.hour, colon, now.minute, colon, now.second),
         style = Caliper.type.dataS, color = c.ink
     )

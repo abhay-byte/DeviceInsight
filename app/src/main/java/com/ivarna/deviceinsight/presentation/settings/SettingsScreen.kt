@@ -1,5 +1,6 @@
 package com.ivarna.deviceinsight.presentation.settings
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -22,7 +23,8 @@ import kotlinx.coroutines.launch
 @Composable
 fun SettingsScreen(
     currentMedium: Medium?,
-    onMediumSelected: (Medium) -> Unit
+    onMediumSelected: (Medium) -> Unit,
+    onBack: (() -> Unit)? = null
 ) {
     val c = Caliper.colors
     val resolved = currentMedium ?: Medium.PAPER
@@ -32,10 +34,18 @@ fun SettingsScreen(
     val scope = rememberCoroutineScope()
     val showGrid by context.showGridFlow.collectAsStateWithLifecycle(initialValue = true)
 
+    // B2: system back first exits colophon, then settings
+    BackHandler(enabled = showColophon) { showColophon = false }
+
     Column(
         Modifier.fillMaxSize().caliperGrid().verticalScroll(rememberScrollState())
     ) {
         if (!showColophon) {
+            if (onBack != null) {
+                HardKey("← BACK", variant = HardKeyVariant.SECONDARY,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    onClick = onBack)
+            }
             ScreenHeader("№ 05 — SETTINGS", "Settings.", "control panel · caliper standard")
 
             // 01 PRESENTATION

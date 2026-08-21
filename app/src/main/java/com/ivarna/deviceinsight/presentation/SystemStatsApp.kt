@@ -5,12 +5,17 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.core.tween
+import android.app.Activity
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
+import androidx.core.view.WindowCompat
+import com.ivarna.deviceinsight.ui.caliper.Medium
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
@@ -83,6 +88,15 @@ fun SystemStatsApp() {
     val selectedRail = railRoutes.firstOrNull { route ->
         currentDestination?.hierarchy?.any { it.route == route.route } == true
     }?.number
+
+    // B1: light status bars on Paper so clock/ink visible on light surface
+    val view = LocalView.current
+    val useDarkIcons = currentMedium == Medium.PAPER
+    SideEffect {
+        val window = (view.context as? Activity)?.window ?: return@SideEffect
+        WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = useDarkIcons
+        WindowCompat.getInsetsController(window, view).isAppearanceLightNavigationBars = useDarkIcons
+    }
 
     // S-00 first-launch calibration gate (skippable). After finishing, the
     // one-time "recalibrated" MarginNote is shown via caliperMigrated flag.
@@ -174,7 +188,8 @@ fun SystemStatsApp() {
                             composable(ScreenRoute.Settings.route) {
                                 SettingsScreen(
                                     currentMedium = currentMedium,
-                                    onMediumSelected = settingsViewModel::setMedium
+                                    onMediumSelected = settingsViewModel::setMedium,
+                                    onBack = { navController.popBackStack() }
                                 )
                             }
                         }
@@ -216,7 +231,8 @@ fun SystemStatsApp() {
                         composable(ScreenRoute.Settings.route) {
                             SettingsScreen(
                                 currentMedium = currentMedium,
-                                onMediumSelected = settingsViewModel::setMedium
+                                onMediumSelected = settingsViewModel::setMedium,
+                                onBack = { navController.popBackStack() }
                             )
                         }
                     }

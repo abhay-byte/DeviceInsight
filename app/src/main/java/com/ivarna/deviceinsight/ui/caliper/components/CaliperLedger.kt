@@ -84,14 +84,15 @@ private fun LedgerRow(row: ProcRow, onClick: () -> Unit) {
             Text(Fmt.index(row.index), style = Caliper.type.dataS, color = c.ink40, modifier = Modifier.width(44.dp))
             Text(row.pkg, style = Caliper.type.dataM, color = c.ink,
                 maxLines = 1, modifier = Modifier.weight(1f))
-            Text(String.format(java.util.Locale.US, "%.1f%%", row.cpu), style = Caliper.type.dataM,
+            // B5: unknown cpu → — per §4.9, rss 0 → —
+            Text(if (row.cpu == 0f) "—" else String.format(java.util.Locale.US, "%.1f%%", row.cpu), style = Caliper.type.dataM,
                 color = if (row.cpu > 25f) c.fault else c.ink, modifier = Modifier.width(64.dp))
-            Text(Fmt.bytes(row.rssBytes), style = Caliper.type.dataM, color = c.ink60)
+            Text(if (row.rssBytes == 0L) "—" else Fmt.bytes(row.rssBytes), style = Caliper.type.dataM, color = c.ink60)
             if (row.isSelf) Spacer(Modifier.width(8.dp))
             if (row.isSelf) StampBadge("SELF", color = c.accent, rotation = -3f, animateIn = false)
         }
-        Text(
-            "pid ${row.pid} · ${row.uptime} · ${if (row.state == ProcState.FOREGROUND) "●" else "○"} ${row.state.name.lowercase()}",
+            Text(
+            "pid ${if (row.pid == 0) "—" else row.pid.toString()} · ${row.uptime} · ${if (row.state == ProcState.FOREGROUND) "●" else "○"} ${row.state.name.lowercase()}",
             style = Caliper.type.meta, color = c.ink40, modifier = Modifier.padding(start = 44.dp)
         )
     }
@@ -271,7 +272,7 @@ fun ProcessesScreen(
         val twoPane = maxWidth >= 560.dp
         val paneWidth = (maxWidth * 0.45f).coerceIn(280.dp, 352.dp)
         Column(Modifier.fillMaxSize()) {
-            ScreenHeader("№ 03 — PROCESSES", "Processes.",
+            ScreenHeader("№ 04 — PROCESSES", "Processes.",
                 "${rows.size} listed · ${rows.sumOf { it.threads }} threads")
             SegKey(listOf("ALL", "APPS", "SYSTEM"), filter, { filter = it },
                 Modifier.padding(horizontal = 16.dp))

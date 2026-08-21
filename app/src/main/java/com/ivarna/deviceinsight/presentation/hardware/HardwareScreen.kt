@@ -3,6 +3,7 @@ package com.ivarna.deviceinsight.presentation.hardware
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -10,6 +11,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -29,7 +33,7 @@ fun HardwareScreen(
     val tabs = listOf("SYSTEM", "CPU", "DISPLAY", "GPU", "NETWORK", "BATTERY", "ANDROID", "HARDWARE", "THERMAL", "STORAGE", "SENSORS")
 
     Column(Modifier.fillMaxSize()) {
-        ScreenHeader("№ 04 — DEVICE DOSSIER", "Device.", "hardware spec sheets · plates")
+        ScreenHeader("№ 02 — DEVICE DOSSIER", "Device.", "hardware spec sheets · plates")
         if (hardwareInfo == null) {
             Column(Modifier.fillMaxSize(), horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally) {
                 Spacer(Modifier.height(48.dp))
@@ -93,12 +97,40 @@ fun HardwareScreen(
                         }
                     }
                 } else {
-                    Column(
-                        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 12.dp)
-                    ) {
-                        tabContent()
-                        Spacer(Modifier.height(24.dp))
-                        EndOfSheet()
+                    val scroll = rememberScrollState()
+                    Column(Modifier.fillMaxSize()) {
+                        // B3: narrow phone tab strip — horizontal scroll, CALIPER style
+                        Row(
+                            Modifier.fillMaxWidth().horizontalScroll(scroll)
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            tabs.forEachIndexed { i, t ->
+                                val sel = i == tab
+                                Text(
+                                    t,
+                                    style = Caliper.type.meta.copy(fontSize = 10.sp),
+                                    color = if (sel) Caliper.colors.surface else Caliper.colors.ink,
+                                    modifier = Modifier
+                                        .background(if (sel) Caliper.colors.ink else Caliper.colors.panel)
+                                        .border(1.dp, if (sel) Caliper.colors.ink else Caliper.colors.hairline)
+                                        .clickable(
+                                            interactionSource = remember { MutableInteractionSource() },
+                                            indication = null
+                                        ) { tab = i }
+                                        .semantics { role = Role.Tab }
+                                        .padding(horizontal = 10.dp, vertical = 8.dp)
+                                )
+                            }
+                        }
+                        DoubleRule(Modifier.padding(horizontal = 16.dp))
+                        Column(
+                            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 12.dp)
+                        ) {
+                            tabContent()
+                            Spacer(Modifier.height(24.dp))
+                            EndOfSheet()
+                        }
                     }
                 }
             }
