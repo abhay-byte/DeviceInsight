@@ -30,6 +30,7 @@ import com.ivarna.deviceinsight.data.provider.SecurityProvider
 import com.ivarna.deviceinsight.data.provider.SensorProvider
 import com.ivarna.deviceinsight.data.provider.StorageProvider
 import com.ivarna.deviceinsight.data.provider.ThermalProvider
+import com.ivarna.deviceinsight.data.monitor.MonitorBus
 import com.ivarna.deviceinsight.data.provider.UsbProvider
 import dagger.Module
 import dagger.Provides
@@ -138,7 +139,9 @@ object AppModule {
         thermalProvider: ThermalProvider,
         cpuProvider: CpuProvider,
         gpuUsageProvider: GpuUsageProvider,
-        gpuMapper: com.ivarna.deviceinsight.data.mapper.GpuMapper
+        gpuMapper: com.ivarna.deviceinsight.data.mapper.GpuMapper,
+        monitorBus: MonitorBus,
+        topConsumersProvider: com.ivarna.deviceinsight.data.monitor.TopConsumersProvider
     ): DashboardRepository {
         return DashboardRepositoryImpl(
             context,
@@ -154,7 +157,9 @@ object AppModule {
             thermalProvider,
             cpuProvider,
             gpuUsageProvider,
-            gpuMapper
+            gpuMapper,
+            monitorBus,
+            topConsumersProvider
         )
     }
 

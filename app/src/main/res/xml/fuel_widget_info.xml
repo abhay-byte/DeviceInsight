@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/widget_desc_fuel"
+    android:initialLayout="@layout/glance_default_loading_layout"
+    android:minWidth="140dp"
+    android:minHeight="140dp"
+    android:targetCellWidth="2"
+    android:targetCellHeight="2"
+    android:resizeMode="horizontal|vertical"
+    android:widgetCategory="home_screen"
+    android:widgetFeatures="reconfigurable"
+    android:configure="com.ivarna.deviceinsight.ui.caliper.widget.BenchConfigActivity"
+    android:previewImage="@drawable/preview_fuel_paper"
+    android:updatePeriodMillis="0" />

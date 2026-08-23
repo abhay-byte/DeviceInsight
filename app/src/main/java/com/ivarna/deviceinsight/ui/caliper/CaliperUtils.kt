@@ -29,6 +29,7 @@ object Fmt {
     fun temp(v: Float) = String.format(Locale.US, "%.1f°C", v)
     fun rate(bytesPerSec: Long) = bytes(bytesPerSec) + "/s"
     fun watts(v: Float) = String.format(Locale.US, "≈ %.2f W", v)
+    fun wattsSigned(v: Float) = String.format(Locale.US, "≈ %+.2f W", v)
     fun duration(ms: Long): String {
         val h = ms / 3_600_000; val m = (ms % 3_600_000) / 60_000
         return String.format(Locale.US, "%dh %02dm", h, m)

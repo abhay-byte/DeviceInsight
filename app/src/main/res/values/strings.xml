@@ -140,4 +140,10 @@
     <string name="ok">OK</string>
     <string name="cancel">Cancel</string>
     <string name="close">Close</string>
+
+    <string name="widget_desc_scope">SCOPE — live CPU load, frequency, thermal</string>
+    <string name="widget_desc_stack">STACK — memory composition, ZRAM, consumers</string>
+    <string name="widget_desc_fuel">FUEL — wattage, amperage, fuel gauge</string>
+    <string name="widget_desc_raster">RASTER — GPU load and clocks</string>
+    <string name="widget_desc_bench">BENCH — all channels, one instrument panel</string>
 </resources>

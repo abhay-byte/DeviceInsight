@@ -38,7 +38,8 @@ class SettingsActivity : ComponentActivity() {
                 ) {
                     SettingsScreen(
                         currentMedium = currentMedium,
-                        onMediumSelected = { newMedium -> viewModel.setMedium(newMedium) }
+                        onMediumSelected = { newMedium -> viewModel.setMedium(newMedium) },
+                        onBack = { finish() }
                     )
                 }
             }

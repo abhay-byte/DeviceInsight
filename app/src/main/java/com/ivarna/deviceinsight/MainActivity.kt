@@ -10,8 +10,11 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.core.app.ActivityCompat
+import android.content.Intent
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
@@ -25,14 +28,16 @@ import dagger.hilt.android.AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
     private val settingsViewModel: SettingsViewModel by viewModels()
+    private var diRoute by mutableStateOf<String?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        diRoute = intent?.getStringExtra("di_route")
         enableEdgeToEdge()
         enableHighRefreshRate()
 
         requestPermissions()
-        
+
         setContent {
             val currentMedium by settingsViewModel.medium.collectAsStateWithLifecycle()
 
@@ -41,10 +46,16 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    SystemStatsApp()
+                    SystemStatsApp(initialRoute = diRoute)
                 }
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        diRoute = intent.getStringExtra("di_route")
     }
 
     private fun requestPermissions() {

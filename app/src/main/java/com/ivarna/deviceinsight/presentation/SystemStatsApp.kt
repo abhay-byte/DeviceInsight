@@ -77,17 +77,36 @@ internal val caliperRailOrder: List<Pair<Int, String>> = railRoutes.map { it.num
 private const val WIDE_MIN_DP = 600
 
 @Composable
-fun SystemStatsApp() {
+fun SystemStatsApp(initialRoute: String? = null) {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
     val onSettings = { navController.navigate(ScreenRoute.Settings.route) { launchSingleTop = true } }
     val settingsViewModel: SettingsViewModel = hiltViewModel()
     val currentMedium by settingsViewModel.medium.collectAsStateWithLifecycle()
+    var hardwareTab by remember { mutableStateOf<Int?>(null) }
+    LaunchedEffect(initialRoute) {
+        when (initialRoute) {
+            "overview", "CH-01", "CH-02" -> navController.navigate(ScreenRoute.Dashboard.route) { launchSingleTop = true }
+            "CH-03" -> { hardwareTab = 4; navController.navigate(ScreenRoute.Hardware.route) { launchSingleTop = true } }
+            "CH-04" -> { hardwareTab = 5; navController.navigate(ScreenRoute.Hardware.route) { launchSingleTop = true } }
+            "CH-05" -> { hardwareTab = 9; navController.navigate(ScreenRoute.Hardware.route) { launchSingleTop = true } }
+            "CH-06" -> { hardwareTab = 3; navController.navigate(ScreenRoute.Hardware.route) { launchSingleTop = true } }
+            "processes" -> navController.navigate(ScreenRoute.Tasks.route) { launchSingleTop = true }
+            "calibrate" -> navController.navigate(ScreenRoute.Overlay.route) { launchSingleTop = true }
+            "hud-config" -> navController.navigate(ScreenRoute.Overlay.route) { launchSingleTop = true }
+            else -> if (initialRoute?.startsWith("dossier:") == true) navController.navigate(ScreenRoute.Tasks.route) { launchSingleTop = true }
+        }
+    }
 
     val selectedRail = railRoutes.firstOrNull { route ->
         currentDestination?.hierarchy?.any { it.route == route.route } == true
     }?.number
+
+    // B2: SETTINGS owns its own ← BACK HardKey, so the global masthead and
+    // ModeRail step aside while that sheet is frontmost (full-bleed sheet).
+    val isSettings = currentDestination?.hierarchy
+        ?.any { it.route == ScreenRoute.Settings.route } == true
 
     // B1: light status bars on Paper so clock/ink visible on light surface
     val view = LocalView.current
@@ -152,13 +171,15 @@ fun SystemStatsApp() {
 
         if (wide) {
             Row(Modifier.fillMaxSize()) {
-                rail()
+                if (!isSettings) rail()
                 Column(Modifier.weight(1f).fillMaxHeight()) {
-                    Masthead(
-                        onSettingsClick = onSettings
-                        // degraded/rootVerified wired by each screen's ViewModel as needed
-                    )
-                    if (showMigratedNote) {
+                    if (!isSettings) {
+                        Masthead(
+                            onSettingsClick = onSettings
+                            // degraded/rootVerified wired by each screen's ViewModel as needed
+                        )
+                    }
+                    if (showMigratedNote && !isSettings) {
                         MarginNote(
                             message = "Your instrument has been recalibrated to the CALIPER standard.",
                             title = "NOTE 001",
@@ -170,6 +191,11 @@ fun SystemStatsApp() {
                             .weight(1f)
                             .fillMaxWidth()
                             .caliperGrid()
+                            .then(
+                                if (isSettings) Modifier.windowInsetsPadding(
+                                    WindowInsets.statusBars.union(WindowInsets.navigationBars)
+                                ) else Modifier
+                            )
                     ) {
                         NavHost(
                             navController = navController,
@@ -182,7 +208,7 @@ fun SystemStatsApp() {
                             popExitTransition = { fadeOut(tween(160)) }
                         ) {
                             composable(ScreenRoute.Dashboard.route) { DashboardScreen() }
-                            composable(ScreenRoute.Hardware.route) { HardwareScreen() }
+                            composable(ScreenRoute.Hardware.route) { HardwareScreen(initialTab = hardwareTab) }
                             composable(ScreenRoute.Overlay.route) { OverlayScreen() }
                             composable(ScreenRoute.Tasks.route) { TasksScreen() }
                             composable(ScreenRoute.Settings.route) {
@@ -198,11 +224,13 @@ fun SystemStatsApp() {
             }
         } else {
             Column(Modifier.fillMaxSize()) {
-                Masthead(
-                    onSettingsClick = onSettings
-                    // degraded/rootVerified wired by each screen's ViewModel as needed
-                )
-                if (showMigratedNote) {
+                if (!isSettings) {
+                    Masthead(
+                        onSettingsClick = onSettings
+                        // degraded/rootVerified wired by each screen's ViewModel as needed
+                    )
+                }
+                if (showMigratedNote && !isSettings) {
                     MarginNote(
                         message = "Your instrument has been recalibrated to the CALIPER standard.",
                         title = "NOTE 001",
@@ -212,7 +240,13 @@ fun SystemStatsApp() {
                 Box(
                     Modifier
                         .weight(1f)
+                        .fillMaxWidth()
                         .caliperGrid()
+                        .then(
+                            if (isSettings) Modifier.windowInsetsPadding(
+                                WindowInsets.statusBars.union(WindowInsets.navigationBars)
+                            ) else Modifier
+                        )
                 ) {
                     NavHost(
                         navController = navController,
@@ -225,7 +259,7 @@ fun SystemStatsApp() {
                         popExitTransition = { fadeOut(tween(160)) }
                     ) {
                         composable(ScreenRoute.Dashboard.route) { DashboardScreen() }
-                        composable(ScreenRoute.Hardware.route) { HardwareScreen() }
+                        composable(ScreenRoute.Hardware.route) { HardwareScreen(initialTab = hardwareTab) }
                         composable(ScreenRoute.Overlay.route) { OverlayScreen() }
                         composable(ScreenRoute.Tasks.route) { TasksScreen() }
                         composable(ScreenRoute.Settings.route) {
@@ -237,7 +271,7 @@ fun SystemStatsApp() {
                         }
                     }
                 }
-                rail()
+                if (!isSettings) rail()
             }
         }
     }

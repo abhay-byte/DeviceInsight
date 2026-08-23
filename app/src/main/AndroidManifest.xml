@@ -30,10 +30,20 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
+            android:launchMode="singleTop"
             android:theme="@style/Theme.SystemStats">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name=".ui.caliper.widget.BenchConfigActivity"
+            android:exported="true"
+            android:theme="@style/Theme.SystemStats">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
             </intent-filter>
         </activity>
 
@@ -64,10 +74,11 @@
             </intent-filter>
         </service>
 
-        <!-- CALIPER widgets (S-12): 2×2 single channel, 4×2 dual, 4×4 bench -->
+        <!-- BENCH widgets — 5 instruments (S-12) -->
         <receiver
             android:name=".ui.caliper.widget.SingleChannelWidgetReceiver"
-            android:exported="true">
+            android:exported="true"
+            android:label="SCOPE">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
@@ -78,7 +89,8 @@
 
         <receiver
             android:name=".ui.caliper.widget.DualChannelWidgetReceiver"
-            android:exported="true">
+            android:exported="true"
+            android:label="STACK">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
@@ -89,13 +101,38 @@
 
         <receiver
             android:name=".ui.caliper.widget.BenchWidgetReceiver"
-            android:exported="true">
+            android:exported="true"
+            android:label="BENCH">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/bench_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name=".ui.caliper.widget.FuelWidgetReceiver"
+            android:exported="true"
+            android:label="FUEL">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/fuel_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name=".ui.caliper.widget.RasterWidgetReceiver"
+            android:exported="true"
+            android:label="RASTER">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/raster_widget_info" />
         </receiver>
 
     </application>

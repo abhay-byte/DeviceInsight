@@ -4,7 +4,10 @@ package com.ivarna.deviceinsight.ui.caliper
 
 import android.content.Context
 import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.doublePreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.floatPreferencesKey
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
@@ -18,6 +21,18 @@ object CaliperKeys {
     val showGrid = booleanPreferencesKey("showGrid")
     val hatchingEnabled = booleanPreferencesKey("hatchingEnabled")
     val caliperMigrated = booleanPreferencesKey("caliperMigrated")
+    // HUD — single source of truth (caliper only)
+    val hudMedium = stringPreferencesKey("hudMedium")
+    val hudScale = stringPreferencesKey("hudScale")
+    val hudOpacity = floatPreferencesKey("hudOpacity")
+    val hudBlur = booleanPreferencesKey("hudBlur")
+    val hudLocked = booleanPreferencesKey("hudLocked")
+    val hudModules = stringPreferencesKey("hudModules")
+    val hudShowCoreBank = booleanPreferencesKey("hudShowCoreBank")
+    val hudX = intPreferencesKey("hudX")
+    val hudY = intPreferencesKey("hudY")
+    val fpsMode = stringPreferencesKey("fpsMode")
+    val hudMigrated = booleanPreferencesKey("hudMigrated")
 }
 
 /** Persisted medium; null means "follow system dark" (Paper on light, Carbon on dark). */
@@ -50,3 +65,50 @@ val Context.caliperMigratedFlow: Flow<Boolean>
 suspend fun Context.markCaliperMigrated() {
     caliperDataStore.edit { it[CaliperKeys.caliperMigrated] = true }
 }
+
+// ── HUD flows (caliper single source) ──
+
+val Context.hudMediumFlow: Flow<String>
+    get() = caliperDataStore.data.map { it[CaliperKeys.hudMedium] ?: "CARBON" }
+
+val Context.hudScaleFlow: Flow<String>
+    get() = caliperDataStore.data.map { it[CaliperKeys.hudScale] ?: "M" }
+
+val Context.hudOpacityFlow: Flow<Float>
+    get() = caliperDataStore.data.map { it[CaliperKeys.hudOpacity] ?: 0.75f }
+
+val Context.hudBlurFlow: Flow<Boolean>
+    get() = caliperDataStore.data.map { it[CaliperKeys.hudBlur] ?: true }
+
+val Context.hudLockedFlow: Flow<Boolean>
+    get() = caliperDataStore.data.map { it[CaliperKeys.hudLocked] ?: false }
+
+val Context.hudModulesFlow: Flow<String>
+    get() = caliperDataStore.data.map { it[CaliperKeys.hudModules] ?: "FPS,CPU,MEMORY,POWER,NETWORK" }
+
+val Context.hudShowCoreBankFlow: Flow<Boolean>
+    get() = caliperDataStore.data.map { it[CaliperKeys.hudShowCoreBank] ?: true }
+
+val Context.hudXFlow: Flow<Int>
+    get() = caliperDataStore.data.map { it[CaliperKeys.hudX] ?: 100 }
+
+val Context.hudYFlow: Flow<Int>
+    get() = caliperDataStore.data.map { it[CaliperKeys.hudY] ?: 100 }
+
+val Context.hudFpsModeFlow: Flow<String>
+    get() = caliperDataStore.data.map { it[CaliperKeys.fpsMode] ?: "AUTO" }
+
+val Context.hudMigratedFlow: Flow<Boolean>
+    get() = caliperDataStore.data.map { it[CaliperKeys.hudMigrated] ?: false }
+
+suspend fun Context.setHudMedium(v: String) { caliperDataStore.edit { it[CaliperKeys.hudMedium] = v } }
+suspend fun Context.setHudScale(v: String) { caliperDataStore.edit { it[CaliperKeys.hudScale] = v } }
+suspend fun Context.setHudOpacity(v: Float) { caliperDataStore.edit { it[CaliperKeys.hudOpacity] = v.coerceIn(0.4f, 0.9f) } }
+suspend fun Context.setHudBlur(v: Boolean) { caliperDataStore.edit { it[CaliperKeys.hudBlur] = v } }
+suspend fun Context.setHudLocked(v: Boolean) { caliperDataStore.edit { it[CaliperKeys.hudLocked] = v } }
+suspend fun Context.setHudModules(v: String) { caliperDataStore.edit { it[CaliperKeys.hudModules] = v } }
+suspend fun Context.setHudShowCoreBank(v: Boolean) { caliperDataStore.edit { it[CaliperKeys.hudShowCoreBank] = v } }
+suspend fun Context.setHudX(v: Int) { caliperDataStore.edit { it[CaliperKeys.hudX] = v } }
+suspend fun Context.setHudY(v: Int) { caliperDataStore.edit { it[CaliperKeys.hudY] = v } }
+suspend fun Context.setFpsMode(v: String) { caliperDataStore.edit { it[CaliperKeys.fpsMode] = v } }
+suspend fun Context.setHudMigrated(v: Boolean) { caliperDataStore.edit { it[CaliperKeys.hudMigrated] = v } }

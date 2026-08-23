@@ -2,33 +2,44 @@ package com.ivarna.deviceinsight.presentation.overlay
 
 import android.app.AppOpsManager
 import android.content.Context
-import android.content.SharedPreferences
+import android.content.Intent
 import android.os.Process
 import android.provider.Settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import com.ivarna.deviceinsight.data.monitor.HudFast
+import com.ivarna.deviceinsight.data.monitor.HudSlow
+import com.ivarna.deviceinsight.data.monitor.MonitorBus
+import com.ivarna.deviceinsight.service.OverlayService
+import com.ivarna.deviceinsight.ui.caliper.caliperDataStore
+import com.ivarna.deviceinsight.ui.caliper.hud.HudConfig
+import com.ivarna.deviceinsight.ui.caliper.hud.HudMedium
+import com.ivarna.deviceinsight.ui.caliper.hud.HudModule
+import com.ivarna.deviceinsight.ui.caliper.hud.HudScale
+import com.ivarna.deviceinsight.ui.caliper.hud.hudMediumFromString
+import com.ivarna.deviceinsight.ui.caliper.CaliperKeys
+import com.ivarna.deviceinsight.ui.caliper.setHudBlur
+import com.ivarna.deviceinsight.ui.caliper.setHudLocked
+import com.ivarna.deviceinsight.ui.caliper.setHudMedium
+import com.ivarna.deviceinsight.ui.caliper.setHudModules
+import com.ivarna.deviceinsight.ui.caliper.setHudOpacity
+import com.ivarna.deviceinsight.ui.caliper.setHudScale
+import com.ivarna.deviceinsight.ui.caliper.setHudShowCoreBank
+import com.ivarna.deviceinsight.ui.caliper.setHudX
+import com.ivarna.deviceinsight.ui.caliper.setHudY
+import com.ivarna.deviceinsight.ui.caliper.setFpsMode
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import rikka.shizuku.Shizuku
 import javax.inject.Inject
 
 enum class FpsMode { AUTO, ROOT, SHIZUKU }
-
-data class OverlayMetricItem(
-    val id: String,
-    val name: String,
-    val category: String,
-    val icon: String,
-    val enabled: Boolean,
-    val order: Int
-)
 
 data class OverlayPermissions(
     val hasOverlay: Boolean = false,
@@ -40,60 +51,116 @@ data class OverlayPermissions(
 
 data class OverlayUiState(
     val permissions: OverlayPermissions = OverlayPermissions(),
-    val metrics: List<OverlayMetricItem> = emptyList(),
     val fpsMode: FpsMode = FpsMode.AUTO,
-    val scaleFactor: Float = 1.0f,
-    val isHorizontal: Boolean = false,
+    val config: HudConfig = HudConfig(),
     val isServiceRunning: Boolean = false
 )
+
+/** HUD position reset default (matches CaliperPrefs hudX/hudY fallbacks). */
+private const val DEFAULT_X = 100
+private const val DEFAULT_Y = 100
 
 @HiltViewModel
 class OverlayViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val securityProvider: com.ivarna.deviceinsight.data.provider.SecurityProvider
+    private val securityProvider: com.ivarna.deviceinsight.data.provider.SecurityProvider,
+    private val monitorBus: MonitorBus
 ) : ViewModel() {
-
-    private val prefs: SharedPreferences =
-        context.getSharedPreferences("overlay_prefs", Context.MODE_PRIVATE)
 
     private val _uiState = MutableStateFlow(OverlayUiState())
     val uiState: StateFlow<OverlayUiState> = _uiState.asStateFlow()
 
+    /** Live feeds — collected by the sheet preview only while the probe window runs. */
+    val hudSlow: StateFlow<HudSlow> = monitorBus.slow
+    val hudFast: StateFlow<HudFast> = monitorBus.fast
+
     init {
-        loadInitialState()
+        viewModelScope.launch(Dispatchers.IO) { loadInitialState() }
         checkPermissions()
     }
 
     fun refreshPermissions() = checkPermissions()
 
-    private fun loadInitialState() {
-        val defaultOrder = METRIC_DEFINITIONS
-        val savedOrderStr = prefs.getString("metricOrder", null)
-        val savedOrder = savedOrderStr?.split(",") ?: defaultOrder.map { it.id }
-        val finalOrder = savedOrder.toMutableList().apply {
-            defaultOrder.forEach { def -> if (!contains(def.id)) add(def.id) }
-        }
-
-        val metrics = finalOrder.mapIndexed { index, id ->
-            val def = defaultOrder.firstOrNull { it.id == id } ?: defaultOrder.first()
-            val prefKey = "show" + id.replaceFirstChar { c -> if (c.isLowerCase()) c.titlecase() else c.toString() }
-            OverlayMetricItem(
-                id = def.id,
-                name = def.name,
-                category = def.category,
-                icon = def.icon,
-                enabled = prefs.getBoolean(prefKey, true),
-                order = index
-            )
-        }
-
+    private suspend fun loadInitialState() {
+        val data = try { context.caliperDataStore.data.first() } catch (_: Exception) { null } ?: return
+        val modulesCsv = data[CaliperKeys.hudModules] ?: "FPS,CPU,MEMORY,POWER"
+        val cfg = HudConfig(
+            medium = hudMediumFromString(data[CaliperKeys.hudMedium]),
+            scale = runCatching { HudScale.valueOf(data[CaliperKeys.hudScale] ?: "M") }.getOrDefault(HudScale.M),
+            opacity = (data[CaliperKeys.hudOpacity] ?: 0.75f).coerceIn(0.4f, 0.9f),
+            blurBehind = data[CaliperKeys.hudBlur] ?: true,
+            locked = data[CaliperKeys.hudLocked] ?: false,
+            modules = HudConfig.fromCsv(modulesCsv),
+            showCoreBank = data[CaliperKeys.hudShowCoreBank] ?: true
+        )
         _uiState.value = _uiState.value.copy(
-            metrics = metrics,
-            fpsMode = runCatching { FpsMode.valueOf(prefs.getString("fps_mode", "AUTO") ?: "AUTO") }.getOrDefault(FpsMode.AUTO),
-            scaleFactor = prefs.getFloat("scaleFactor", 1.0f),
-            isHorizontal = prefs.getBoolean("isHorizontal", false)
+            config = cfg,
+            fpsMode = runCatching { FpsMode.valueOf(data[CaliperKeys.fpsMode] ?: "AUTO") }.getOrDefault(FpsMode.AUTO)
         )
     }
+
+    // ─────────────── HUD config setters (caliper DataStore single source) ───────────────
+
+    fun setHudMedium(medium: HudMedium) {
+        _uiState.value = _uiState.value.copy(config = _uiState.value.config.copy(medium = medium))
+        persist { context.setHudMedium(medium.name) }
+    }
+
+    fun setHudScale(scale: HudScale) {
+        _uiState.value = _uiState.value.copy(config = _uiState.value.config.copy(scale = scale))
+        persist { context.setHudScale(scale.name) }
+    }
+
+    fun setHudOpacity(opacity: Float) {
+        _uiState.value = _uiState.value.copy(config = _uiState.value.config.copy(opacity = opacity.coerceIn(0.4f, 0.9f)))
+        persist { context.setHudOpacity(opacity) }
+    }
+
+    fun setBlurBehind(enabled: Boolean) {
+        _uiState.value = _uiState.value.copy(config = _uiState.value.config.copy(blurBehind = enabled))
+        persist { context.setHudBlur(enabled) }
+    }
+
+    fun setLocked(locked: Boolean) {
+        _uiState.value = _uiState.value.copy(config = _uiState.value.config.copy(locked = locked))
+        persist { context.setHudLocked(locked) }
+    }
+
+    fun toggleModule(module: HudModule, enabled: Boolean) {
+        val current = _uiState.value.config.modules
+        val next = if (enabled) current + module else current - module
+        _uiState.value = _uiState.value.copy(config = _uiState.value.config.copy(modules = next))
+        persist { context.setHudModules(next.joinToString(",") { it.name }) }
+    }
+
+    fun setShowCoreBank(show: Boolean) {
+        _uiState.value = _uiState.value.copy(config = _uiState.value.config.copy(showCoreBank = show))
+        persist { context.setHudShowCoreBank(show) }
+    }
+
+    fun resetPosition() {
+        persist { context.setHudX(DEFAULT_X); context.setHudY(DEFAULT_Y) }
+    }
+
+    fun setFpsMode(mode: FpsMode) {
+        _uiState.value = _uiState.value.copy(fpsMode = mode)
+        persist { context.setFpsMode(mode.name) }
+    }
+
+    private fun persist(block: suspend () -> Unit) {
+        viewModelScope.launch(Dispatchers.IO) { runCatching { block() } }
+    }
+
+    // ─────────────── service ───────────────
+
+    /** Empty intent — config comes from the caliper store, not extras (process-death safe). */
+    fun buildServiceIntent(): Intent = Intent(context, OverlayService::class.java)
+
+    fun setServiceRunning(running: Boolean) {
+        _uiState.value = _uiState.value.copy(isServiceRunning = running)
+    }
+
+    // ─────────────── permissions ───────────────
 
     private fun checkPermissions() {
         viewModelScope.launch(Dispatchers.IO) {
@@ -122,105 +189,12 @@ class OverlayViewModel @Inject constructor(
         }
     }
 
-    fun toggleMetric(metricId: String, enabled: Boolean) {
-        _uiState.value = _uiState.value.copy(
-            metrics = _uiState.value.metrics.map {
-                if (it.id == metricId) it.copy(enabled = enabled) else it
-            }
-        )
-        savePreferences()
-    }
-
-    fun reorderMetrics(from: Int, to: Int) {
-        val current = _uiState.value.metrics.sortedBy { it.order }.toMutableList()
-        if (from !in current.indices || to !in current.indices) return
-        val item = current.removeAt(from)
-        current.add(to, item)
-        _uiState.value = _uiState.value.copy(
-            metrics = current.mapIndexed { i, m -> m.copy(order = i) }
-        )
-        savePreferences()
-    }
-
-    fun setFpsMode(mode: FpsMode) {
-        _uiState.value = _uiState.value.copy(fpsMode = mode)
-        savePreferences()
-    }
-
-    fun setScaleFactor(scale: Float) {
-        _uiState.value = _uiState.value.copy(scaleFactor = scale)
-    }
-
-    fun commitScaleFactor() {
-        savePreferences()
-    }
-
-    fun setHorizontal(horizontal: Boolean) {
-        _uiState.value = _uiState.value.copy(isHorizontal = horizontal)
-        savePreferences()
-    }
-
-    fun setServiceRunning(running: Boolean) {
-        _uiState.value = _uiState.value.copy(isServiceRunning = running)
-    }
-
-    private fun savePreferences() {
-        val state = _uiState.value
-        prefs.edit().apply {
-            state.metrics.forEach { m ->
-                val prefKey = "show" + m.id.replaceFirstChar { c -> if (c.isLowerCase()) c.titlecase() else c.toString() }
-                putBoolean(prefKey, m.enabled)
-            }
-            putFloat("scaleFactor", state.scaleFactor)
-            putBoolean("isHorizontal", state.isHorizontal)
-            putString("fps_mode", state.fpsMode.name)
-            putString("metricOrder", state.metrics.sortedBy { it.order }.joinToString(",") { it.id })
-            apply()
-        }
-    }
-
-    fun buildServiceIntent(): android.content.Intent {
-        val state = _uiState.value
-        savePreferences()
-        return android.content.Intent(context, com.ivarna.deviceinsight.service.OverlayService::class.java).apply {
-            state.metrics.forEach { m ->
-                val prefKey = "show" + m.id.replaceFirstChar { c -> if (c.isLowerCase()) c.titlecase() else c.toString() }
-                putExtra(prefKey, m.enabled)
-            }
-            putExtra("scaleFactor", state.scaleFactor)
-            putExtra("isHorizontal", state.isHorizontal)
-            putExtra("metricOrder", state.metrics.sortedBy { it.order }.joinToString(",") { it.id })
-        }
-    }
-
     fun requestShizukuPermission() {
         try {
             if (Shizuku.pingBinder()) {
                 Shizuku.requestPermission(0)
             }
         } catch (_: Exception) {}
-    }
-
-    companion object {
-        data class MetricDef(val id: String, val name: String, val category: String, val icon: String)
-
-        val METRIC_DEFINITIONS = listOf(
-            MetricDef("time", "System Time", "System", "schedule"),
-            MetricDef("cpu", "CPU Usage", "Performance", "memory"),
-            MetricDef("cpuGraph", "CPU Graph", "Performance", "show_chart"),
-            MetricDef("cpuTemp", "CPU Temperature", "Thermal", "thermostat"),
-            MetricDef("cpuFreq", "CPU Frequency", "Performance", "speed"),
-            MetricDef("ram", "RAM Usage", "Memory", "storage"),
-            MetricDef("swap", "Swap Usage", "Memory", "swap_horiz"),
-            MetricDef("power", "Power Draw", "Power", "bolt"),
-            MetricDef("powerGraph", "Power Graph", "Power", "trending_up"),
-            MetricDef("battery", "Battery Level", "Power", "battery_full"),
-            MetricDef("batteryTemp", "Battery Temperature", "Thermal", "device_thermostat"),
-            MetricDef("fps", "FPS Monitor", "Display", "videogame_asset"),
-            MetricDef("fpsGraph", "FPS History", "Display", "analytics"),
-            MetricDef("network", "Network Speed", "Network", "network_check"),
-            MetricDef("currentApp", "Current App", "System", "apps")
-        )
     }
 }
 

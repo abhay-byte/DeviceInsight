@@ -72,7 +72,7 @@ class BatteryProvider @Inject constructor(
             powerSource = powerSource,
             chargeCounter = chargeCounter,
             currentNow = currentNow,
-            chargingCycles = if (cycles >= 0) cycles else 835, // Mocking fallback if not found as user example showed 835
+            chargingCycles = if (cycles >= 0) cycles else -1,
             remainingChargeTime = remainingTimeStr,
             capacity = getBatteryCapacity()
         )

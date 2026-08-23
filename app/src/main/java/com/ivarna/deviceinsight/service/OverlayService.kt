@@ -1,951 +1,350 @@
 package com.ivarna.deviceinsight.service
 
+import android.annotation.SuppressLint
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
-import android.content.Context
 import android.content.Intent
 import android.graphics.PixelFormat
 import android.os.Build
 import android.os.IBinder
+import android.provider.Settings
 import android.view.Gravity
-import android.view.LayoutInflater
 import android.view.View
 import android.view.WindowManager
-import android.widget.TextView
-import android.widget.ProgressBar
-import android.widget.LinearLayout
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.core.app.NotificationCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.LifecycleRegistry
+import androidx.lifecycle.setViewTreeLifecycleOwner
+import androidx.savedstate.SavedStateRegistry
+import androidx.savedstate.SavedStateRegistryController
+import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import com.ivarna.deviceinsight.MainActivity
 import com.ivarna.deviceinsight.R
-import com.ivarna.deviceinsight.domain.model.CpuDataPoint
-import com.ivarna.deviceinsight.domain.repository.DashboardRepository
-import com.ivarna.deviceinsight.utils.CpuUtilizationUtils
-import com.ivarna.deviceinsight.service.overlay.OverlayGraphView
-import kotlinx.coroutines.*
+import com.ivarna.deviceinsight.data.fps.FpsMonitor
+import com.ivarna.deviceinsight.data.monitor.HudFast
+import com.ivarna.deviceinsight.data.monitor.MonitorBus
+import com.ivarna.deviceinsight.ui.caliper.hud.HudConfig
+import com.ivarna.deviceinsight.ui.caliper.hud.HudPanel
+import com.ivarna.deviceinsight.ui.caliper.hud.HudScale
+import com.ivarna.deviceinsight.ui.caliper.hud.HudTheme
+import com.ivarna.deviceinsight.ui.caliper.hud.hudMediumFromString
+import com.ivarna.deviceinsight.ui.caliper.hudMediumFlow
+import com.ivarna.deviceinsight.ui.caliper.hudOpacityFlow
+import com.ivarna.deviceinsight.ui.caliper.hudBlurFlow
+import com.ivarna.deviceinsight.ui.caliper.hudLockedFlow
+import com.ivarna.deviceinsight.ui.caliper.hudModulesFlow
+import com.ivarna.deviceinsight.ui.caliper.hudScaleFlow
+import com.ivarna.deviceinsight.ui.caliper.hudShowCoreBankFlow
+import com.ivarna.deviceinsight.ui.caliper.hudXFlow
+import com.ivarna.deviceinsight.ui.caliper.hudYFlow
+import com.ivarna.deviceinsight.ui.caliper.setHudLocked
+import com.ivarna.deviceinsight.ui.caliper.setHudX
+import com.ivarna.deviceinsight.ui.caliper.setHudY
 import dagger.hilt.android.AndroidEntryPoint
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
+/**
+ * Scope Probe host (DI-HD-001). Keeps the FQCN + foreground contract of the old overlay
+ * service; internals are a WRAP_CONTENT ComposeView hosting [HudPanel]. Config lives only
+ * in the `caliper` DataStore — no intent extras.
+ */
 @AndroidEntryPoint
-class OverlayService : Service() {
+class OverlayService : Service(), LifecycleOwner, androidx.savedstate.SavedStateRegistryOwner {
+
+    companion object {
+        val isRunning = java.util.concurrent.atomic.AtomicBoolean(false)
+        private const val CHANNEL_ID = "overlay_channel"
+        private const val NOTIFICATION_ID = 1
+        private const val BLUR_RADIUS_DP = 10
+    }
+
+    @Inject lateinit var monitorBus: MonitorBus
+    @Inject lateinit var fpsMonitor: FpsMonitor
+
+    private val lifecycleRegistry = LifecycleRegistry(this)
+    override val lifecycle: Lifecycle get() = lifecycleRegistry
+
+    private val savedStateRegistryController = SavedStateRegistryController.create(this)
+    override val savedStateRegistry: SavedStateRegistry get() = savedStateRegistryController.savedStateRegistry
 
     private lateinit var windowManager: WindowManager
-    private lateinit var overlayView: View
-    private var job: Job? = null
-    
-    @Inject
-    lateinit var dashboardRepository: DashboardRepository
+    private var view: ComposeView? = null
+    private lateinit var params: WindowManager.LayoutParams
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private var positionPersistJob: Job? = null
+    private var dragX: Int = 100
+    private var dragY: Int = 100
 
-    private var density: Float = 1.0f
-    
-    // Default values for parameters
-    private var showCpu: Boolean = true
-    private var showBattery: Boolean = true
-    private var showRam: Boolean = true
-    private var showSwap: Boolean = true
-    private var showCpuTemp: Boolean = true
-    private var showBatteryTemp: Boolean = true
-    private var showCpuGraph: Boolean = true
-    private var showPowerGraph: Boolean = true
-    private var showPower: Boolean = true
-    private var showCpuFreq: Boolean = true
-    private var showNetwork: Boolean = true
-    private var showCurrentApp: Boolean = true
-    private var showFps: Boolean = true
-    private var showFpsGraph: Boolean = true
-    private var showTime: Boolean = true
-    private var lastKnownApp: String = "DeviceInsight"
-    private var scaleFactor: Float = 1.0f
-    private var isHorizontal: Boolean = false
-    private var metricOrder: List<String> = listOf("time", "cpu", "power", "battery", "ram", "swap", "cpuTemp", "batteryTemp", "cpuGraph", "powerGraph", "fps", "fpsGraph", "cpuFreq", "network", "currentApp")
+    // Panel state holders — slow at 2 Hz (repository), fast at ~10 Hz (own ticker)
+    private val slowState = mutableStateOf(com.ivarna.deviceinsight.data.monitor.HudSlow())
+    private val fastState = mutableStateOf(HudFast())
+    private val configState = mutableStateOf(HudConfig())
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
         super.onCreate()
-        windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
-        density = resources.displayMetrics.density
-        
-        createOverlayView()
-        startForegroundService()
-        startUpdatingStats()
-    }
-    
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        // Read parameters from intent
-        intent?.let {
-            showCpu = it.getBooleanExtra("showCpu", true)
-            showBattery = it.getBooleanExtra("showBattery", true)
-            showRam = it.getBooleanExtra("showRam", true)
-            showSwap = it.getBooleanExtra("showSwap", true)
-            showCpuTemp = it.getBooleanExtra("showCpuTemp", true)
-            showBatteryTemp = it.getBooleanExtra("showBatteryTemp", true)
-            showCpuGraph = it.getBooleanExtra("showCpuGraph", true)
-            showPowerGraph = it.getBooleanExtra("showPowerGraph", true)
-            showPower = it.getBooleanExtra("showPower", true)
-            showCpuFreq = it.getBooleanExtra("showCpuFreq", true)
-            showNetwork = it.getBooleanExtra("showNetwork", true)
-            showCurrentApp = it.getBooleanExtra("showCurrentApp", true)
-            showFps = it.getBooleanExtra("showFps", true)
-            showFpsGraph = it.getBooleanExtra("showFpsGraph", true)
-            showTime = it.getBooleanExtra("showTime", true)
-            scaleFactor = it.getFloatExtra("scaleFactor", 1.0f)
-            isHorizontal = it.getBooleanExtra("isHorizontal", false)
-            metricOrder = it.getStringExtra("metricOrder")?.split(",")
-                ?: listOf("time", "cpu", "power", "battery", "ram", "swap", "cpuTemp", "batteryTemp", "cpuGraph", "powerGraph", "fps", "fpsGraph", "cpuFreq", "network", "currentApp")
-            
-            // Update the overlay with new parameters
-            updateOverlayWithNewParameters()
+        isRunning.set(true)
+        savedStateRegistryController.performRestore(null)
+        lifecycleRegistry.currentState = Lifecycle.State.RESUMED
+        windowManager = getSystemService(WindowManager::class.java)
+
+        // FGS contract first — never stopSelf without it on API 26+
+        startForegroundNotification()
+
+        // F2 defense-in-depth: UI gates START, service refuses to draw without special-app-access.
+        // startForeground has already run, so stopSelf here is legal.
+        if (!Settings.canDrawOverlays(this)) {
+            stopSelf()
+            return
         }
-        
+
+        params = buildParams()
+        applyBlurBehind()
+
+        val composeView = ComposeView(this).apply {
+            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
+            setViewTreeLifecycleOwner(this@OverlayService)
+            setViewTreeSavedStateRegistryOwner(this@OverlayService)
+            setContent { HudContent() }
+        }
+        view = composeView
+        try {
+            windowManager.addView(composeView, params)
+        } catch (_: Exception) {
+            // OEM revoked the permission mid-flight (BadTokenException et al.)
+            view = null
+            stopSelf()
+            return
+        }
+
+        observeConfigAndFeeds()
+        startFastTicker()
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // Config is DataStore-owned; extras are ignored by design (process-death safe).
+        if (!Settings.canDrawOverlays(this)) stopSelf()
         return START_STICKY
     }
 
-    private var isCollapsed = false
-    private var initialX = 0
-    private var initialY = 0
-    private var initialTouchX = 0f
-    private var initialTouchY = 0f
-    private lateinit var mainLayout: LinearLayout
-    private lateinit var collapseButton: android.widget.ImageButton
-    private lateinit var expandButton: android.widget.ImageButton
-    private lateinit var closeButton: android.widget.ImageButton
-    private lateinit var contentLayout: LinearLayout
-    private lateinit var cpuProgressBar: ProgressBar
-    private lateinit var batteryProgressBar: ProgressBar
-    private lateinit var ramProgressBar: ProgressBar
-    private lateinit var swapProgressBar: ProgressBar
-    private lateinit var cpuGraphView: OverlayGraphView
-    private lateinit var powerGraphView: OverlayGraphView
-    private lateinit var fpsGraphView: OverlayGraphView
-    
-    private fun createOverlayView() {
-        // Since we don't have XML layout, we'll create view programmatically or inflate if we had one.
-        // For simplicity in this environment, let's create a simple TextView container.
-        // Wait, creating purely programmatic view with Compose in Service is harder without XML.
-        // I will use a simple specialized View or FrameLayout.
-        // Actually, simpler to just inflate a layout if I create one, or build view hierarchy code.
-        // I'll build a simple TextView hierarchy in code.
-         
-        // Base size for the overlay (in pixels)
-        val baseWidth = WindowManager.LayoutParams.WRAP_CONTENT
-        val baseHeight = WindowManager.LayoutParams.WRAP_CONTENT
-        
-        android.util.Log.d("OverlayService", "Creating overlay with WRAP_CONTENT dimensions, scaleFactor=$scaleFactor")
-        
-        val params = WindowManager.LayoutParams(
-            baseWidth,
-            baseHeight,
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
-                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-            else
-                WindowManager.LayoutParams.TYPE_PHONE,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
+    // ─────────────── window plumbing ───────────────
+
+    @SuppressLint("RtlHardcoded")
+    private fun buildParams(): WindowManager.LayoutParams {
+        return WindowManager.LayoutParams(
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
             PixelFormat.TRANSLUCENT
-        )
-        params.gravity = Gravity.TOP or Gravity.START
-        params.x = 100
-        params.y = 100
- 
-        // Create a wrapper container (FrameLayout)
-        val container = android.widget.FrameLayout(this)
-        
-        // Main Layout containing Header and Content
-        val mainLayout = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setBackgroundResource(R.drawable.rounded_widget_background)
-            setPadding(16, 16, 16, 16)
-            layoutParams = android.widget.FrameLayout.LayoutParams(
-                android.widget.FrameLayout.LayoutParams.WRAP_CONTENT,
-                android.widget.FrameLayout.LayoutParams.WRAP_CONTENT
-            )
-        }
-        
-        // Header Layout for buttons and title
-        val headerLayout = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                setMargins(0, 0, 0, (4 * scaleFactor).toInt())
-            }
-        }
-
-        // Title View
-        val titleView = TextView(this).apply {
-            text = "DeviceInsights"
-            textSize = 14f * scaleFactor
-            setTextColor(android.graphics.Color.WHITE)
-            setTypeface(null, android.graphics.Typeface.BOLD)
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                1f
-            )
-        }
-        
-        // Button size - use density independent pixels conversion
-        val density = resources.displayMetrics.density
-        val buttonSize = (16 * density * scaleFactor).toInt()
-        val buttonPadding = (2 * density * scaleFactor).toInt()
-        
-        // Collapse button
-        val collapseButton = android.widget.ImageButton(this).apply {
-            setImageResource(android.R.drawable.arrow_up_float)
-            setBackgroundColor(android.graphics.Color.TRANSPARENT)
-            scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
-            setColorFilter(android.graphics.Color.WHITE) // Ensure visibility against dark background
-            setPadding(buttonPadding, buttonPadding, buttonPadding, buttonPadding)
-            
-            layoutParams = LinearLayout.LayoutParams(
-                buttonSize,
-                buttonSize
-            )
-            
-            setOnClickListener {
-                collapseOverlay(params)
-            }
-        }
-        
-        // Close button
-        val closeButton = android.widget.ImageButton(this).apply {
-            setImageResource(android.R.drawable.ic_menu_close_clear_cancel)
-            setBackgroundColor(android.graphics.Color.TRANSPARENT)
-            scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
-            setColorFilter(android.graphics.Color.WHITE) // Ensure visibility against dark background
-            setPadding(buttonPadding, buttonPadding, buttonPadding, buttonPadding)
-            
-            layoutParams = LinearLayout.LayoutParams(
-                buttonSize,
-                buttonSize
-            ).apply {
-                setMargins(0, 0, 0, 0) // No margin to keep them close
-            }
-            
-            setOnClickListener {
-                stopSelf()
-            }
-        }
-        
-        headerLayout.addView(titleView)
-        headerLayout.addView(collapseButton)
-        headerLayout.addView(closeButton)
-        mainLayout.addView(headerLayout)
-
-        // Create a LinearLayout for content with progress bars
-        val contentLayout = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            )
-        }
-        
-        mainLayout.addView(contentLayout)
-        
-        // Create progress bars - they will size dynamically based on content width
-        val progressBarWidth = LinearLayout.LayoutParams.MATCH_PARENT
-        
-        cpuProgressBar = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                progressBarWidth,
-                (8 * scaleFactor).toInt()
-            ).apply {
-                setMargins(0, (4 * scaleFactor).toInt(), 0, (4 * scaleFactor).toInt())
-            }
-            max = 100
-            progress = 0
-            scaleY = 1.5f * scaleFactor
-        }
-        
-        batteryProgressBar = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                progressBarWidth,
-                (8 * scaleFactor).toInt()
-            ).apply {
-                setMargins(0, (4 * scaleFactor).toInt(), 0, (4 * scaleFactor).toInt())
-            }
-            max = 100
-            progress = 0
-            scaleY = 1.5f * scaleFactor
-        }
-        
-        ramProgressBar = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                progressBarWidth,
-                (8 * scaleFactor).toInt()
-            ).apply {
-                setMargins(0, (4 * scaleFactor).toInt(), 0, (4 * scaleFactor).toInt())
-            }
-            max = 100
-            progress = 0
-            scaleY = 1.5f * scaleFactor
-        }
-        
-        swapProgressBar = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                progressBarWidth,
-                (8 * scaleFactor).toInt()
-            ).apply {
-                setMargins(0, (4 * scaleFactor).toInt(), 0, (4 * scaleFactor).toInt())
-            }
-            max = 100
-            progress = 0
-            scaleY = 1.5f * scaleFactor
-        }
-
-        cpuGraphView = OverlayGraphView(this, "CPU %", android.graphics.Color.GREEN).apply {
-             scaleFactor = this@OverlayService.scaleFactor
-             layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                (60 * scaleFactor).toInt()
-            ).apply {
-                setMargins(0, (4 * scaleFactor).toInt(), 0, (4 * scaleFactor).toInt())
-            }
-        }
-        
-        powerGraphView = OverlayGraphView(this, "Power W", android.graphics.Color.YELLOW).apply {
-             scaleFactor = this@OverlayService.scaleFactor
-             layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                (60 * scaleFactor).toInt()
-            ).apply {
-                setMargins(0, (4 * scaleFactor).toInt(), 0, (4 * scaleFactor).toInt())
-            }
-        }
-
-        fpsGraphView = OverlayGraphView(this, "FPS", android.graphics.Color.CYAN).apply {
-             scaleFactor = this@OverlayService.scaleFactor
-             layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                (60 * scaleFactor).toInt()
-            ).apply {
-                setMargins(0, (4 * scaleFactor).toInt(), 0, (4 * scaleFactor).toInt())
-            }
-        }
-        
-        // Expand button - shown when collapsed
-        val expandButton = android.widget.ImageButton(this).apply {
-            setImageResource(android.R.drawable.arrow_down_float)
-            setBackgroundColor(0x80000000.toInt()) // Semi-transparent background
-            setPadding(24, 24, 24, 24)
-            visibility = android.view.View.GONE
-            
-            val layoutParams = android.widget.FrameLayout.LayoutParams(
-                android.widget.FrameLayout.LayoutParams.WRAP_CONTENT,
-                android.widget.FrameLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                gravity = android.view.Gravity.CENTER
-            }
-            this.layoutParams = layoutParams
-            
-            setOnClickListener {
-                expandOverlay(params)
-            }
-        }
-
-        container.addView(mainLayout)
-        container.addView(expandButton)
-
-        overlayView = container
-        this.mainLayout = mainLayout
-        this.contentLayout = contentLayout
-        this.collapseButton = collapseButton
-        this.expandButton = expandButton
-        this.closeButton = closeButton
-        this.cpuProgressBar = cpuProgressBar
-        this.batteryProgressBar = batteryProgressBar
-        this.ramProgressBar = ramProgressBar
-        this.swapProgressBar = swapProgressBar
-        
-        // Make the overlay draggable by touching the main layout
-        mainLayout.setOnTouchListener { v, event ->
-            when (event.action) {
-                android.view.MotionEvent.ACTION_DOWN -> {
-                    initialX = params.x
-                    initialY = params.y
-                    initialTouchX = event.rawX
-                    initialTouchY = event.rawY
-                    true
-                }
-                android.view.MotionEvent.ACTION_MOVE -> {
-                    params.x = initialX + (event.rawX - initialTouchX).toInt()
-                    params.y = initialY + (event.rawY - initialTouchY).toInt()
-                    windowManager.updateViewLayout(overlayView, params)
-                    true
-                }
-                android.view.MotionEvent.ACTION_UP -> {
-                    if (!isCollapsed) {
-                        snapToEdge(params)
-                    }
-                    false
-                }
-                else -> false
-            }
-        }
-         
-        // Make it draggable later? For now just static.
-        try {
-            windowManager.addView(overlayView, params)
-        } catch (e: Exception) {
-            e.printStackTrace()
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+            x = dragX
+            y = dragY
         }
     }
-    
-    private fun createTextView(text: String, isBold: Boolean = false): TextView {
-         return TextView(this).apply {
-            this.text = text
-            textSize = 14f * scaleFactor
-            setTextColor(android.graphics.Color.WHITE)
-            if (isBold) {
-                setTypeface(null, android.graphics.Typeface.BOLD)
+
+    private fun touchFlags(base: Int, locked: Boolean): Int =
+        if (locked) base or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE   // full passthrough
+        else base and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()   // drag + tap
+
+    private fun applyBlurBehind() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && configState.value.blurBehind) {
+            params.flags = params.flags or WindowManager.LayoutParams.FLAG_BLUR_BEHIND
+            params.blurBehindRadius = (BLUR_RADIUS_DP * resources.displayMetrics.density).toInt()
+        } else {
+            params.flags = params.flags and WindowManager.LayoutParams.FLAG_BLUR_BEHIND.inv()
+        }
+    }
+
+    private fun relayout() {
+        val v = view ?: return
+        try {
+            windowManager.updateViewLayout(v, params)
+        } catch (_: Exception) {
+            stopSelf()
+        }
+    }
+
+    // ─────────────── feeds ───────────────
+
+    private fun hudConfigFlow(): Flow<HudConfig> {
+        val core = combine(
+            hudMediumFlow.map(::hudMediumFromString),
+            hudScaleFlow.map { s -> runCatching { HudScale.valueOf(s) }.getOrDefault(HudScale.M) },
+            hudOpacityFlow,
+            hudBlurFlow,
+            hudLockedFlow
+        ) { medium, scale, opacity, blur, locked ->
+            HudConfig(medium = medium, scale = scale, opacity = opacity, blurBehind = blur, locked = locked)
+        }
+        return combine(
+            core,
+            hudModulesFlow.map { HudConfig.fromCsv(it) },
+            hudShowCoreBankFlow
+        ) { cfg, modules, coreBank ->
+            cfg.copy(modules = modules, showCoreBank = coreBank)
+        }
+    }
+
+    private fun observeConfigAndFeeds() {
+        scope.launch {
+            // initial position from store (never runBlocking on main)
+            dragX = try { withContext(Dispatchers.IO) { hudXFlow.first() } } catch (_: Exception) { 100 }
+            dragY = try { withContext(Dispatchers.IO) { hudYFlow.first() } } catch (_: Exception) { 100 }
+            params.x = dragX; params.y = dragY
+            relayout()
+        }
+        scope.launch {
+            hudConfigFlow().collectLatest { cfg ->
+                val lockChanged = configState.value.locked != cfg.locked
+                val blurChanged = configState.value.blurBehind != cfg.blurBehind
+                configState.value = cfg
+                if (lockChanged || blurChanged) {
+                    applyBlurBehind()
+                    params.flags = touchFlags(params.flags, cfg.locked)
+                    relayout()
+                }
             }
-            if (isHorizontal) {
-                setSingleLine(true)
-                ellipsize = android.text.TextUtils.TruncateAt.END
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply {
-                     setMargins(0, 0, 0, 0)
-                     gravity = Gravity.CENTER_VERTICAL
+        }
+        scope.launch { monitorBus.slow.collect { slowState.value = it } }
+        scope.launch { monitorBus.fast.collect { fastState.value = it } }
+    }
+
+    /** 10 Hz dumpsys probe on IO — adaptive backoff after 5× "—", honest source stamp. */
+    private fun startFastTicker() {
+        scope.launch(Dispatchers.IO) {
+            var consecutiveDash = 0
+            while (isActive && isRunning.get()) {
+                val sample = try { fpsMonitor.getCurrentFpsWithSource() } catch (_: Exception) { null }
+                if (sample == null || sample.source == "—") consecutiveDash++ else consecutiveDash = 0
+                monitorBus.pushFast(HudFast(sample?.fps ?: 0, sample?.source ?: "—"))
+                delay(if (consecutiveDash >= 5) 1000L else 100L)
+            }
+        }
+    }
+
+    // ─────────────── panel callbacks ───────────────
+
+    private fun onDrag(dxPx: Int, dyPx: Int) {
+        dragX += dxPx
+        dragY += dyPx
+        params.x = dragX
+        params.y = dragY
+        relayout()
+        positionPersistJob?.cancel()
+        positionPersistJob = scope.launch(Dispatchers.IO) {
+            delay(500)
+            runCatching { setHudX(dragX); setHudY(dragY) }
+        }
+    }
+
+    private fun onLock() {
+        scope.launch(Dispatchers.IO) { runCatching { setHudLocked(true) } }
+    }
+
+    private fun onOpenConfig() {
+        val intent = Intent(this, MainActivity::class.java).apply {
+            putExtra("di_route", "hud-config")
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        startActivity(intent)
+    }
+
+    // ─────────────── composition ───────────────
+
+    @androidx.compose.runtime.Composable
+    private fun HudContent() {
+        var blurSupported by remember { mutableStateOf(true) }
+        DisposableEffect(Unit) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val listener = java.util.function.Consumer<Boolean> { enabled ->
+                    blurSupported = enabled
+                    applyBlurBehind()
+                    relayout()
+                }
+                windowManager.addCrossWindowBlurEnabledListener(listener)
+                onDispose {
+                    windowManager.removeCrossWindowBlurEnabledListener(listener)
                 }
             } else {
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply {
-                    setMargins(0, (2 * scaleFactor).toInt(), 0, (2 * scaleFactor).toInt())
-                }
+                onDispose { }
             }
         }
-    }
-    
-    private fun addMetricItem(
-        label: String?, 
-        progressView: View?, 
-        graphView: View?, 
-        extraText: String? = null,
-        isBold: Boolean = false
-    ) {
-        // Fix for "Child already has a parent" crash
-        (progressView?.parent as? android.view.ViewGroup)?.removeView(progressView)
-        (graphView?.parent as? android.view.ViewGroup)?.removeView(graphView)
 
-        if (!isHorizontal) {
-            // Vertical Layout - Stacks Text, then Progress/Graph vertically
-            if (label != null) {
-                val tv = createTextView(label, isBold)
-                contentLayout.addView(tv)
-            }
-            if (extraText != null) {
-                val tv = createTextView(extraText)
-                contentLayout.addView(tv)
-            }
-            if (progressView != null) {
-                progressView.layoutParams = LinearLayout.LayoutParams(
-                     LinearLayout.LayoutParams.MATCH_PARENT,
-                     (8 * scaleFactor).toInt()
-                ).apply {
-                    setMargins(0, (4 * scaleFactor).toInt(), 0, (4 * scaleFactor).toInt())
-                }
-                contentLayout.addView(progressView)
-            }
-            if (graphView != null) {
-                graphView.layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    (60 * scaleFactor).toInt()
-                ).apply {
-                    setMargins(0, (4 * scaleFactor).toInt(), 0, (4 * scaleFactor).toInt())
-                }
-                contentLayout.addView(graphView)
-            }
-            addSeparator()
-        } else {
-            // Horizontal Layout - Single Line Row per Metric
-            val container = LinearLayout(this).apply {
-                 orientation = LinearLayout.HORIZONTAL // Changed to Horizontal for concise 1-line
-                 layoutParams = LinearLayout.LayoutParams(
-                     LinearLayout.LayoutParams.WRAP_CONTENT,
-                     LinearLayout.LayoutParams.WRAP_CONTENT
-                 ).apply {
-                     setMargins(
-                         (6 * scaleFactor).toInt(), 
-                         0, 
-                         (6 * scaleFactor).toInt(), 
-                         0
-                     )
-                 }
-                 gravity = Gravity.CENTER_VERTICAL
-            }
-            
-            // Combine label and extra text for concise view
-            val combinedText = StringBuilder()
-            if (label != null) combinedText.append(label)
-            if (label != null && extraText != null) combinedText.append(" ")
-            if (extraText != null) combinedText.append(extraText)
-            
-            if (combinedText.isNotEmpty()) {
-                val tv = createTextView(combinedText.toString(), isBold).apply {
-                    setPadding(0, 0, (8 * scaleFactor).toInt(), 0)
-                    // Remove default margins for inline look
-                    (layoutParams as LinearLayout.LayoutParams).setMargins(0, 0, 0, 0)
-                }
-                container.addView(tv)
-            }
-            
-            if (progressView != null) {
-                 progressView.layoutParams = LinearLayout.LayoutParams(
-                     (40 * scaleFactor).toInt(), // Smaller width
-                     (6 * scaleFactor).toInt()   // Thin bar
-                 ).apply {
-                     setMargins(0, 0, 0, 0)
-                 }
-                 container.addView(progressView)
-            }
-            
-             if (graphView != null) {
-                 graphView.layoutParams = LinearLayout.LayoutParams(
-                     (50 * scaleFactor).toInt(), // Smaller width
-                     (20 * scaleFactor).toInt()  // Short height to fit in one line
-                 ).apply {
-                      setMargins(0, 0, 0, 0)
-                 }
-                 container.addView(graphView)
-             }
-             
-             contentLayout.addView(container)
-             
-             // Vertical Separator (Divider between items)
-             val separator = View(this).apply {
-                setBackgroundColor(0x40FFFFFF.toInt())
-                layoutParams = LinearLayout.LayoutParams(
-                    (1 * scaleFactor).toInt().coerceAtLeast(1),
-                    (16 * scaleFactor).toInt() // Height of separator
-                ).apply {
-                    setMargins((2 * scaleFactor).toInt(), 0, (2 * scaleFactor).toInt(), 0)
-                    gravity = Gravity.CENTER_VERTICAL
-                }
-            }
-            contentLayout.addView(separator)
+        val cfg = configState.value
+        val effectiveOpacity =
+            if (cfg.blurBehind && blurSupported && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) cfg.opacity
+            else (cfg.opacity + 0.10f).coerceAtMost(0.97f)   // scrim compensates for missing blur
+
+        HudTheme(medium = cfg.medium, scale = cfg.scale) {
+            HudPanel(
+                config = cfg,
+                slow = slowState,
+                fast = fastState,
+                effectiveOpacity = effectiveOpacity,
+                interactive = true,
+                onDrag = ::onDrag,
+                onLock = ::onLock,
+                onOpenConfig = ::onOpenConfig
+            )
         }
     }
 
-    private fun startUpdatingStats() {
-        job = CoroutineScope(Dispatchers.Main).launch {
-            dashboardRepository.getDashboardMetrics().collect { metrics ->
-                val cpuUsage = (metrics.cpuUsage * 100).toInt()
-                val batteryLevel = metrics.batteryLevel
-                val ramUsedMb = metrics.ramUsedBytes / (1024 * 1024)
-                val ramTotalMb = metrics.ramTotalBytes / (1024 * 1024)
-                val swapUsedMb = metrics.swapUsedBytes / (1024 * 1024)
-                val swapTotalMb = metrics.swapTotalBytes / (1024 * 1024)
-                val batteryTemperature = metrics.temperature
-                val cpuTemperature = metrics.cpuTemperature
-                val powerConsumption = metrics.powerConsumption
-                val cpuCoreFrequencies = metrics.cpuCoreFrequencies
-                val cpuHistory = metrics.cpuHistory
-                val powerHistory = metrics.powerHistory
-                val fpsHistory = metrics.fpsHistory
-                val fps = metrics.fps
-                val netUpload = metrics.networkUploadSpeed
-                val netDownload = metrics.networkDownloadSpeed
-                
-                // Debug log to check temperature values
-                android.util.Log.d("OverlayService", "CPU Temp: ${cpuTemperature}°C, Battery Temp: ${batteryTemperature}°C, Power: ${powerConsumption}W")
-                android.util.Log.d("OverlayService", "Flags - showCpu: $showCpu, showBattery: $showBattery, showRam: $showRam, showSwap: $showSwap, showCpuGraph: $showCpuGraph")
-                
-                // Clear and rebuild layout
-                contentLayout.removeAllViews()
-                
-                // Display metrics in custom order
-                metricOrder.forEach { metricId ->
-                    when (metricId) {
-                        "time" -> if (showTime) {
-                            val timeFormat = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
-                            val currentTime = timeFormat.format(Date())
-                            if (isHorizontal) {
-                                // Just show MM:SS or HH:MM
-                                addMetricItem(currentTime.takeLast(5), null, null, isBold = true)
-                            } else {
-                                addMetricItem("Time: $currentTime", null, null, isBold = true)
-                            }
-                        }
-                        "cpu" -> if (showCpu) {
-                            val governorText = metrics.cpuGovernor?.let { " ($it)" } ?: ""
-                            cpuProgressBar.progress = cpuUsage
-                            if (isHorizontal) {
-                                addMetricItem("${cpuUsage}%".take(3), cpuProgressBar, null)
-                            } else {
-                                addMetricItem("CPU: ${cpuUsage}%$governorText", cpuProgressBar, null)
-                            }
-                        }
-                        "cpuGraph" -> if (showCpuGraph && cpuHistory.isNotEmpty()) {
-                            cpuGraphView.setData(cpuHistory.map { it.utilization })
-                            addMetricItem(if (isHorizontal) "CPU" else "CPU Graph", null, cpuGraphView)
-                        }
-                        "powerGraph" -> if (showPowerGraph) {
-                             val data = if (powerHistory.isNotEmpty()) powerHistory.map { kotlin.math.abs(it.powerWatts) } else listOf(kotlin.math.abs(powerConsumption))
-                             powerGraphView.setData(data)
-                             addMetricItem(if (isHorizontal) "PWR" else "Power Graph", null, powerGraphView)
-                        }
-                        "fps" -> if (showFps) {
-                            if (isHorizontal) {
-                                addMetricItem("$fps".take(3), null, null)
-                            } else {
-                                addMetricItem("FPS: $fps", null, null)
-                            }
-                        }
-                        "fpsGraph" -> if (showFpsGraph && fpsHistory.isNotEmpty()) {
-                            fpsGraphView.setData(fpsHistory.map { it.fps.toFloat() })
-                            addMetricItem(if (isHorizontal) "FPS" else "FPS Graph", null, fpsGraphView)
-                        }
-                        "cpuFreq" -> if (showCpu && showCpuFreq && cpuCoreFrequencies.isNotEmpty()) {
-                            if (isHorizontal) {
-                                // Simplified concise format for horizontal mode
-                                val avgFreq = cpuCoreFrequencies.map { it.toFloat() }.average() / 1000.0
-                                addMetricItem("%.1f".format(avgFreq).take(3), null, null)
-                            } else {
-                                val freqBuilder = StringBuilder("Freq:")
-                                cpuCoreFrequencies.forEachIndexed { index, freq ->
-                                    if (index % 2 == 0) freqBuilder.append("\n")
-                                    else freqBuilder.append("  ")
-                                    freqBuilder.append("Core $index:$freq")
-                                }
-                                addMetricItem(freqBuilder.toString(), null, null)
-                            }
-                        }
-                        "cpuTemp" -> if (showCpuTemp) {
-                            if (isHorizontal) {
-                                addMetricItem("${cpuTemperature.toInt()}°".take(3), null, null)
-                            } else {
-                                if (cpuTemperature > 0) {
-                                    addMetricItem("CPU Temp: ${cpuTemperature}°C", null, null)
-                                } else {
-                                    addMetricItem("CPU Temp: N/A", null, null)
-                                }
-                            }
-                        }
-                        "power" -> if (showPower) {
-                            val powerText = if (powerConsumption > 0) "+%.2f".format(powerConsumption)
-                                           else "%.2f".format(powerConsumption)
-                            if (isHorizontal) {
-                                addMetricItem("%.1fW".format(powerConsumption).take(3), null, null)
-                            } else {
-                                addMetricItem("Power: ${powerText}W", null, null)
-                            }
-                        }
-                        "battery" -> if (showBattery) {
-                            batteryProgressBar.progress = batteryLevel
-                            if (isHorizontal) {
-                                addMetricItem("${batteryLevel}%".take(3), batteryProgressBar, null)
-                            } else {
-                                addMetricItem("Battery: ${batteryLevel}%", batteryProgressBar, null)
-                            }
-                        }
-                        "batteryTemp" -> if (showBatteryTemp) {
-                            if (isHorizontal) {
-                                addMetricItem("${batteryTemperature.toInt()}°".take(3), null, null)
-                            } else {
-                                if (batteryTemperature > 0) {
-                                    addMetricItem("Battery Temp: ${batteryTemperature}°C", null, null)
-                                } else {
-                                    addMetricItem("Battery Temp: N/A", null, null)
-                                }
-                            }
-                        }
-                        "ram" -> if (showRam) {
-                            val ramPercentage = if (ramTotalMb > 0) ((ramUsedMb.toFloat() / ramTotalMb) * 100).toInt() else 0
-                            if (isHorizontal) {
-                                addMetricItem("${ramPercentage}%".take(3), ramProgressBar, null)
-                            } else {
-                                addMetricItem("RAM: ${ramUsedMb}/${ramTotalMb} MB", ramProgressBar, null, "(${ramPercentage}%)")
-                            }
-                        }
-                        "swap" -> if (showSwap) {
-                            val swapPercentage = if (swapTotalMb > 0) ((swapUsedMb.toFloat() / swapTotalMb) * 100).toInt() else 0
-                            if (isHorizontal) {
-                                addMetricItem("${swapPercentage}%".take(3), swapProgressBar, null)
-                            } else {
-                                addMetricItem("Swap: ${swapUsedMb}/${swapTotalMb} MB", swapProgressBar, null, "(${swapPercentage}%)")
-                            }
-                        }
-                        "network" -> if (showNetwork) {
-                            if (isHorizontal) {
-                                // Combine or just show one
-                                addMetricItem(netDownload.take(3), null, null)
-                            } else {
-                                addMetricItem("↑ $netUpload   ↓ $netDownload", null, null)
-                            }
-                        }
-                        "currentApp" -> if (showCurrentApp) {
-                            val appName = getForegroundApp()
-                            if (isHorizontal) {
-                                addMetricItem(appName.take(3), null, null)
-                            } else {
-                                addMetricItem("App: $appName", null, null)
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-    
-    private fun addTextView(text: String, isBold: Boolean = false) {
-        val textView = TextView(this).apply {
-            this.text = text
-            textSize = 14f * scaleFactor
-            setTextColor(android.graphics.Color.WHITE)
-            if (isBold) {
-                setTypeface(null, android.graphics.Typeface.BOLD)
-            }
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                setMargins(0, (2 * scaleFactor).toInt(), 0, (2 * scaleFactor).toInt())
-            }
-        }
-        contentLayout.addView(textView)
-    }
-    
-    private fun addSeparator() {
-        val separator = android.view.View(this).apply {
-            setBackgroundColor(0x40FFFFFF.toInt()) // Semi-transparent white
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                (2 * scaleFactor).toInt().coerceAtLeast(1)
-            ).apply {
-                setMargins(0, (8 * scaleFactor).toInt(), 0, (8 * scaleFactor).toInt())
-            }
-        }
-        contentLayout.addView(separator)
-    }
+    // ─────────────── notification ───────────────
 
-    private fun collapseOverlay(params: WindowManager.LayoutParams) {
-        isCollapsed = true
-        
-        // Fade out animation for main layout
-        mainLayout.animate()
-            .alpha(0f)
-            .setDuration(200)
-            .withEndAction {
-                mainLayout.visibility = android.view.View.GONE
-                
-                // Show expand button with fade in
-                expandButton.visibility = android.view.View.VISIBLE
-                expandButton.alpha = 0f
-                expandButton.animate().alpha(1f).setDuration(200).start()
-                
-                // Snap to nearest edge
-                snapToEdge(params)
-            }
-            .start()
-    }
-    
-    private fun expandOverlay(params: WindowManager.LayoutParams) {
-        isCollapsed = false
-        
-        // Fade out expand button
-        expandButton.animate()
-            .alpha(0f)
-            .setDuration(200)
-            .withEndAction {
-                expandButton.visibility = android.view.View.GONE
-                
-                // Show main layout with fade in
-                mainLayout.visibility = android.view.View.VISIBLE
-                mainLayout.alpha = 0f
-                mainLayout.animate().alpha(1f).setDuration(200).start()
-            }
-            .start()
-    }
-    
-    private fun snapToEdge(params: WindowManager.LayoutParams) {
-        val displayMetrics = resources.displayMetrics
-        val screenWidth = displayMetrics.widthPixels
-        val screenHeight = displayMetrics.heightPixels
-        
-        val currentX = params.x
-        val currentY = params.y
-        
-        // Determine which edge is closest
-        val distanceToLeft = currentX
-        val distanceToRight = screenWidth - currentX - overlayView.width
-        val distanceToTop = currentY
-        val distanceToBottom = screenHeight - currentY - overlayView.height
-        
-        val minDistance = minOf(distanceToLeft, distanceToRight, distanceToTop, distanceToBottom)
-        
-        // Snap to the closest edge with animation
-        val targetX: Int
-        val targetY: Int
-        
-        when (minDistance) {
-            distanceToLeft -> {
-                targetX = -overlayView.width / 2 // Snap to left, half off-screen
-                targetY = currentY
-            }
-            distanceToRight -> {
-                targetX = screenWidth - overlayView.width / 2 // Snap to right, half off-screen
-                targetY = currentY
-            }
-            distanceToTop -> {
-                targetX = currentX
-                targetY = -overlayView.height / 2 // Snap to top, half off-screen
-            }
-            else -> {
-                targetX = currentX
-                targetY = screenHeight - overlayView.height / 2 // Snap to bottom, half off-screen
-            }
-        }
-        
-        // Animate to target position
-        android.animation.ValueAnimator.ofInt(currentX, targetX).apply {
-            duration = 300
-            addUpdateListener { animator ->
-                params.x = animator.animatedValue as Int
-                windowManager.updateViewLayout(overlayView, params)
-            }
-        }.start()
-        
-        android.animation.ValueAnimator.ofInt(currentY, targetY).apply {
-            duration = 300
-            addUpdateListener { animator ->
-                params.y = animator.animatedValue as Int
-                windowManager.updateViewLayout(overlayView, params)
-            }
-        }.start()
-    }
-    
-
-    private fun updateOverlayWithNewParameters() {
-        // Update the overlay layout with new scale factor - use WRAP_CONTENT
-        val params = overlayView.layoutParams as WindowManager.LayoutParams
-        params.width = WindowManager.LayoutParams.WRAP_CONTENT
-        params.height = WindowManager.LayoutParams.WRAP_CONTENT
-        
-        android.util.Log.d("OverlayService", "Updated overlay to WRAP_CONTENT dimensions")
-        
-        contentLayout.orientation = if (isHorizontal) LinearLayout.HORIZONTAL else LinearLayout.VERTICAL
-        
-        // Adjust padding for concise horizontal mode
-        if (isHorizontal) {
-            mainLayout.setPadding((8 * scaleFactor).toInt(), (4 * scaleFactor).toInt(), (8 * scaleFactor).toInt(), (4 * scaleFactor).toInt())
-        } else {
-            mainLayout.setPadding(16, 16, 16, 16)
-        }
-        
-        // Update graph views scale factor
-        if (::cpuGraphView.isInitialized) cpuGraphView.scaleFactor = scaleFactor
-        if (::powerGraphView.isInitialized) powerGraphView.scaleFactor = scaleFactor
-        if (::fpsGraphView.isInitialized) fpsGraphView.scaleFactor = scaleFactor
-        
-        // Note: Progress bars and other views layout params are recreated when added in addMetricItem
-        // but we should update their base layout params here if they are reused directly or if addMetricItem relies on current instances
-        
-        // Update existing progress bars layout params just in case they are currently attached or will be re-attached
-        val progressHeight = (8 * scaleFactor).toInt()
-        val progressMargin = (4 * scaleFactor).toInt()
-        val progressParams = LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT, 
-            progressHeight
-        ).apply {
-            setMargins(0, progressMargin, 0, progressMargin)
-        }
-        
-        if (::cpuProgressBar.isInitialized) {
-            cpuProgressBar.layoutParams = LinearLayout.LayoutParams(progressParams)
-            cpuProgressBar.scaleY = 1.5f * scaleFactor
-        }
-        if (::batteryProgressBar.isInitialized) {
-            batteryProgressBar.layoutParams = LinearLayout.LayoutParams(progressParams)
-            batteryProgressBar.scaleY = 1.5f * scaleFactor
-        }
-        if (::ramProgressBar.isInitialized) {
-            ramProgressBar.layoutParams = LinearLayout.LayoutParams(progressParams)
-            ramProgressBar.scaleY = 1.5f * scaleFactor
-        }
-        if (::swapProgressBar.isInitialized) {
-            swapProgressBar.layoutParams = LinearLayout.LayoutParams(progressParams)
-            swapProgressBar.scaleY = 1.5f * scaleFactor
-        }
-
-        windowManager.updateViewLayout(overlayView, params)
-    }
-
-    private fun getForegroundApp(): String {
-        try {
-            val usm = getSystemService(Context.USAGE_STATS_SERVICE) as android.app.usage.UsageStatsManager
-            val time = System.currentTimeMillis()
-            // Query events for the last 1 minute
-            val events = usm.queryEvents(time - 1000 * 60, time) 
-            var topPackageName: String? = null
-            var lastEventTime = 0L
-
-            if (events != null) {
-                val event = android.app.usage.UsageEvents.Event()
-                while (events.hasNextEvent()) {
-                    events.getNextEvent(event)
-                    if (event.eventType == android.app.usage.UsageEvents.Event.MOVE_TO_FOREGROUND) {
-                         if (event.timeStamp > lastEventTime) {
-                             lastEventTime = event.timeStamp
-                             topPackageName = event.packageName
-                         }
-                    }
-                }
-            }
-            
-            if (topPackageName != null) {
-                 return try {
-                    val pm = packageManager
-                    val appInfo = pm.getApplicationInfo(topPackageName, 0)
-                    val label = pm.getApplicationLabel(appInfo).toString()
-                    lastKnownApp = label
-                    label
-                } catch (e: Exception) {
-                    lastKnownApp = topPackageName
-                    topPackageName
-                }
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-        return lastKnownApp
-    }
-
-    private fun startForegroundService() {
-        val channelId = "overlay_channel"
+    private fun startForegroundNotification() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
-                channelId,
-                "Overlay Service",
+                CHANNEL_ID,
+                "DeviceInsight HUD",
                 NotificationManager.IMPORTANCE_LOW
             )
             getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
         }
-
-        val notification: Notification = NotificationCompat.Builder(this, channelId)
-            .setContentTitle("DeviceInsights Overlay")
-            .setContentText("Performance monitor is running")
-            .setSmallIcon(R.mipmap.ic_launcher) // Use default icon
+        val notification: Notification = NotificationCompat.Builder(this, CHANNEL_ID)
+            .setContentTitle("DeviceInsight HUD")
+            .setContentText("Scope Probe running · tap STOP in app")
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setOngoing(true)
             .build()
-         
-        startForeground(1, notification)
+        startForeground(NOTIFICATION_ID, notification)
     }
 
     override fun onDestroy() {
-        super.onDestroy()
-        job?.cancel()
-        if (::overlayView.isInitialized) {
-            windowManager.removeView(overlayView)
+        lifecycleRegistry.currentState = Lifecycle.State.DESTROYED
+        isRunning.set(false)
+        scope.cancel()
+        view?.let {
+            try { windowManager.removeView(it) } catch (_: Exception) {}
         }
+        view = null
+        super.onDestroy()
     }
 }

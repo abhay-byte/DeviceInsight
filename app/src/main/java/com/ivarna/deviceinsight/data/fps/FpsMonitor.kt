@@ -1,9 +1,8 @@
 package com.ivarna.deviceinsight.data.fps
 
 import android.content.Context
-import android.os.Build
 import android.util.Log
-import com.ivarna.deviceinsight.BuildConfig
+import com.ivarna.deviceinsight.data.monitor.HudSettingsCache
 import dagger.hilt.android.qualifiers.ApplicationContext
 import rikka.shizuku.Shizuku
 import java.io.BufferedReader
@@ -11,39 +10,46 @@ import java.io.InputStreamReader
 import javax.inject.Inject
 import javax.inject.Singleton
 
+data class FpsSample(val fps: Int, val source: String) // "SF" | "GFX" | "—"
+
 @Singleton
-class FpsMonitor @Inject constructor(@ApplicationContext private val context: Context) {
+class FpsMonitor @Inject constructor(
+    @ApplicationContext private val context: Context,
+    private val hudSettingsCache: HudSettingsCache
+) {
 
     companion object {
         private const val TAG = "FpsMonitor"
+        private const val LAYER_CACHE_MS = 30_000L
     }
 
     enum class AccessType {
         SHIZUKU, ROOT, NONE
     }
 
-    private fun getAccessType(): AccessType {
-        val prefs = context.getSharedPreferences("overlay_prefs", Context.MODE_PRIVATE)
-        val mode = prefs.getString("fps_mode", "AUTO")
+    // Layer cache 30s to avoid dumpsys SurfaceFlinger --list every 100ms
+    @Volatile private var cachedLayerName: String? = null
+    @Volatile private var cachedLayerPkg: String? = null
+    @Volatile private var cachedLayerTime: Long = 0L
 
+    private fun getAccessType(): AccessType {
+        val mode = hudSettingsCache.fpsMode
         if (mode == "ROOT") {
             return if (isRootAvailable()) AccessType.ROOT else AccessType.NONE
         }
-
         if (mode == "SHIZUKU") {
-             return if (Shizuku.pingBinder() && Shizuku.checkSelfPermission() == android.content.pm.PackageManager.PERMISSION_GRANTED) {
-                 AccessType.SHIZUKU
-             } else {
-                 AccessType.NONE
-             }
+            return if (Shizuku.pingBinder() && Shizuku.checkSelfPermission() == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                AccessType.SHIZUKU
+            } else {
+                AccessType.NONE
+            }
         }
-
         // AUTO
         return if (Shizuku.pingBinder()) {
             if (Shizuku.checkSelfPermission() == android.content.pm.PackageManager.PERMISSION_GRANTED) {
                 AccessType.SHIZUKU
             } else {
-                AccessType.NONE // Shizuku exists but permission not granted
+                AccessType.NONE
             }
         } else if (isRootAvailable()) {
             AccessType.ROOT
@@ -61,12 +67,8 @@ class FpsMonitor @Inject constructor(@ApplicationContext private val context: Co
         }
     }
 
-    /**
-     * Executes a shell command using the best available method (Shizuku or Root).
-     */
     private fun executeCommand(command: String): List<String> {
         val accessType = getAccessType()
-
         return try {
             when (accessType) {
                 AccessType.SHIZUKU -> executeShizukuCommand(command)
@@ -95,8 +97,6 @@ class FpsMonitor @Inject constructor(@ApplicationContext private val context: Co
 
     private fun executeShizukuCommand(command: String): List<String> {
         return try {
-            // Use reflection to access Shizuku.newProcess to avoid hidden API restrictions/compilation issues
-            // signature: public static Process newProcess(String[] cmd, String[] env, String dir)
             val newProcessMethod = Shizuku::class.java.getMethod(
                 "newProcess",
                 Array<String>::class.java,
@@ -104,7 +104,6 @@ class FpsMonitor @Inject constructor(@ApplicationContext private val context: Co
                 String::class.java
             )
             val process = newProcessMethod.invoke(null, arrayOf("sh", "-c", command), null, null) as Process
-            
             val output = mutableListOf<String>()
             BufferedReader(InputStreamReader(process.inputStream)).use { reader ->
                 var line: String?
@@ -120,42 +119,27 @@ class FpsMonitor @Inject constructor(@ApplicationContext private val context: Co
         }
     }
 
-    // Shizuku execution removed due to build limitations.
-    // The previous implementation using bindUserService requires AIDL which failed to compile with current SDK tools.
-
     /**
-     * Gets the current FPS.
-     * Returns 0 if unable to calculate.
+     * Gets the current FPS with source stamp.
+     * Source: SF if SurfaceFlinger succeeds, else GFX if gfxinfo succeeds, else "—".
      */
-    fun getCurrentFps(): Int {
-        val packageName = getForegroundPackage()
-        
-        if (packageName == null) {
-            Log.d(TAG, "getCurrentFps: No foreground package found")
-            return 0
-        }
-
-        // For games and high-performance apps, SurfaceFlinger latency is more accurate
-        val sfFps = getSurfaceFlingerFps(packageName)
-        if (sfFps > 0) return sfFps
-
-        // Fallback to gfxinfo for standard UI apps
-        return getGfxInfoFps(packageName)
+    fun getCurrentFpsWithSource(): FpsSample {
+        val pkg = getForegroundPackage() ?: return FpsSample(0, "—")
+        val sfFps = getSurfaceFlingerFps(pkg)
+        if (sfFps > 0) return FpsSample(sfFps, "SF")
+        val gfxFps = getGfxInfoFps(pkg)
+        if (gfxFps > 0) return FpsSample(gfxFps, "GFX")
+        return FpsSample(0, "—")
     }
 
+    fun getCurrentFps(): Int = getCurrentFpsWithSource().fps
+
     private fun getForegroundPackage(): String? {
-        // Use 'dumpsys window' to find mFocusedApp
-        // Output format: mFocusedApp=ActivityRecord{hash u0 package/activity token}
         val cmd = "dumpsys window | grep mFocusedApp"
         val output = executeCommand(cmd)
-        
         val focusLine = output.firstOrNull { it.contains("mFocusedApp") } ?: return null
-        
-        // Regex to extract package name
-        // Matches: ActivityRecord{... u0 com.package/
         val regex = Regex("ActivityRecord\\{[^ ]+ [^ ]+ ([^ /]+)/")
         val match = regex.find(focusLine)
-        
         val pkg = match?.groups?.get(1)?.value
         Log.d(TAG, "Found foreground package: $pkg from line: $focusLine")
         return pkg
@@ -164,34 +148,23 @@ class FpsMonitor @Inject constructor(@ApplicationContext private val context: Co
     private fun getGfxInfoFps(packageName: String): Int {
         val cmd = "dumpsys gfxinfo $packageName framestats"
         val output = executeCommand(cmd)
-        
         if (output.isEmpty()) return 0
-
-        // Parse framestats CSV
-        // Look for header line to identify columns
         val headerIdx = output.indexOfFirst { it.startsWith("Flags,FrameTimelineVsyncId") }
         if (headerIdx == -1) return 0
-        
         val header = output[headerIdx].split(",")
         val vsyncIdx = header.indexOf("IntendedVsync")
-        
         if (vsyncIdx == -1) return 0
-        
         var frameCount = 0
         val currentTime = System.nanoTime()
         val oneSecondAgo = currentTime - 1_000_000_000L
-        
-        // Data starts after header
         for (i in (headerIdx + 1) until output.size) {
             val line = output[i]
             if (line.isBlank() || line.startsWith("---PROFILEDATA---") || line.startsWith("View hierarchy:")) break
-            
             val columns = line.split(",")
             if (columns.size > vsyncIdx) {
                 val timestampStr = columns[vsyncIdx]
                 try {
                     val timestamp = timestampStr.toLong()
-                    // Gfxinfo timestamps are from CLOCK_MONOTONIC, same as System.nanoTime()
                     if (timestamp > oneSecondAgo) {
                         frameCount++
                     }
@@ -200,7 +173,6 @@ class FpsMonitor @Inject constructor(@ApplicationContext private val context: Co
                 }
             }
         }
-        
         Log.d(TAG, "GfxInfo FPS for $packageName: $frameCount")
         return frameCount
     }
@@ -209,37 +181,44 @@ class FpsMonitor @Inject constructor(@ApplicationContext private val context: Co
         val layerName = findSurfaceFlingerLayer(packageName) ?: return 0
         val cmd = "dumpsys SurfaceFlinger --latency '$layerName'"
         val output = executeCommand(cmd)
-        
         val fps = parseFps(output)
         Log.d(TAG, "SurfaceFlinger FPS for $packageName ($layerName): $fps")
         return fps
     }
 
     private fun findSurfaceFlingerLayer(packageName: String): String? {
+        val now = System.currentTimeMillis()
+        if (packageName == cachedLayerPkg && cachedLayerName != null && now - cachedLayerTime < LAYER_CACHE_MS) {
+            return cachedLayerName
+        }
         val cmd = "dumpsys SurfaceFlinger --list"
         val output = executeCommand(cmd)
-        
-        // Prioritize BLAST layers which are common in newer Android versions / high perf apps
         val blastLayer = output.firstOrNull { it.contains(packageName) && it.contains("BLAST") }
-        if (blastLayer != null) return extractLayerName(blastLayer)
-        
-        // Then SurfaceView
-        val surfaceViewLayer = output.firstOrNull { it.contains(packageName) && it.contains("SurfaceView") }
-        if (surfaceViewLayer != null) return extractLayerName(surfaceViewLayer)
-        
-        // Then any layer matching package
-        val genericLayer = output.firstOrNull { it.contains(packageName) }
-        if (genericLayer != null) return extractLayerName(genericLayer)
-        
-        return null
+        val result = when {
+            blastLayer != null -> extractLayerName(blastLayer)
+            else -> {
+                val surfaceViewLayer = output.firstOrNull { it.contains(packageName) && it.contains("SurfaceView") }
+                when {
+                    surfaceViewLayer != null -> extractLayerName(surfaceViewLayer)
+                    else -> {
+                        val genericLayer = output.firstOrNull { it.contains(packageName) }
+                        if (genericLayer != null) extractLayerName(genericLayer) else null
+                    }
+                }
+            }
+        }
+        if (result != null) {
+            cachedLayerName = result
+            cachedLayerPkg = packageName
+            cachedLayerTime = now
+        }
+        return result
     }
 
     private fun extractLayerName(rawLine: String): String {
         var name = rawLine.trim()
         if (name.startsWith("RequestedLayerState{")) {
             name = name.substringAfter("RequestedLayerState{").substringBeforeLast("}")
-            // Match until the first space followed by metadata like parentId
-            // OR until the end of the string if no spaces
             val firstSpace = name.indexOf(' ')
             if (firstSpace != -1) {
                 name = name.substring(0, firstSpace)
@@ -260,44 +239,23 @@ class FpsMonitor @Inject constructor(@ApplicationContext private val context: Co
 
     private fun parseFps(lines: List<String>): Int {
         if (lines.isEmpty()) return 0
-        
-        // Line 1 is refresh period in ns (e.g. 16666666 for 60hz)
-        // We don't strictly need it for counting frames in last second, but good to validate
-        
-        // Data lines: [Desired Present Time] [Actual Present Time] [Frame Ready Time]
-        // We count lines where Actual Present Time is within the last 1 second (1,000,000,000 ns)
-        
         val now = System.nanoTime()
         val oneSecondAgo = now - 1_000_000_000L
-        
         var frameCount = 0
-        
-        // Skip first line (header)
         for (i in 1 until lines.size) {
             val line = lines[i].trim()
             if (line.isEmpty()) continue
-            
             val parts = line.split("\\s+".toRegex())
             if (parts.size != 3) continue
-            
             try {
                 val actualPresentTime = parts[1].toLong()
-                
-                // Check if frame was presented (non-zero, not MAX_VALUE)
                 if (actualPresentTime == 0L || actualPresentTime == Long.MAX_VALUE) continue
-                
-                // For 'dumpsys SurfaceFlinger --latency', the timestamps are typically monotonic.
-                // However, they come from the SurfaceFlinger process. System.nanoTime() in our process 
-                // should generally match the clock used by SF (CLOCK_MONOTONIC).
-                
                 if (actualPresentTime >= oneSecondAgo) {
                     frameCount++
                 }
             } catch (e: NumberFormatException) {
-                // Ignore malformed lines
             }
         }
-        
         return frameCount
     }
 }

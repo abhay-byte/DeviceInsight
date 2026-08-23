@@ -8,8 +8,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Text
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -18,12 +20,17 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.ivarna.deviceinsight.ui.caliper.*
+import com.ivarna.deviceinsight.service.OverlayService
+import com.ivarna.deviceinsight.ui.caliper.Caliper
 import com.ivarna.deviceinsight.ui.caliper.components.*
-import com.ivarna.deviceinsight.ui.caliper.hud.CaliperHud
-import com.ivarna.deviceinsight.ui.caliper.hud.HudState
+import com.ivarna.deviceinsight.ui.caliper.hud.HudModule
+import com.ivarna.deviceinsight.ui.caliper.hud.HudPanel
+import com.ivarna.deviceinsight.ui.caliper.hud.HudScale
+import com.ivarna.deviceinsight.ui.caliper.hud.HudTheme
+import com.ivarna.deviceinsight.ui.caliper.hud.rememberHudDemo
+import kotlinx.coroutines.delay
 
-/** № 03 — OVERLAY / HUD config (S-11). CALIPER config sheet. */
+/** № 03 — OVERLAY / Scope Probe config (S-11). CALIPER config sheet. */
 @Composable
 fun OverlayScreen(
     viewModel: OverlayViewModel = hiltViewModel()
@@ -32,21 +39,21 @@ fun OverlayScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
+    // ON_RESUME refresh + one 400 ms delayed re-check — Android 8 canDrawOverlays is stale
+    // right after grant (issuetracker 62047810). Never auto-starts the HUD.
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) viewModel.refreshPermissions()
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.refreshPermissions()
+            }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
-
-    // HUD live preview fed by current config (values are illustrative on config sheet).
-    val preview = HudState(
-        fps = 119.8f, fpsSource = "SF",
-        cpu = 42f, cpuHist = listOf(0.3f, 0.4f, 0.42f, 0.38f, 0.5f, 0.46f),
-        gpu = 71f, ramBytes = 6_800_000_000L, tempC = 58f,
-        netDown = 18_100_000L, netUp = 2_400_000L
-    )
+    androidx.compose.runtime.LaunchedEffect(state.permissions.hasOverlay) {
+        delay(400)
+        viewModel.refreshPermissions()
+    }
 
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState())
@@ -54,15 +61,16 @@ fun OverlayScreen(
         ScreenHeader(
             sheetLabel = "№ 03 — OVERLAY",
             title = "Overlay.",
-            sub = if (state.isServiceRunning) "● live · running" else "performance overlay · config",
+            sub = if (state.isServiceRunning) "● live · running" else "scope probe · config",
             warn = state.isServiceRunning
         )
 
-        // HUD preview — corner brackets + scrim (the real service draws the window)
-        CaliperHud(preview, Modifier.fillMaxWidth().padding(horizontal = 16.dp))
+        // F3: wrap-to-scale preview — stage centers a fixed-width probe, never page-width,
+        // never a WindowManager overlay. Gap above PERMISSIONS comes from the vertical padding.
+        HudPreviewHost(state, viewModel)
         Spacer(Modifier.height(12.dp))
 
-        // Status + permissions
+        // Permissions
         PanelCard(title = "PERMISSIONS") {
             SpecRow("overlay", if (state.permissions.hasOverlay) "GRANTED" else "REQUIRED")
             SpecRow("usage", if (state.permissions.hasUsageStats) "GRANTED" else "REQUIRED")
@@ -91,26 +99,69 @@ fun OverlayScreen(
         }
         Spacer(Modifier.height(12.dp))
 
-        // Style & Layout
+        // Probe style — explicit medium (never follow-system), S/M/L scale, opacity
         PanelCard(title = "STYLE & LAYOUT") {
-            DipSwitch(
-                checked = state.isHorizontal,
-                onCheckedChange = viewModel::setHorizontal,
-                label = "horizontal layout"
+            SegKey(
+                options = listOf(HudScale.S, HudScale.M, HudScale.L),
+                selected = state.config.scale,
+                onSelect = { viewModel.setHudScale(it) },
+                labelFor = { it.name }
+            )
+            Spacer(Modifier.height(10.dp))
+            SegKey(
+                options = listOf(
+                    com.ivarna.deviceinsight.ui.caliper.hud.HudMedium.PAPER,
+                    com.ivarna.deviceinsight.ui.caliper.hud.HudMedium.CARBON,
+                    com.ivarna.deviceinsight.ui.caliper.hud.HudMedium.BLUEPRINT
+                ),
+                selected = state.config.medium,
+                onSelect = { viewModel.setHudMedium(it) },
+                labelFor = { it.name }
             )
             Spacer(Modifier.height(12.dp))
             FaderKey(
-                value = state.scaleFactor,
-                onValueChange = viewModel::setScaleFactor,
-                valueRange = 0.5f..2.0f,
-                ticks = 7,
-                label = "scale",
-                valueText = { String.format(java.util.Locale.US, "%.1fx", it) }
+                value = state.config.opacity,
+                onValueChange = { viewModel.setHudOpacity(it) },
+                valueRange = 0.40f..0.90f,
+                ticks = 6,
+                label = "opacity",
+                valueText = { "${(it * 100).toInt()}%" }
+            )
+            Spacer(Modifier.height(12.dp))
+            DipSwitch(
+                checked = state.config.blurBehind,
+                onCheckedChange = { viewModel.setBlurBehind(it) },
+                enabled = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S,
+                label = "blur behind" + if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) "" else " · needs android 12"
+            )
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+                MarginNote(message = "window blur is unavailable below android 12 — scrim opacity compensates (+10 pt)", title = "NOTE")
+            }
+            Spacer(Modifier.height(12.dp))
+            HardKey("RESET POSITION", variant = HardKeyVariant.SECONDARY,
+                modifier = Modifier.fillMaxWidth(), onClick = { viewModel.resetPosition() })
+        }
+        Spacer(Modifier.height(12.dp))
+
+        // Modules — bands are toggles; TRACE has no history feed yet and renders honestly empty
+        PanelCard(title = "MODULES") {
+            HudModule.entries.forEach { module ->
+                DipSwitch(
+                    checked = module in state.config.modules,
+                    onCheckedChange = { enabled -> viewModel.toggleModule(module, enabled) },
+                    label = module.name
+                )
+                Spacer(Modifier.height(8.dp))
+            }
+            DipSwitch(
+                checked = state.config.showCoreBank,
+                onCheckedChange = { viewModel.setShowCoreBank(it) },
+                label = "core bank"
             )
         }
         Spacer(Modifier.height(12.dp))
 
-        // FPS mode
+        // FPS mode feeds FpsMonitor via caliper store (HudSettingsCache reads synchronously)
         PanelCard(title = "FPS MONITOR MODE") {
             SegKey(
                 options = listOf(FpsMode.AUTO, FpsMode.ROOT, FpsMode.SHIZUKU),
@@ -126,33 +177,21 @@ fun OverlayScreen(
         }
         Spacer(Modifier.height(12.dp))
 
-        // Metrics toggles
-        PanelCard(title = "METRICS") {
-            state.metrics.sortedBy { it.order }.forEach { metric ->
-                DipSwitch(
-                    checked = metric.enabled,
-                    onCheckedChange = { enabled -> viewModel.toggleMetric(metric.id, enabled) },
-                    label = metric.name
-                )
-                Spacer(Modifier.height(8.dp))
-            }
-        }
-        Spacer(Modifier.height(12.dp))
-
-        // Actions
+        // F2 action row: STOP always when running; START only when canDrawOverlays;
+        // otherwise nothing — GRANT OVERLAY above is the only CTA.
         Row(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            if (state.isServiceRunning) {
-                HardKey("STOP", variant = HardKeyVariant.DESTRUCTIVE,
+            when {
+                state.isServiceRunning -> HardKey("STOP", variant = HardKeyVariant.DESTRUCTIVE,
                     modifier = Modifier.weight(1f),
                     onClick = {
-                        context.stopService(Intent(context, com.ivarna.deviceinsight.service.OverlayService::class.java))
+                        context.stopService(Intent(context, OverlayService::class.java))
                         viewModel.setServiceRunning(false)
                     })
-            } else {
-                HardKey("START", variant = HardKeyVariant.PRIMARY,
+                state.permissions.hasOverlay -> HardKey("START", variant = HardKeyVariant.PRIMARY,
                     modifier = Modifier.weight(1f),
-                    enabled = state.permissions.hasOverlay,
                     onClick = {
+                        // check, then start — never start then hope
+                        if (!Settings.canDrawOverlays(context)) return@HardKey
                         val intent = viewModel.buildServiceIntent()
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                             context.startForegroundService(intent)
@@ -161,8 +200,62 @@ fun OverlayScreen(
                         }
                         viewModel.setServiceRunning(true)
                     })
+                else -> {} // zero START keys while permission denied
             }
         }
         EndOfSheet()
+    }
+}
+
+/**
+ * F3 preview host: a graph-paper stage that fixes the probe to its scale width
+ * (196/260/300 dp), centered, with breathing room against header and PERMISSIONS.
+ * Live feed when the service window is running, animated demo otherwise.
+ */
+@Composable
+private fun HudPreviewHost(
+    state: OverlayUiState,
+    viewModel: OverlayViewModel
+) {
+    val probeW = when (state.config.scale) {
+        HudScale.S -> 196.dp
+        HudScale.M -> 260.dp
+        HudScale.L -> 300.dp
+    }
+
+    Box(
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+        contentAlignment = Alignment.TopCenter
+    ) {
+        Box(
+            Modifier.width(probeW + 24.dp).wrapContentHeight()
+                .background(Caliper.colors.panel)
+                .padding(12.dp)
+        ) {
+            if (state.isServiceRunning) {
+                val slow by viewModel.hudSlow.collectAsStateWithLifecycle()
+                val fast by viewModel.hudFast.collectAsStateWithLifecycle()
+                HudTheme(medium = state.config.medium, scale = state.config.scale) {
+                    HudPanel(
+                        config = state.config.copy(locked = false),
+                        slow = androidx.compose.runtime.rememberUpdatedState(slow),
+                        fast = androidx.compose.runtime.rememberUpdatedState(fast),
+                        effectiveOpacity = state.config.opacity,
+                        interactive = false
+                    )
+                }
+            } else {
+                val (demoSlow, demoFast) = rememberHudDemo()
+                HudTheme(medium = state.config.medium, scale = state.config.scale) {
+                    HudPanel(
+                        config = state.config,
+                        slow = demoSlow,
+                        fast = demoFast,
+                        effectiveOpacity = state.config.opacity,
+                        interactive = false
+                    )
+                }
+            }
+        }
     }
 }

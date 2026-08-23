@@ -89,6 +89,6 @@ class CaliperSelfCheckTest {
 
         val keys = Regex("PreferencesKey\\(\"([^\"]+)\"\\)")
             .findAll(src).map { it.groupValues[1] }.toList()
-        assertEquals(listOf("medium", "showGrid", "hatchingEnabled", "caliperMigrated"), keys)
+        assertEquals(listOf("medium", "showGrid", "hatchingEnabled", "caliperMigrated", "hudMedium", "hudScale", "hudOpacity", "hudBlur", "hudLocked", "hudModules", "hudShowCoreBank", "hudX", "hudY", "fpsMode", "hudMigrated"), keys)
     }
 }

@@ -11,7 +11,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ivarna.deviceinsight.ui.caliper.Medium
 import com.ivarna.deviceinsight.ui.caliper.PaperColors
@@ -30,17 +33,47 @@ fun SettingsScreen(
     val resolved = currentMedium ?: Medium.PAPER
     val haptics = rememberCaliperHaptics()
     var showColophon by remember { mutableStateOf(false) }
+    var showWidgets by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
     val showGrid by context.showGridFlow.collectAsStateWithLifecycle(initialValue = true)
+    var widgetCount by remember { mutableIntStateOf(0) }
+    suspend fun refreshCount() {
+        try {
+            val mgr = androidx.glance.appwidget.GlanceAppWidgetManager(context)
+            val kinds = listOf(
+                com.ivarna.deviceinsight.ui.caliper.widget.ScopeWidget::class.java,
+                com.ivarna.deviceinsight.ui.caliper.widget.StackWidget::class.java,
+                com.ivarna.deviceinsight.ui.caliper.widget.FuelWidget::class.java,
+                com.ivarna.deviceinsight.ui.caliper.widget.RasterWidget::class.java,
+                com.ivarna.deviceinsight.ui.caliper.widget.BenchWidgetAll::class.java
+            )
+            var total = 0
+            for (k in kinds) try { total += mgr.getGlanceIds(k).size } catch (_: Exception) {}
+            widgetCount = total
+        } catch (_: Exception) {}
+    }
+    LaunchedEffect(showWidgets) {
+        if (!showWidgets) refreshCount()
+    }
+    DisposableEffect(lifecycleOwner) {
+        val obs = LifecycleEventObserver { _, ev -> if (ev == Lifecycle.Event.ON_RESUME) scope.launch { refreshCount() } }
+        lifecycleOwner.lifecycle.addObserver(obs)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(obs) }
+    }
 
-    // B2: system back first exits colophon, then settings
+    if (showWidgets) BackHandler { showWidgets = false }
     BackHandler(enabled = showColophon) { showColophon = false }
 
-    Column(
-        Modifier.fillMaxSize().caliperGrid().verticalScroll(rememberScrollState())
-    ) {
-        if (!showColophon) {
+    // F1 (plan §2.0): outer Column is NOT scrollable. Each branch owns exactly one scroller,
+    // so the sheet's fillMaxSize().verticalScroll() never sees infinite maxHeight constraints.
+    Column(Modifier.fillMaxSize().caliperGrid()) {
+        if (showWidgets) {
+            WidgetsSheet(onBack = { showWidgets = false })  // sheet is the only scroller on this branch
+        } else {
+            Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+                if (!showColophon) {
             if (onBack != null) {
                 HardKey("← BACK", variant = HardKeyVariant.SECONDARY,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
@@ -75,6 +108,18 @@ fun SettingsScreen(
             )
             Spacer(Modifier.height(10.dp))
 
+            // 03 WIDGETS
+            Text("03 WIDGETS", style = Caliper.type.meta, color = c.ink60,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+            Spacer(Modifier.height(6.dp))
+            PanelCard(
+                title = "INSTRUMENTS",
+                status = { Text(if (widgetCount == 0) "NOT PLACED" else "PLACED ×$widgetCount", style = Caliper.type.meta, color = c.ink40) },
+                onClick = { showWidgets = true },
+                modifier = Modifier.padding(horizontal = 16.dp)
+            ) {
+                Text("home-screen panels · tap to place or inspect", style = Caliper.type.dataS, color = c.ink60)
+            }
             Spacer(Modifier.height(20.dp))
             DoubleRule(Modifier.padding(horizontal = 16.dp))
 
@@ -111,6 +156,8 @@ fun SettingsScreen(
                 onClick = { showColophon = false })
         }
         EndOfSheet()
+            }
+        }
     }
 }
 
