@@ -331,7 +331,7 @@ class OverlayService : Service(), LifecycleOwner, androidx.savedstate.SavedState
         val notification: Notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("DeviceInsight HUD")
             .setContentText("Scope Probe running · tap STOP in app")
-            .setSmallIcon(R.mipmap.ic_launcher)
+            .setSmallIcon(R.drawable.ic_tile_caliper)
             .setOngoing(true)
             .build()
         startForeground(NOTIFICATION_ID, notification)

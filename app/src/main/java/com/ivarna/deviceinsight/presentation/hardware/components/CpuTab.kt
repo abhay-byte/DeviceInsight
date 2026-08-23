@@ -1,124 +1,82 @@
 package com.ivarna.deviceinsight.presentation.hardware.components
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Memory
-import androidx.compose.material.icons.filled.Shield
-import androidx.compose.material.icons.filled.Speed
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.foundation.Image
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.ivarna.deviceinsight.R
 import com.ivarna.deviceinsight.data.mapper.SocLogoRepository
 import com.ivarna.deviceinsight.domain.model.HardwareInfo
+import com.ivarna.deviceinsight.ui.caliper.Caliper
+import com.ivarna.deviceinsight.ui.caliper.Channels
+import com.ivarna.deviceinsight.ui.caliper.components.PanelCard
 
 @Composable
 fun CpuTab(info: HardwareInfo) {
     val logoRepo = remember { SocLogoRepository() }
-    val logoRes = remember(info.socModel) { logoRepo.logoDrawableResFor(info.socModel) }
-    val primary = MaterialTheme.colorScheme.primary
-    val secondary = MaterialTheme.colorScheme.secondary
-    val tertiary = MaterialTheme.colorScheme.tertiary
+    val logoUrl = remember(info.socModel) { logoRepo.logoUrlFor(info.socModel) }
+    val cpuColor = Caliper.colors.channel(Channels.CPU)
 
     Column {
-        // ── SoC Hero Header ──────────────────────────────────────────────
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 6.dp)
-                .clip(RoundedCornerShape(0.dp))
-                .background(
-                    Brush.verticalGradient(
-                        listOf(primary.copy(alpha = 0.10f), secondary.copy(alpha = 0.03f))
+        // ── SoC hero plate (CALIPER flat — no glass, no gradient) ───────────
+        PanelCard(title = "SOC", status = {
+            Text(info.cpuArchitecture, style = Caliper.type.meta, color = Caliper.colors.ink40)
+        }) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (logoUrl != null) {
+                    AsyncImage(
+                        model = logoUrl,
+                        contentDescription = "${info.socModel} logo",
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier.size(56.dp),
+                        error = painterResource(R.drawable.ic_soc_generic),
+                        fallback = painterResource(R.drawable.ic_soc_generic)
                     )
-                )
-                .border(
-                    1.dp,
-                    Brush.linearGradient(
-                        listOf(primary.copy(alpha = 0.3f), secondary.copy(alpha = 0.1f))
-                    ),
-                    RoundedCornerShape(0.dp)
-                )
-                .padding(horizontal = 20.dp, vertical = 18.dp)
-        ) {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Image(
-                    painter = painterResource(id = logoRes),
-                    contentDescription = "${info.socModel} logo",
-                    contentScale = ContentScale.Fit,
-                    modifier = Modifier
-                        .size(56.dp)
-                        .padding(bottom = 8.dp)
-                )
-                Text(
-                    text = info.socModel,
-                    style = MaterialTheme.typography.titleLarge.copy(
-                        fontWeight = FontWeight.ExtraBold,
-                        letterSpacing = (-0.3).sp
-                    ),
-                    color = primary
-                )
-                Text(
-                    text = info.cpuArchitecture,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f)
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly
-                ) {
-                    SummaryItem(
-                        label = "Cores",
-                        value = info.cpuCoreCount.toString(),
-                        color = primary
+                } else {
+                    Image(
+                        painter = painterResource(R.drawable.ic_soc_generic),
+                        contentDescription = "${info.socModel} logo",
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier.size(56.dp)
                     )
-                    SummaryItem(
-                        label = "Process",
-                        value = info.manufacturingProcess.takeIf { it.isNotBlank() } ?: "—",
-                        color = secondary
-                    )
-                    SummaryItem(
-                        label = "Usage",
-                        value = "${(info.cpuUtilization * 100).toInt()}%",
-                        color = tertiary
+                }
+                Spacer(Modifier.width(12.dp))
+                Column {
+                    Text(info.socModel, style = Caliper.type.dataM, color = Caliper.colors.ink)
+                    Text(
+                        "process ${info.manufacturingProcess.takeIf { it.isNotBlank() } ?: "—"}",
+                        style = Caliper.type.meta, color = Caliper.colors.ink60
                     )
                 }
             }
+            Spacer(Modifier.height(10.dp))
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                SummaryItem(label = "Cores", value = info.cpuCoreCount.toString())
+                SummaryItem(label = "Usage", value = "${(info.cpuUtilization * 100).toInt()}%")
+            }
         }
 
-        InfoSection(title = "System on Chip", icon = Icons.Filled.Memory) {
-            InfoRow("SoC Model",            info.socModel)
-            InfoRow("Architecture",         info.cpuArchitecture)
-            InfoRow("Manufacturing Process",info.manufacturingProcess)
-            InfoRow("Instruction Set",      info.supportedAbis.firstOrNull() ?: "Unknown")
-            InfoRow("CPU Revision",         info.cpuRevision, monospace = true)
+        InfoSection(title = "System on Chip") {
+            InfoRow("SoC Model",             info.socModel)
+            InfoRow("Architecture",          info.cpuArchitecture)
+            InfoRow("Manufacturing Process", info.manufacturingProcess)
+            InfoRow("Instruction Set",       info.supportedAbis.firstOrNull() ?: "Unknown")
+            InfoRow("CPU Revision",          info.cpuRevision, monospace = true)
         }
 
-        InfoSection(title = "Processor Cores", icon = Icons.Filled.Speed) {
-            InfoRow("Core Count",    info.cpuCoreCount.toString(), monospace = true)
-            InfoRow("Clock Range",   info.cpuClockRange)
-            InfoRow("Utilization",   "${(info.cpuUtilization * 100).toInt()}%", monospace = true, valueColor = primary)
+        InfoSection(title = "Processor Cores") {
+            InfoRow("Core Count",  info.cpuCoreCount.toString(), monospace = true)
+            InfoRow("Clock Range", info.cpuClockRange)
+            InfoRow("Utilization", "${(info.cpuUtilization * 100).toInt()}%", monospace = true)
 
             if (info.coreClocks.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(8.dp))
@@ -126,7 +84,7 @@ fun CpuTab(info: HardwareInfo) {
                     UsageBar(
                         label = "Core ${index + 1}",
                         value = (clock.toFloat() / (info.coreClocks.maxOrNull()?.toFloat() ?: 1f)).coerceIn(0f, 1f),
-                        color = primary
+                        color = cpuColor
                     )
                     Spacer(modifier = Modifier.height(6.dp))
                 }
@@ -134,20 +92,16 @@ fun CpuTab(info: HardwareInfo) {
         }
 
         InfoSection(title = "ABI Support") {
-            InfoRow("Supported ABIs",  info.supportedAbis.joinToString(", "))
-            InfoRow("64-bit ABIs",     info.supported64BitAbis.joinToString(", "))
+            InfoRow("Supported ABIs", info.supportedAbis.joinToString(", "))
+            InfoRow("64-bit ABIs",    info.supported64BitAbis.joinToString(", "))
         }
 
-        InfoSection(title = "Extensions & Security", icon = Icons.Filled.Shield) {
-            FeatureRow("AES",         info.hasAes)
-            FeatureRow("ASIMD / NEON",info.hasNeon)
-            FeatureRow("PMULL",       info.hasPmull)
-            FeatureRow("SHA-1",       info.hasSha1)
-            FeatureRow("SHA-2",       info.hasSha2)
+        InfoSection(title = "Extensions & Security") {
+            FeatureRow("AES",          info.hasAes)
+            FeatureRow("ASIMD / NEON", info.hasNeon)
+            FeatureRow("PMULL",        info.hasPmull)
+            FeatureRow("SHA-1",        info.hasSha1)
+            FeatureRow("SHA-2",        info.hasSha2)
         }
     }
-}
-
-private fun formatClockSpeed(mhz: Int): String {
-    return if (mhz >= 1000) "%.2f GHz".format(mhz / 1000f) else "$mhz MHz"
 }

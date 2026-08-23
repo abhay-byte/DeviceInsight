@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
@@ -34,6 +36,14 @@ fun HardwareScreen(
     initialTab: Int? = null
 ) {
     val hardwareInfo by viewModel.hardwareInfo.collectAsStateWithLifecycle()
+    val lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
+    androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
+        val obs = androidx.lifecycle.LifecycleEventObserver { _, ev ->
+            if (ev == androidx.lifecycle.Lifecycle.Event.ON_RESUME) viewModel.loadHardwareInfo()
+        }
+        lifecycleOwner.lifecycle.addObserver(obs)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(obs) }
+    }
     var tab by rememberSaveable { mutableIntStateOf(initialTab ?: 0) }
     val tabs = listOf("SYSTEM", "CPU", "DISPLAY", "GPU", "NETWORK", "BATTERY", "ANDROID", "HARDWARE", "THERMAL", "STORAGE", "SENSORS")
     val tabRange = tabs.indices
@@ -109,11 +119,13 @@ fun HardwareScreen(
                     }
                 } else {
                     val scroll = rememberLazyListState()
-                    // Keep the selected tab visible when selection changes programmatically.
+                    val pagerState = rememberPagerState(pageCount = { tabs.size })
+                    // tabs are the only switch this pass — swipe stays off; jump without animation loops
                     LaunchedEffect(tab) {
                         if (tab in tabRange && !scroll.isScrollInProgress) {
-                            scroll.animateScrollToItem(tab)
+                            scroll.scrollToItem(tab)
                         }
+                        if (pagerState.currentPage != tab) pagerState.scrollToPage(tab)
                     }
                     Column(Modifier.fillMaxSize()) {
                         // B3: narrow phone tab strip — horizontal scroll, CALIPER style
@@ -122,7 +134,7 @@ fun HardwareScreen(
                             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            itemsIndexed(tabs) { i, t ->
+                            itemsIndexed(tabs, key = { i, _ -> i }) { i, t ->
                                 val sel = i == tab
                                 Text(
                                     t,
@@ -144,12 +156,31 @@ fun HardwareScreen(
                             }
                         }
                         DoubleRule(Modifier.padding(horizontal = 16.dp))
-                        Column(
-                            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 12.dp)
-                        ) {
-                            tabContent()
-                            Spacer(Modifier.height(24.dp))
-                            EndOfSheet()
+                        HorizontalPager(
+                            state = pagerState,
+                            userScrollEnabled = false,
+                            beyondViewportPageCount = 0,
+                            modifier = Modifier.fillMaxSize()
+                        ) { page ->
+                            Column(
+                                Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 12.dp)
+                            ) {
+                                when (page) {
+                                    0  -> SystemTab(info)
+                                    1  -> CpuTab(info)
+                                    2  -> DisplayTab(info)
+                                    3  -> GpuTab(info)
+                                    4  -> NetworkTab(info)
+                                    5  -> BatteryTab(info)
+                                    6  -> AndroidTab(info)
+                                    7  -> DevicesTab(info)
+                                    8  -> ThermalTab(info)
+                                    9  -> StorageTab(info)
+                                    10 -> SensorsTab(info)
+                                }
+                                Spacer(Modifier.height(24.dp))
+                                EndOfSheet()
+                            }
                         }
                     }
                 }

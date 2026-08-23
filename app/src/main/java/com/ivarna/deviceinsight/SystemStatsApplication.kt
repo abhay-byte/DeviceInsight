@@ -9,7 +9,10 @@ import coil.disk.DiskCache
 import coil.memory.MemoryCache
 import coil.request.CachePolicy
 import com.ivarna.deviceinsight.ui.caliper.CaliperKeys
+import com.ivarna.deviceinsight.ui.caliper.LauncherAlias
+import com.ivarna.deviceinsight.ui.caliper.Medium
 import com.ivarna.deviceinsight.ui.caliper.caliperDataStore
+import com.ivarna.deviceinsight.ui.caliper.mediumFlow
 import com.ivarna.deviceinsight.ui.caliper.widget.BenchBudget
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
@@ -30,6 +33,15 @@ class SystemStatsApplication : Application(), ImageLoaderFactory {
         applicationScope.launch {
             runCatching { migrateOverlayPrefs() }
             runCatching { BenchBudget.enqueue(this@SystemStatsApplication) }
+        }
+        // launcher alias sync: stage DataStore medium, drain on first background —
+        // never swap while an activity is started (system finishes the task)
+        LauncherAlias.attach(this)
+        applicationScope.launch {
+            runCatching {
+                val m = mediumFlow.first() ?: Medium.PAPER
+                LauncherAlias.request(this@SystemStatsApplication, m)
+            }
         }
     }
 

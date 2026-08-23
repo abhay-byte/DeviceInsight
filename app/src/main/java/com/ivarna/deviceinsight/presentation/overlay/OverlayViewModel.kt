@@ -31,6 +31,7 @@ import com.ivarna.deviceinsight.ui.caliper.setHudX
 import com.ivarna.deviceinsight.ui.caliper.setHudY
 import com.ivarna.deviceinsight.ui.caliper.setFpsMode
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -95,7 +96,8 @@ class OverlayViewModel @Inject constructor(
         )
         _uiState.value = _uiState.value.copy(
             config = cfg,
-            fpsMode = runCatching { FpsMode.valueOf(data[CaliperKeys.fpsMode] ?: "AUTO") }.getOrDefault(FpsMode.AUTO)
+            fpsMode = runCatching { FpsMode.valueOf(data[CaliperKeys.fpsMode] ?: "AUTO") }.getOrDefault(FpsMode.AUTO),
+            isServiceRunning = OverlayService.isRunning.get()
         )
     }
 
@@ -111,9 +113,16 @@ class OverlayViewModel @Inject constructor(
         persist { context.setHudScale(scale.name) }
     }
 
+    private var opacityJob: kotlinx.coroutines.Job? = null
+
+    /** UI moves instantly; DataStore persists debounced so fader drags don't storm writes. */
     fun setHudOpacity(opacity: Float) {
         _uiState.value = _uiState.value.copy(config = _uiState.value.config.copy(opacity = opacity.coerceIn(0.4f, 0.9f)))
-        persist { context.setHudOpacity(opacity) }
+        opacityJob?.cancel()
+        opacityJob = viewModelScope.launch(Dispatchers.IO) {
+            delay(150)
+            runCatching { context.setHudOpacity(_uiState.value.config.opacity) }
+        }
     }
 
     fun setBlurBehind(enabled: Boolean) {
@@ -184,7 +193,8 @@ class OverlayViewModel @Inject constructor(
                     hasShizukuInstalled = shizukuInstalled,
                     hasShizukuPermission = shizukuGranted,
                     hasRoot = root
-                )
+                ),
+                isServiceRunning = OverlayService.isRunning.get()
             )
         }
     }

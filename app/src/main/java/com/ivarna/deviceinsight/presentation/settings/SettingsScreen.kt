@@ -66,8 +66,6 @@ fun SettingsScreen(
     if (showWidgets) BackHandler { showWidgets = false }
     BackHandler(enabled = showColophon) { showColophon = false }
 
-    // F1 (plan §2.0): outer Column is NOT scrollable. Each branch owns exactly one scroller,
-    // so the sheet's fillMaxSize().verticalScroll() never sees infinite maxHeight constraints.
     Column(Modifier.fillMaxSize().caliperGrid()) {
         if (showWidgets) {
             WidgetsSheet(onBack = { showWidgets = false })  // sheet is the only scroller on this branch
@@ -97,6 +95,11 @@ fun SettingsScreen(
             )
             Spacer(Modifier.height(8.dp))
             MediumSwatches(resolved)
+            MarginNote(
+                message = "the launcher icon follows media — some launchers cache icons, so the swap may need a launcher restart to show",
+                title = "NOTE",
+                modifier = Modifier.padding(horizontal = 16.dp)
+            )
             Spacer(Modifier.height(12.dp))
 
             // presentation DIPs drive global grid/hatching via DataStore

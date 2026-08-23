@@ -1,6 +1,10 @@
 # PLAN — Field QA (widgets / overlay / icons / device / overview)
 
-Doc ID: DI-PLAN-003 · PASS 1 · Status: READY — 2026-08-23. Research + planning only this pass — **no product code**. Successor to DI-PLAN-002 (`docs/plans/PLAN_widgets_overlay.md`). Lands leftover PASS 5 MAJOR/MINOR from `docs/reviews/PLAN_widgets_overlay-impl-review-PASS5.md` first, then the 7 device-filed field bugs.
+> **PASS 2 leftover (2026-08-23).** Worker landed phases 0→6. Impl review **REVISE**: 1 CRITICAL / 1 MAJOR / 3 MINOR / 2 NIT — [`docs/reviews/PLAN_caliper_field-impl-review.md`](../reviews/PLAN_caliper_field-impl-review.md). Next worker executes **only § leftover** below. Do **not** recreate phases 0–6, HudPanel, aliases, pin extras, channel routes, or W1–W7.
+>
+> Historical body (field-bug table + phases 0–6) stays as pins. That work is **landed except the leftover table**.
+
+Doc ID: DI-PLAN-003 · PASS 2 · Status: REVISE leftover — 2026-08-23. Successor to DI-PLAN-002 (`docs/plans/PLAN_widgets_overlay.md`). Original PASS 1 body: leftover PASS 5 MAJOR/MINOR first, then the 7 device-filed field bugs.
 
 **This is not a greenfield build.** Phase 0 bus/parser/WM/previews/hairline/receivers, W1–W7/W9 layouts, F1 scroll split, F2 START `when` gate, OverlayService `WRAP_CONTENT` + startForeground-before-stopSelf, and the HudPanel rewrite are **already correct**. Do not recreate them. Do not rewrite HudAtoms/Modules/Panel/Demo. Do not regenerate the 15 WEBPs.
 
@@ -594,16 +598,37 @@ AsyncImage(
 
 ---
 
+## Leftover (PASS 2 — next worker, surgical)
+
+Do **not** reopen phases 0–6. Compile after the two defects; MINOR/NIT in the same files if already open.
+
+| # | Sev | File:line | Change |
+|---|---|---|---|
+| **L1** | CRITICAL | `BenchConfigActivity.kt:75` | `onCancel = { setResult(RESULT_CANCELED, Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)); finish() }`. Bare `setResult(RESULT_CANCELED)` overwrites the onCreate extras-bearing result → first-bind **ghost widget**. Leave SAVE/SKIP and the onCreate default result alone. |
+| **L2** | MAJOR | `GpuChannel.kt:45` | `val pct = snap.gpuPct ?: (metrics.gpuUsage * 100f)`. `BenchSnapshot.gpuPct` is already 0–100 (`BenchModel.kt:227`). Do not `times(100f)` on snap. Do not change Glance / BenchModel scaling. |
+| **L3** | MINOR | `GpuChannel.kt:33-42` | Same order as RasterWidget: `!snap.gpuFitted` → NOT FITTED (print name if non-blank); `snap.gpuRootLocked` → CHANNEL LOCKED. Drop the blank-name conjuncts. |
+| **L4** | MINOR | `DashboardScreen.kt:103-104` | Drop `unit = "%"` **or** drop the trailing `%` in `value`. Keep `spark = m.gpuHistory`. |
+| **L5** | MINOR | `BenchGlance.kt` Header→band spacers (`:374`, `:454`, `:541`, `:659`, `:720`) | `tier != T1` → `Spacer(8.dp)`. T1 stays 4–6 dp. **Never** 16 dp on T1. |
+| **L6** | NIT | `HudModules.kt:11`, `MemoryChannel.kt:12` | Delete duplicate imports (`heightIn` / `material3.Text`). |
+| **L7** | NIT | `BenchConfigActivity.kt:5-6,23` | Remove unused `android.graphics.Canvas`, `Paint`, `drawscope.DrawScope`. Do not rewrite PreviewPanel. |
+
+**Acceptance**
+- First-bind Calibrate **CANCEL** (the HardKey, not only system BACK): no ghost widget — `RESULT_CANCELED` still carries `EXTRA_APPWIDGET_ID`.
+- Gpu channel hero is ~41% not `4100%` when bus `gpuPct=41`.
+- Overview GPU tile is `50%` not `50% %`.
+- `./gradlew :app:compileDebugKotlin` green.
+
 ## 9 · Worker execute order (canonical)
 
-0. PASS 5 leftover (W8, W10, F2 400 ms + isRunning, lock DIP, HudPanel clip/spacedBy/heightIn). Optional MINOR spacers + comment strip if those files are open.
-1. Widget field (theme followSystem as 4-way SegKey, Header/root clickable → config, RESULT_CANCELED extras, nudge logging + empty-cache, BandBitmap timestamps, preview bands + caption).
+**PASS 2 leftover (this pass):** L1 CANCEL extras → L2 GpuChannel percent → L3 NOT FITTED order (same file) → L4 GPU tile unit → L5 T2+ header spacer → L6/L7 nits if those files are open. Stop if compile is red after L1+L2.
+
+**PASS 1 (landed — do not re-do):**
+0. PASS 5 leftover (W8, W10, F2 400 ms + isRunning, lock DIP, HudPanel clip/spacedBy/heightIn).
+1. Widget field (4-way SegKey, tap→config, RESULT_CANCELED extras, nudge, BandBitmap timestamps, preview bands).
 2. Instruments sheet UX + pin extras/callback + `PinSuccessReceiver`.
-3. Overlay sheet FPS split + debounce + HudScales/`barHDp` actually used + compact spacing.
+3. Overlay sheet FPS split + debounce + `barHDp` + compact spacing.
 4. App icon crosshair + monochrome + activity-alias media + HUD notification icon.
-5. Device tabs pager + logo bitmaps + strip Material leftovers on Cpu/Gpu tabs + hardwareInfo load-once.
+5. Device tabs pager + logo bitmaps + strip Material leftovers + hardwareInfo load-once.
 6. Overview channel pages + wire `tap →`. GPU tile uses `gpuHistory`.
 
-Stop at the end of each phase if compile is red. Do not start Phase 6 until Overview `tap →` can land without inventing Hardware-tab wrappers.
-
-**Next agent: Worker. Next action: Phase 0 in order, then 1→6. No product code in this planning pass.**
+**Next agent: Worker. Next action: leftover L1 then L2, then L3–L7 in the same files. Do not recreate phases 0–6.**

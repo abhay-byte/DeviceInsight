@@ -46,5 +46,6 @@ data class DashboardMetrics(
     val fps: Int = 0,
     val fpsHistory: List<FpsDataPoint> = emptyList(),
     val gpuHistory: List<Float> = emptyList(),
-    val netHistory: List<Float> = emptyList()
+    val netHistory: List<Float> = emptyList(),
+    val netUpHistory: List<Float> = emptyList()
 )

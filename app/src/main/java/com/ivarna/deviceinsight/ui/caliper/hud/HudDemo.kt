@@ -35,7 +35,7 @@ fun rememberHudDemo(
                 watts = -1.2f + sin(t * 0.5f) * 0.4f,
                 tempC = 46f + sin(t * 0.3f) * 3f
             )
-            delay(500)
+            delay(1000)   // demo ~1 Hz — the sheet must not look like the 10 Hz probe
         }
     }
     return slow to fast

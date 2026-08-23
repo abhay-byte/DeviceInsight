@@ -102,6 +102,9 @@ class DashboardRepositoryImpl @Inject constructor(
     private val netHistory = java.util.LinkedList<Float>().apply {
         for (i in 0 until 61) add(0f)
     }
+    private val netUpHistory = java.util.LinkedList<Float>().apply {
+        for (i in 0 until 61) add(0f)
+    }
     private val HISTORY_SIZE = 61
     private var maxCpuFreqCache: Int = 0
 
@@ -201,6 +204,7 @@ class DashboardRepositoryImpl @Inject constructor(
 
         addToHistory(gpuHistory, gpuMetrics.usage * 100f)
         addToHistory(netHistory, traffic.rxBps.toFloat())
+        addToHistory(netUpHistory, traffic.txBps.toFloat())
 
         val metrics = DashboardMetrics(
             cpuUsage = cpu,
@@ -248,7 +252,8 @@ class DashboardRepositoryImpl @Inject constructor(
             fps = fps,
             fpsHistory = ArrayList(fpsHistory),
             gpuHistory = ArrayList(gpuHistory),
-            netHistory = ArrayList(netHistory)
+            netHistory = ArrayList(netHistory),
+            netUpHistory = ArrayList(netUpHistory)
         )
         // Foreground single writer → MonitorBus (plan 0.1). BUDGET path never writes MonitorBus.
         try {

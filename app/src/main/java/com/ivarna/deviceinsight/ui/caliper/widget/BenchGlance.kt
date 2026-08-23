@@ -4,6 +4,7 @@ import android.appwidget.AppWidgetManager
 import android.content.ComponentName
 import android.content.Context
 import android.graphics.Bitmap
+import android.util.Log
 import android.graphics.Canvas
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.DpSize
@@ -58,8 +59,13 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
 val ROUTE = ActionParameters.Key<String>("di_route")
+val APPWIDGET_ID = ActionParameters.Key<Int>(AppWidgetManager.EXTRA_APPWIDGET_ID)
 
 private fun open(route: String) = actionStartActivity<MainActivity>(parameters = actionParametersOf(ROUTE to route))
+
+// root tap → official configure activity for THIS widget id
+private fun openConfig(appWidgetId: Int) =
+    actionStartActivity<BenchConfigActivity>(parameters = actionParametersOf(APPWIDGET_ID to appWidgetId))
 
 private val T1Size = DpSize(140.dp, 140.dp)
 private val T2Size = DpSize(280.dp, 140.dp)
@@ -74,12 +80,12 @@ private val ResponsiveBench = SizeMode.Responsive(BenchSizes)
 
 private fun tierForSize(w: Int, h: Int): Tier = Tier.of(w, h)
 
-private fun updString(ts: Long): String {
+internal fun updString(ts: Long): String {
     if (ts == 0L) return "—"
     return SimpleDateFormat("HH:mm:ss", Locale.US).format(Date(ts))
 }
 
-// W5: Xh Ym remaining when >=60, N min remaining otherwise; null hides the subline part
+// Xh Ym remaining when >=60, N min remaining otherwise; null hides the subline part
 internal fun remainingText(min: Int): String? = when {
     min <= 0 -> null
     min >= 60 -> String.format(Locale.US, "%dh %dm remaining", min / 60, min % 60)
@@ -112,7 +118,11 @@ object BenchUpdater {
                     try {
                         val ids = mgr.getGlanceIds(w::class.java)
                         m[w::class.java.name] = ids
-                    } catch (_: Exception) { m[w::class.java.name] = emptyList() }
+                    } catch (e: Exception) {
+                        // binder hiccup — keep the previous id list instead of caching an empty (30 s widget freeze)
+                        cachedIds[w::class.java.name]?.takeIf { it.isNotEmpty() }?.let { m[w::class.java.name] = it }
+                        Log.w("BenchUpdater", "getGlanceIds failed for ${w::class.java.simpleName}", e)
+                    }
                 }
                 cachedIds = m; lastIdFetch = now; m
             } else cachedIds
@@ -130,7 +140,9 @@ object BenchUpdater {
                             w.update(context, id)
                             lastPush[key] = now
                         }
-                    } catch (_: Exception) { }
+                    } catch (e: Exception) {
+                        Log.w("BenchUpdater", "update failed id=$id", e)
+                    }
                 }
             }
         }
@@ -177,14 +189,16 @@ fun BandBitmap(
 private fun BenchPanel(
     pal: WidgetPalette,
     contentDescription: String,
+    configTap: androidx.glance.action.Action,
     content: @Composable androidx.glance.layout.ColumnScope.() -> Unit
 ) {
-    // 4-side hairline per plan §1.2 — outer 12dp inset prevents OEM corner-clip eating frame
+    // 4-side hairline — outer 12dp inset prevents OEM corner-clip eating frame
     // Row(defaultWeight)+fillMaxHeight uses Glance 1.1.0 RowScope/ColumnScope member defaultWeight
-    // W9: spoken summary lives on the root Box
+    // spoken summary lives on the root Box; root tap opens Calibrate (child actions win where present)
     Box(
         modifier = GlanceModifier.fillMaxSize().background(ColorProvider(pal.panel))
-            .semantics { this.contentDescription = contentDescription },
+            .semantics { this.contentDescription = contentDescription }
+            .clickable(configTap),
         contentAlignment = Alignment.TopStart
     ) {
         Column(
@@ -211,7 +225,6 @@ private fun Header(
     chId: String,
     chName: String,
     status: String,
-    onClick: androidx.glance.action.Action,
     locked: Boolean = false,
     ledOn: Boolean = true
 ) {
@@ -238,7 +251,7 @@ private fun Footer(
     val stale = snap.stale(cadenceMs(cfg, snap))
     val updText = if (stale) "SIGNAL LOST" else "upd ${updString(snap.timestamp)}"
     val updColor = if (stale) pal.fault else pal.ink40
-    Row(modifier = GlanceModifier.fillMaxWidth().clickable(open("overview")), verticalAlignment = Alignment.Vertical.CenterVertically) {
+    Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.Vertical.CenterVertically) {
         Text(updText, style = TextStyle(color = ColorProvider(updColor), fontSize = 11.sp, fontFamily = FontFamily.Monospace))
         Spacer(GlanceModifier.defaultWeight())
         Text(windowLabel, style = TextStyle(color = ColorProvider(pal.ink40), fontSize = 11.sp, fontFamily = FontFamily.Monospace))
@@ -274,15 +287,16 @@ private fun ChannelRow(
     }
 }
 
-// W7: BENCH masthead — LIVE/SIGNAL LOST + 6dp LED box + HH:mm clock (WD ● 14:32)
+// BENCH masthead — LIVE/SIGNAL LOST + 6dp LED box + HH:mm clock (WD ● 14:32)
 @Composable
 private fun BenchMasthead(
     pal: WidgetPalette,
     stale: Boolean,
     calibrating: Boolean,
-    snap: BenchSnapshot
+    snap: BenchSnapshot,
+    configTap: androidx.glance.action.Action
 ) {
-    Row(modifier = GlanceModifier.fillMaxWidth().clickable(open("overview")), verticalAlignment = Alignment.Vertical.CenterVertically) {
+    Row(modifier = GlanceModifier.fillMaxWidth().clickable(configTap), verticalAlignment = Alignment.Vertical.CenterVertically) {
         Text("DEVICEINSIGHT · BENCH", style = TextStyle(color = ColorProvider(pal.ink60), fontSize = 11.sp, fontWeight = FontWeight.Medium, fontFamily = FontFamily.Monospace))
         Spacer(GlanceModifier.defaultWeight())
         Text(if (stale) "SIGNAL LOST" else "LIVE", style = TextStyle(color = ColorProvider(if (stale) pal.fault else pal.ink40), fontSize = 11.sp, fontFamily = FontFamily.Monospace))
@@ -300,7 +314,7 @@ private fun BenchMasthead(
     }
 }
 
-// W7: one 14dp sub-instrument bitmap per bench tile (CH-01/03/06 sparks · CH-02/05 hatches · CH-04 gauge)
+// one 14dp sub-instrument bitmap per bench tile (CH-01/03/06 sparks · CH-02/05 hatches · CH-04 gauge)
 @Composable
 private fun TileBitmap(
     chId: String,
@@ -314,7 +328,7 @@ private fun TileBitmap(
         "CH-01" -> BandBitmap("${snap.cpuHist.contentHash()}|${snap.timestamp}", "tileSpark01", tier, medium, 14, "cpu spark") { c, w, h, d ->
             c.spark(snap.cpuHist, pal, pal.ch01, w, h, d)
         }
-        "CH-02" -> BandBitmap("${snap.memUsedGb}|${snap.memTotalGb}|${snap.memComposition.hashCode()}", "tileHatch02", tier, medium, 14, "memory composition") { c, w, h, _ ->
+        "CH-02" -> BandBitmap("${snap.memUsedGb}|${snap.memTotalGb}|${snap.memComposition.hashCode()}|${snap.timestamp}", "tileHatch02", tier, medium, 14, "memory composition") { c, w, h, _ ->
             val segs = if (snap.memComposition.isNotEmpty()) snap.memComposition
             else listOf(MemSeg(fraction = if (snap.memTotalGb > 0) snap.memUsedGb / snap.memTotalGb else 0f, pattern = HatchPattern.SOLID, channelId = "CH-02"))
             c.hatchBar(ctx, pal, w, h, segs, segs.map { pal.channelFor(it.channelId) })
@@ -322,10 +336,10 @@ private fun TileBitmap(
         "CH-03" -> BandBitmap("${snap.netHist.contentHash()}|${snap.netDown}|${snap.netUp}", "tileSpark03", tier, medium, 14, "network spark") { c, w, h, d ->
             c.spark(snap.netHist, pal, pal.ch03, w, h, d)
         }
-        "CH-04" -> BandBitmap("${snap.batteryPct}|${snap.charging}", "tileFuel04", tier, medium, 14, "fuel gauge") { c, w, h, d ->
+        "CH-04" -> BandBitmap("${snap.batteryPct}|${snap.charging}|${snap.timestamp}", "tileFuel04", tier, medium, 14, "fuel gauge") { c, w, h, d ->
             c.fuelGauge(ctx, snap.batteryPct, pal, w, h, d, snap.charging)
         }
-        "CH-05" -> BandBitmap("${snap.stoUsedGb}|${snap.stoTotalGb}", "tileHatch05", tier, medium, 14, "storage hatch") { c, w, h, _ ->
+        "CH-05" -> BandBitmap("${snap.stoUsedGb}|${snap.stoTotalGb}|${snap.timestamp}", "tileHatch05", tier, medium, 14, "storage hatch") { c, w, h, _ ->
             val frac = if (snap.stoTotalGb > 0) snap.stoUsedGb / snap.stoTotalGb else 0f
             val seg = MemSeg(fraction = frac, pattern = HatchPattern.VERTICAL, channelId = "CH-05")
             c.hatchBar(ctx, pal, w, h, listOf(seg), listOf(pal.ch05))
@@ -348,26 +362,27 @@ class ScopeWidget : GlanceAppWidget() {
         val snap = GlobalSnapshot.current() ?: BenchBudgetSnapshot.last ?: BenchSampler.sample(context)
         val placedAt = try { BenchState.placedAt(context, id) } catch (_: Exception) { 0L }
         val calibrating = snap.timestamp == 0L || (placedAt != 0L && System.currentTimeMillis() - placedAt < 6000)
+        val awId = try { GlanceAppWidgetManager(context).getAppWidgetId(id) } catch (_: Exception) { AppWidgetManager.INVALID_APPWIDGET_ID }
         provideContent {
             val size = LocalSize.current
             val tier = tierForSize(size.width.value.toInt(), size.height.value.toInt())
             val stale = snap.stale(cadenceMs(cfg, snap))
             val calibratingNow = calibrating
             val desc = "Scope. CPU ${snap.cpuPct.toInt()} percent. Updated ${updString(snap.timestamp)}."
-            BenchPanel(pal, desc) {
-                Header(pal, "CH-01", "CPU", if (calibratingNow) "CALIBRATING…" else if (stale) "SIGNAL LOST" else "LIVE", open("CH-01"), ledOn = !stale && !calibratingNow)
+            BenchPanel(pal, desc, openConfig(awId)) {
+                Header(pal, "CH-01", "CPU", if (calibratingNow) "CALIBRATING…" else if (stale) "SIGNAL LOST" else "LIVE", ledOn = !stale && !calibratingNow)
                 Spacer(GlanceModifier.height(6.dp))
                 val heroText = Fmt.pct(snap.cpuPct, 1)
                 val stateKey = "${snap.cpuHist.contentHash()}|${snap.timestamp}|${snap.tempC}"
                 if (tier == Tier.T1) {
-                    // W1: T1 stays stacked — hero + 28dp spark
+                    // T1 stays stacked — hero + 28dp spark
                     Hero(heroText, pal, stale)
                     Spacer(GlanceModifier.height(4.dp))
                     BandBitmap(stateKey, "spark", tier, medium, 28, "cpu spark") { c, w, h, d ->
                         c.spark(snap.cpuHist, pal, pal.ch01, w, h, d)
                     }
                 } else {
-                    // W1 (WD §4 T2): hero + freq + temp LEFT, gridded trace RIGHT; thermal below full width
+                    // WD §4 T2: hero + freq + temp LEFT, gridded trace RIGHT; thermal below full width
                     Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.Vertical.Top) {
                         Column(modifier = GlanceModifier.defaultWeight(), verticalAlignment = Alignment.Top) {
                             Hero(heroText, pal, stale)
@@ -387,19 +402,19 @@ class ScopeWidget : GlanceAppWidget() {
                                 showYLabels = true, showAllYLabels = tier >= Tier.T4)
                         }
                     }
-                    Spacer(GlanceModifier.height(4.dp))
+                    Spacer(GlanceModifier.height(8.dp))
                     BandBitmap("$stateKey|thermal", "thermal", tier, medium, 8, "thermal ramp") { c, w, h, _ ->
                         c.thermalRamp(pal, w, h, snap.tempC)
                     }
                     snap.governor?.let {
                         if (it.isNotBlank()) {
-                            Spacer(GlanceModifier.height(4.dp))
+                            Spacer(GlanceModifier.height(8.dp))
                             Subline(it, pal)
                         }
                     }
                 }
                 if (tier >= Tier.T3 && snap.cores.isNotEmpty()) {
-                    Spacer(GlanceModifier.height(6.dp))
+                    Spacer(GlanceModifier.height(8.dp))
                     BandBitmap(stateKey, "rail", tier, medium, (snap.cores.size * 12).coerceAtLeast(24), "core rail") { c, w, _, _ ->
                         c.coreRailRows(context, pal, w, snap.cores, 12f * context.resources.displayMetrics.density)
                     }
@@ -424,28 +439,29 @@ class StackWidget : GlanceAppWidget() {
         // STACK consumers — authoritative via TopConsumersProvider (permission-gated)
         val consumers: List<Consumer> = snap.topConsumers
 
+        val awId = try { GlanceAppWidgetManager(context).getAppWidgetId(id) } catch (_: Exception) { AppWidgetManager.INVALID_APPWIDGET_ID }
         provideContent {
             val size = LocalSize.current
             val tier = tierForSize(size.width.value.toInt(), size.height.value.toInt())
             val stale = snap.stale(cadenceMs(cfg, snap))
             val desc = "Stack. Memory ${snap.memUsedGb.toInt()} of ${snap.memTotalGb.toInt()} gigabytes. Updated ${updString(snap.timestamp)}."
-            BenchPanel(pal, desc) {
-                // W3: trailing header status is the used % when live; CALIBRATING / SIGNAL LOST win otherwise
+            BenchPanel(pal, desc, openConfig(awId)) {
+                // trailing header status is the used % when live; CALIBRATING / SIGNAL LOST win otherwise
                 Header(pal, "CH-02", "MEMORY",
                     if (calibrating) "CALIBRATING…" else if (stale) "SIGNAL LOST"
                     else Fmt.pct(if (snap.memTotalGb > 0) snap.memUsedGb / snap.memTotalGb * 100f else 0f, 0),
-                    open("CH-02"), ledOn = !stale && !calibrating)
+                    ledOn = !stale && !calibrating)
                 Spacer(GlanceModifier.height(6.dp))
                 val heroText = if (snap.memTotalGb > 0) String.format(Locale.US, "%.1f / %.0f GB", snap.memUsedGb, snap.memTotalGb) else "—"
                 Hero(heroText, pal, stale)
                 Spacer(GlanceModifier.height(4.dp))
-                val barKey = "${snap.memUsedGb}|${snap.memTotalGb}|${snap.memComposition.hashCode()}"
+                val barKey = "${snap.memUsedGb}|${snap.memTotalGb}|${snap.memComposition.hashCode()}|${snap.timestamp}"
                 BandBitmap(barKey, "hatchBar", tier, medium, 14, "memory composition") { c, w, h, _ ->
                     val segs = if (snap.memComposition.isNotEmpty()) snap.memComposition else listOf(MemSeg(0f, HatchPattern.NONE, ""))
                     val cols = segs.map { pal.channelFor(it.channelId) }
                     c.hatchBar(context, pal, w, h, segs, cols)
                 }
-                // W4: labeled cadastral — one text subline from memComposition (skip near-zero segments)
+                // labeled cadastral — one text subline from memComposition (skip near-zero segments)
                 if (snap.memComposition.isNotEmpty()) {
                     Spacer(GlanceModifier.height(2.dp))
                     var crossUsed = false
@@ -460,7 +476,7 @@ class StackWidget : GlanceAppWidget() {
                     if (compSub.isNotBlank()) Subline(compSub, pal)
                 }
                 if (tier >= Tier.T2) {
-                    Spacer(GlanceModifier.height(4.dp))
+                    Spacer(GlanceModifier.height(8.dp))
                     val histKey = "${snap.memHist.contentHash()}|${snap.timestamp}"
                     BandBitmap(histKey, "memSpark", tier, medium, 28, "memory pressure spark") { c, w, h, d ->
                         if (calibrating) c.calibrating(context, pal, w, h, d, 0.7f)
@@ -468,7 +484,7 @@ class StackWidget : GlanceAppWidget() {
                     }
                 }
                 if (tier >= Tier.T3 && consumers.isNotEmpty()) {
-                    Spacer(GlanceModifier.height(4.dp))
+                    Spacer(GlanceModifier.height(8.dp))
                     val rows = if (tier >= Tier.T4) 5 else 3
                     consumers.take(rows).forEach { con ->
                         Row(modifier = GlanceModifier.fillMaxWidth().clickable(open("processes")), verticalAlignment = Alignment.Vertical.CenterVertically) {
@@ -503,14 +519,15 @@ class FuelWidget : GlanceAppWidget() {
         val snap = GlobalSnapshot.current() ?: BenchBudgetSnapshot.last ?: BenchSampler.sample(context)
         val placedAt = try { BenchState.placedAt(context, id) } catch (_: Exception) { 0L }
         val calibrating = snap.timestamp == 0L || (placedAt != 0L && System.currentTimeMillis() - placedAt < 6000)
+        val awId = try { GlanceAppWidgetManager(context).getAppWidgetId(id) } catch (_: Exception) { AppWidgetManager.INVALID_APPWIDGET_ID }
         provideContent {
             val size = LocalSize.current
             val tier = tierForSize(size.width.value.toInt(), size.height.value.toInt())
             val stale = snap.stale(cadenceMs(cfg, snap))
             if (!snap.batteryPresent) {
                 val desc = "Fuel. Not fitted."
-                BenchPanel(pal, desc) {
-                    Header(pal, "CH-04", "POWER", "NOT FITTED", open("CH-04"))
+                BenchPanel(pal, desc, openConfig(awId)) {
+                    Header(pal, "CH-04", "POWER", "NOT FITTED")
                     Spacer(GlanceModifier.height(12.dp))
                     Text("NOT FITTED", style = TextStyle(color = ColorProvider(pal.ink40), fontSize = 22.sp, fontWeight = FontWeight.Medium, fontFamily = FontFamily.Monospace))
                     Spacer(GlanceModifier.defaultWeight())
@@ -519,10 +536,10 @@ class FuelWidget : GlanceAppWidget() {
                 return@provideContent
             }
             val desc = "Fuel. ${if (cfg.wattHero) "${snap.watts} watts" else "${(snap.batteryPct * 100).toInt()} percent"}. Updated ${updString(snap.timestamp)}."
-            BenchPanel(pal, desc) {
-                Header(pal, "CH-04", "POWER", if (snap.charging) "CHARGING" else if (calibrating) "CALIBRATING…" else if (stale) "SIGNAL LOST" else "LIVE", open("CH-04"), ledOn = !stale && !calibrating)
+            BenchPanel(pal, desc, openConfig(awId)) {
+                Header(pal, "CH-04", "POWER", if (snap.charging) "CHARGING" else if (calibrating) "CALIBRATING…" else if (stale) "SIGNAL LOST" else "LIVE", ledOn = !stale && !calibrating)
                 Spacer(GlanceModifier.height(6.dp))
-                // W5: hero + its own secondary line (watt hero → % beneath; % hero → watts beneath)
+                // hero + its own secondary line (watt hero → % beneath; % hero → watts beneath)
                 if (cfg.wattHero) {
                     Hero(Fmt.wattsSigned(snap.watts), pal, stale)
                     Spacer(GlanceModifier.height(2.dp))
@@ -537,11 +554,11 @@ class FuelWidget : GlanceAppWidget() {
                     Text("CHARGING", style = TextStyle(color = ColorProvider(pal.accent), fontSize = 11.sp, fontWeight = FontWeight.Medium, fontFamily = FontFamily.Monospace))
                 }
                 Spacer(GlanceModifier.height(4.dp))
-                BandBitmap("${snap.batteryPct}|${snap.charging}", "fuel", tier, medium, 14, "fuel gauge") { c, w, h, d ->
+                BandBitmap("${snap.batteryPct}|${snap.charging}|${snap.timestamp}", "fuel", tier, medium, 14, "fuel gauge") { c, w, h, d ->
                     c.fuelGauge(context, snap.batteryPct, pal, w, h, d, snap.charging)
                 }
                 if (tier >= Tier.T2) {
-                    Spacer(GlanceModifier.height(4.dp))
+                    Spacer(GlanceModifier.height(8.dp))
                     val wattKey = "${snap.wattHist.contentHash()}|${snap.timestamp}"
                     BandBitmap(wattKey, "wattTrace", tier, medium, 32, "watt trace") { c, w, h, d ->
                         if (calibrating) c.calibrating(context, pal, w, h, d, 0.7f)
@@ -585,14 +602,15 @@ class RasterWidget : GlanceAppWidget() {
         val medium = resolvedMedium(context, cfg)
         val pal = WidgetPalettes.of(medium)
         val snap = GlobalSnapshot.current() ?: BenchBudgetSnapshot.last ?: BenchSampler.sample(context)
+        val awId = try { GlanceAppWidgetManager(context).getAppWidgetId(id) } catch (_: Exception) { AppWidgetManager.INVALID_APPWIDGET_ID }
         provideContent {
             val size = LocalSize.current
             val tier = tierForSize(size.width.value.toInt(), size.height.value.toInt())
             val stale = snap.stale(cadenceMs(cfg, snap))
             if (!snap.gpuFitted) {
                 val desc = "Raster. Not fitted."
-                BenchPanel(pal, desc) {
-                    Header(pal, "CH-06", "GPU", "NOT FITTED", open("CH-06"))
+                BenchPanel(pal, desc, openConfig(awId)) {
+                    Header(pal, "CH-06", "GPU", "NOT FITTED")
                     Spacer(GlanceModifier.height(8.dp))
                     Text("NOT FITTED", style = TextStyle(color = ColorProvider(pal.ink40), fontSize = 18.sp, fontWeight = FontWeight.Medium, fontFamily = FontFamily.Monospace))
                     if (snap.gpuName.isNotBlank()) {
@@ -610,8 +628,8 @@ class RasterWidget : GlanceAppWidget() {
             }
             if (snap.gpuRootLocked) {
                 val desc = "Raster. Channel locked."
-                BenchPanel(pal, desc) {
-                    Header(pal, "CH-06", "GPU", "CHANNEL LOCKED", open("CH-06"), locked = true)
+                BenchPanel(pal, desc, openConfig(awId)) {
+                    Header(pal, "CH-06", "GPU", "CHANNEL LOCKED", locked = true)
                     Spacer(GlanceModifier.height(6.dp))
                     Text("CHANNEL LOCKED", style = TextStyle(color = ColorProvider(pal.fault), fontSize = 16.sp, fontWeight = FontWeight.Medium, fontFamily = FontFamily.Monospace))
                     if (snap.gpuName.isNotBlank()) {
@@ -636,8 +654,8 @@ class RasterWidget : GlanceAppWidget() {
                 return@provideContent
             }
             val desc = "Raster. GPU ${snap.gpuPct?.toInt() ?: 0} percent at ${snap.gpuMHz ?: 0} megahertz."
-            BenchPanel(pal, desc) {
-                Header(pal, "CH-06", "GPU", if (stale) "SIGNAL LOST" else "LIVE", open("CH-06"), ledOn = !stale)
+            BenchPanel(pal, desc, openConfig(awId)) {
+                Header(pal, "CH-06", "GPU", if (stale) "SIGNAL LOST" else "LIVE", ledOn = !stale)
                 Spacer(GlanceModifier.height(6.dp))
                 val heroText = "${snap.gpuPct?.toInt() ?: 0}% · ${snap.gpuMHz ?: 0} MHz"
                 Hero(heroText, pal, stale)
@@ -646,7 +664,7 @@ class RasterWidget : GlanceAppWidget() {
                 BandBitmap(histKey, "gpuSpark", tier, medium, 28, "gpu spark") { c, w, h, d ->
                     c.spark(snap.gpuHist, pal, pal.ch06, w, h, d)
                 }
-                // W6: live datasheet line (WD T1: "adreno 740 · vulkan 1.3") — honest, no fake freq hist
+                // live datasheet line (WD T1: "adreno 740 · vulkan 1.3") — honest, no fake freq hist
                 val datasheet = listOf(snap.gpuName, snap.gpuVulkan).filter { it.isNotBlank() }.distinct().joinToString(" · ")
                 if (datasheet.isNotEmpty()) {
                     Spacer(GlanceModifier.height(4.dp))
@@ -669,6 +687,7 @@ class BenchWidgetAll : GlanceAppWidget() {
         val snap = GlobalSnapshot.current() ?: BenchBudgetSnapshot.last ?: BenchSampler.sample(context)
         val placedAt = try { BenchState.placedAt(context, id) } catch (_: Exception) { 0L }
         val calibrating = snap.timestamp == 0L || (placedAt != 0L && System.currentTimeMillis() - placedAt < 6000)
+        val awId = try { GlanceAppWidgetManager(context).getAppWidgetId(id) } catch (_: Exception) { AppWidgetManager.INVALID_APPWIDGET_ID }
         provideContent {
             val size = LocalSize.current
             val tier = tierForSize(size.width.value.toInt(), size.height.value.toInt())
@@ -677,8 +696,8 @@ class BenchWidgetAll : GlanceAppWidget() {
 
             if (isLedger) {
                 val desc = "Bench. Four channels. Updated ${updString(snap.timestamp)}."
-                BenchPanel(pal, desc) {
-                    BenchMasthead(pal, stale, calibrating, snap)
+                BenchPanel(pal, desc, openConfig(awId)) {
+                    BenchMasthead(pal, stale, calibrating, snap, configTap = openConfig(awId))
                     Spacer(GlanceModifier.height(8.dp))
                     cfg.compactChannels.take(4).forEach { chId ->
                         val (label, value, sub) = channelRowData(chId, snap, cfg)
@@ -688,16 +707,16 @@ class BenchWidgetAll : GlanceAppWidget() {
                     Spacer(GlanceModifier.defaultWeight())
                     val footerText = if (snap.warning()) "1 channel warning" else "all channels nominal"
                     Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.Vertical.CenterVertically) {
-                        Text(footerText, style = TextStyle(color = ColorProvider(if (snap.warning()) pal.fault else pal.ink40), fontSize = 11.sp))
+                        Text(footerText, style = TextStyle(color = ColorProvider(if (snap.warning()) pal.fault else pal.ink40), fontSize = 11.sp, fontFamily = FontFamily.Monospace))
                         Spacer(GlanceModifier.defaultWeight())
-                        Text("upd ${if (stale) "SIGNAL LOST" else updString(snap.timestamp)}", style = TextStyle(color = ColorProvider(pal.ink40), fontSize = 11.sp))
+                        Text("upd ${if (stale) "SIGNAL LOST" else updString(snap.timestamp)}", style = TextStyle(color = ColorProvider(pal.ink40), fontSize = 11.sp, fontFamily = FontFamily.Monospace))
                     }
                 }
             } else {
                 // T3+ tiled — W7 (WD §7): 2×3 miniature tiles, label + value + one 14dp bitmap each
                 val desc = "Bench. Six channels. Updated ${updString(snap.timestamp)}."
-                BenchPanel(pal, desc) {
-                    BenchMasthead(pal, stale, calibrating, snap)
+                BenchPanel(pal, desc, openConfig(awId)) {
+                    BenchMasthead(pal, stale, calibrating, snap, configTap = openConfig(awId))
                     Spacer(GlanceModifier.height(6.dp))
                     val allChannels = if (tier == Tier.T3) listOf("CH-01", "CH-02", "CH-03", "CH-04", "CH-05")
                                       else listOf("CH-01", "CH-02", "CH-03", "CH-04", "CH-05", "CH-06")
@@ -721,16 +740,16 @@ class BenchWidgetAll : GlanceAppWidget() {
                         Spacer(GlanceModifier.height(6.dp))
                     }
                     if (tier >= Tier.T5 && snap.cores.isNotEmpty()) {
-                        BandBitmap("${snap.cores.hashCode()}", "benchRail", tier, medium, (snap.cores.size * 8).coerceAtLeast(16), "core rail") { c, w, _, _ ->
+                        BandBitmap("${snap.cores.hashCode()}|${snap.timestamp}", "benchRail", tier, medium, (snap.cores.size * 8).coerceAtLeast(16), "core rail") { c, w, _, _ ->
                             c.coreRailRows(context, pal, w, snap.cores, 8f * context.resources.displayMetrics.density)
                         }
                     }
                     Spacer(GlanceModifier.defaultWeight())
                     val footerText = if (snap.warning()) "1 channel warning" else "all channels nominal"
                     Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.Vertical.CenterVertically) {
-                        Text(footerText, style = TextStyle(color = ColorProvider(if (snap.warning()) pal.fault else pal.ink40), fontSize = 11.sp))
+                        Text(footerText, style = TextStyle(color = ColorProvider(if (snap.warning()) pal.fault else pal.ink40), fontSize = 11.sp, fontFamily = FontFamily.Monospace))
                         Spacer(GlanceModifier.defaultWeight())
-                        Text("upd ${if (stale) "SIGNAL LOST" else updString(snap.timestamp)}", style = TextStyle(color = ColorProvider(pal.ink40), fontSize = 11.sp))
+                        Text("upd ${if (stale) "SIGNAL LOST" else updString(snap.timestamp)}", style = TextStyle(color = ColorProvider(pal.ink40), fontSize = 11.sp, fontFamily = FontFamily.Monospace))
                     }
                 }
             }

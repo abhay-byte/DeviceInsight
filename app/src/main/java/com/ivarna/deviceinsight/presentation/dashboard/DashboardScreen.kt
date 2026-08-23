@@ -9,18 +9,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.ivarna.deviceinsight.domain.model.DashboardMetrics
 import com.ivarna.deviceinsight.ui.caliper.*
 import com.ivarna.deviceinsight.ui.caliper.components.*
 
-/** № 01 — OVERVIEW (S-01 system ledger). No embedded Masthead — global skeleton owns it. */
+/** № 01 — OVERVIEW (S-01 system ledger). Every tile taps through to its channel page. */
 @Composable
 fun DashboardScreen(
-    viewModel: DashboardViewModel = hiltViewModel()
+    viewModel: DashboardViewModel = hiltViewModel(),
+    onChannel: (String) -> Unit = {}
 ) {
     val metrics by viewModel.uiState.collectAsStateWithLifecycle()
     val deviceCard by viewModel.deviceCard.collectAsStateWithLifecycle()
-    val c = Caliper.colors
 
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState())
@@ -43,7 +42,7 @@ fun DashboardScreen(
                 subline = "${Fmt.temp(m.cpuTemperature)} · ${m.cpuTotalCores}C/${m.cpuTotalCores}T" +
                     (m.cpuGovernor?.let { " · gov $it" } ?: ""),
                 spark = m.cpuHistory.map { it.utilization },
-                onClick = {}
+                onClick = { onChannel("processor") }
             )
             Spacer(Modifier.height(12.dp))
 
@@ -58,7 +57,7 @@ fun DashboardScreen(
                 barFraction = m.ramUsage,
                 spark = m.ramHistory.map { it.utilization },
                 statusText = Fmt.pct(m.ramUsage * 100),
-                onClick = {}
+                onClick = { onChannel("memory") }
             )
             Spacer(Modifier.height(12.dp))
 
@@ -69,7 +68,7 @@ fun DashboardScreen(
                 unit = "/s ↓",
                 subline = "↑ ${m.networkUploadSpeed.ifBlank { "—" }}",
                 statusText = "LIVE",
-                onClick = {}
+                onClick = { onChannel("network") }
             )
             Spacer(Modifier.height(12.dp))
 
@@ -81,22 +80,36 @@ fun DashboardScreen(
                 subline = "${Fmt.watts(m.powerConsumption)} · ${Fmt.temp(m.temperature)} · ${m.batteryStatus}",
                 barFraction = m.batteryLevel / 100f,
                 statusText = m.batteryStatus.uppercase(),
-                onClick = {}
+                onClick = { onChannel("power") }
             )
             Spacer(Modifier.height(12.dp))
 
-            // CH-06 GPU (when present)
+            // CH-05 STORAGE
+            ReadoutTile(
+                channel = Channels.STORAGE,
+                value = m.storageUsedGb.ifBlank { "—" },
+                unit = "/ ${m.storageTotalGb.ifBlank { "—" }}",
+                subline = "free ${m.storageFreeGb.ifBlank { "—" }}",
+                barFraction = m.storageUsedPerc.coerceIn(0f, 1f),
+                statusText = Fmt.pct(m.storageUsedPerc * 100),
+                onClick = { onChannel("storage") }
+            )
+            Spacer(Modifier.height(12.dp))
+
+            // CH-06 GPU (when present) — real GPU history, never the CPU trace
             if (m.gpuModel.isNotBlank()) {
-                PanelCard(channel = Channels.GPU, title = "GPU LOAD") {
-                    ScopeTrace(
-                        values = m.cpuHistory.map { it.utilization },   // placeholder trace; real GPU hist not exposed
-                        channel = Channels.GPU,
-                        windowLabel = "60 s",
-                        valueFormat = { Fmt.pct(it, 1) },
-                        timeLabelFor = { frac -> "-${((1f - frac) * 60).toInt()}s" },
-                        height = 120.dp
-                    )
-                }
+                ReadoutTile(
+                    channel = Channels.GPU,
+                    value = "${(m.gpuUsage * 100).toInt()}%",
+                    unit = "%",
+                    subline = listOf(
+                        m.gpuModel,
+                        if (m.gpuFreqMhz > 0) "${m.gpuFreqMhz} MHz" else null
+                    ).filterNotNull().joinToString(" · "),
+                    spark = m.gpuHistory,
+                    statusText = "RASTER",
+                    onClick = { onChannel("gpu") }
+                )
                 Spacer(Modifier.height(12.dp))
             }
 

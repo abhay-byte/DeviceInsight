@@ -29,6 +29,7 @@ import com.ivarna.deviceinsight.ui.caliper.hud.HudScale
 import com.ivarna.deviceinsight.ui.caliper.hud.HudTheme
 import com.ivarna.deviceinsight.ui.caliper.hud.rememberHudDemo
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /** № 03 — OVERLAY / Scope Probe config (S-11). CALIPER config sheet. */
 @Composable
@@ -37,6 +38,7 @@ fun OverlayScreen(
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     // ON_RESUME refresh + one 400 ms delayed re-check — Android 8 canDrawOverlays is stale
@@ -45,14 +47,14 @@ fun OverlayScreen(
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 viewModel.refreshPermissions()
+                scope.launch {
+                    delay(400)
+                    viewModel.refreshPermissions()
+                }
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
-    }
-    androidx.compose.runtime.LaunchedEffect(state.permissions.hasOverlay) {
-        delay(400)
-        viewModel.refreshPermissions()
     }
 
     Column(
@@ -107,7 +109,7 @@ fun OverlayScreen(
                 onSelect = { viewModel.setHudScale(it) },
                 labelFor = { it.name }
             )
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(8.dp))
             SegKey(
                 options = listOf(
                     com.ivarna.deviceinsight.ui.caliper.hud.HudMedium.PAPER,
@@ -118,7 +120,7 @@ fun OverlayScreen(
                 onSelect = { viewModel.setHudMedium(it) },
                 labelFor = { it.name }
             )
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(8.dp))
             FaderKey(
                 value = state.config.opacity,
                 onValueChange = { viewModel.setHudOpacity(it) },
@@ -127,7 +129,7 @@ fun OverlayScreen(
                 label = "opacity",
                 valueText = { "${(it * 100).toInt()}%" }
             )
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(8.dp))
             DipSwitch(
                 checked = state.config.blurBehind,
                 onCheckedChange = { viewModel.setBlurBehind(it) },
@@ -137,7 +139,12 @@ fun OverlayScreen(
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
                 MarginNote(message = "window blur is unavailable below android 12 — scrim opacity compensates (+10 pt)", title = "NOTE")
             }
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(4.dp))
+            DipSwitch(
+                checked = state.config.locked,
+                onCheckedChange = { viewModel.setLocked(it) },
+                label = "lock (touch passthrough)"
+            )
             HardKey("RESET POSITION", variant = HardKeyVariant.SECONDARY,
                 modifier = Modifier.fillMaxWidth(), onClick = { viewModel.resetPosition() })
         }
@@ -145,19 +152,20 @@ fun OverlayScreen(
 
         // Modules — bands are toggles; TRACE has no history feed yet and renders honestly empty
         PanelCard(title = "MODULES") {
-            HudModule.entries.forEach { module ->
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                HudModule.entries.forEach { module ->
+                    DipSwitch(
+                        checked = module in state.config.modules,
+                        onCheckedChange = { enabled -> viewModel.toggleModule(module, enabled) },
+                        label = module.name
+                    )
+                }
                 DipSwitch(
-                    checked = module in state.config.modules,
-                    onCheckedChange = { enabled -> viewModel.toggleModule(module, enabled) },
-                    label = module.name
+                    checked = state.config.showCoreBank,
+                    onCheckedChange = { viewModel.setShowCoreBank(it) },
+                    label = "core bank"
                 )
-                Spacer(Modifier.height(8.dp))
             }
-            DipSwitch(
-                checked = state.config.showCoreBank,
-                onCheckedChange = { viewModel.setShowCoreBank(it) },
-                label = "core bank"
-            )
         }
         Spacer(Modifier.height(12.dp))
 
@@ -224,13 +232,13 @@ private fun HudPreviewHost(
     }
 
     Box(
-        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
         contentAlignment = Alignment.TopCenter
     ) {
         Box(
-            Modifier.width(probeW + 24.dp).wrapContentHeight()
+            Modifier.width(probeW).wrapContentHeight()
                 .background(Caliper.colors.panel)
-                .padding(12.dp)
+                .padding(8.dp)
         ) {
             if (state.isServiceRunning) {
                 val slow by viewModel.hudSlow.collectAsStateWithLifecycle()

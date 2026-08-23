@@ -31,12 +31,48 @@
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTop"
-            android:theme="@style/Theme.SystemStats">
+            android:theme="@style/Theme.SystemStats" />
+
+        <!-- Launcher entry points are activity-aliases so the in-app media pick can swap
+             the icon (enable-new-FIRST-then-disable-others — never zero enabled LAUNCHERs). -->
+        <activity-alias
+            android:name=".MainActivityPaper"
+            android:enabled="true"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_paper"
+            android:roundIcon="@mipmap/ic_launcher_paper"
+            android:targetActivity=".MainActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-        </activity>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".MainActivityCarbon"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_carbon"
+            android:roundIcon="@mipmap/ic_launcher_carbon"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".MainActivityBlueprint"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_blueprint"
+            android:roundIcon="@mipmap/ic_launcher_blueprint"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
 
         <activity
             android:name=".ui.caliper.widget.BenchConfigActivity"
@@ -134,6 +170,11 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/raster_widget_info" />
         </receiver>
+
+        <!-- pin-to-home success callback (log only; sheet refresh is delay+ON_RESUME) -->
+        <receiver
+            android:name=".ui.caliper.widget.PinSuccessReceiver"
+            android:exported="false" />
 
     </application>
 

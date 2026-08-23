@@ -7,9 +7,13 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.State
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -35,13 +39,15 @@ private fun BandLabel(text: String, tick: Color) {
     }
 }
 
-// ─────────────── HM-0 · HEADER — clock, LED, lock affordance ───────────────
+// ─────────────── HM-0 · HEADER GATE — clock on slow, LED child on fast (10 Hz isolated) ───────────────
 
 @Composable
-fun HudHeaderBand(slow: HudSlow, paused: Boolean, fault: Boolean, locked: Boolean, onLock: () -> Unit) {
+fun HudHeaderGate(slow: State<HudSlow>, fast: State<HudFast>, locked: Boolean, onLock: () -> Unit) {
+    val s = slow.value
+    val fault = s.tempC >= 75f || (s.batteryPct in 0f..0.2f && !s.charging)
     val c = LocalHudColors.current
     val m = LocalHudMetrics.current
-    Row(Modifier.fillMaxWidth().height(24.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.fillMaxWidth().heightIn(min = 22.dp), verticalAlignment = Alignment.CenterVertically) {
         if (!locked) {
             // crosshair = lock key (tap ⌖ to lock while unlocked)
             Canvas(Modifier.size(12.dp).clickableNoIndication(onLock)) {
@@ -54,10 +60,17 @@ fun HudHeaderBand(slow: HudSlow, paused: Boolean, fault: Boolean, locked: Boolea
         }
         Text("DI·HUD", hudStyle(m.microSp, trackingEm = 0.1f).copy(color = c.ink40))
         Spacer(Modifier.weight(1f))
-        StrokedText(FmtHud.clock(slow.timestamp), hudStyle(m.valueSp), fill = c.ink)
+        StrokedText(FmtHud.clock(s.timestamp), hudStyle(m.valueSp), fill = c.ink)
         Spacer(Modifier.width(8.dp))
-        LedPulse(color = c.accent, active = !paused, fault = fault)
+        HudLedDot(fast, fault)
     }
+}
+
+/** the only header reader of the 10 Hz feed */
+@Composable
+private fun HudLedDot(fast: State<HudFast>, fault: Boolean) {
+    val c = LocalHudColors.current
+    LedPulse(color = c.accent, active = !fast.value.isNoSignal(), fault = fault)
 }
 
 // ─────────────── HM-1 · FPS — hero band ───────────────
@@ -66,7 +79,7 @@ fun HudHeaderBand(slow: HudSlow, paused: Boolean, fault: Boolean, locked: Boolea
 fun HudFpsBand(fast: HudFast) {
     val c = LocalHudColors.current
     val m = LocalHudMetrics.current
-    Column(Modifier.fillMaxWidth()) {
+    Column(Modifier.fillMaxWidth().wrapContentHeight().heightIn(min = 22.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
             Text("FPS", hudStyle(m.metaSp, trackingEm = 0.08f).copy(color = c.ink40))
             Spacer(Modifier.width(8.dp))
@@ -95,7 +108,7 @@ fun HudFpsBand(fast: HudFast) {
 fun HudCpuBand(slow: HudSlow, showCoreBank: Boolean) {
     val c = LocalHudColors.current
     val m = LocalHudMetrics.current
-    Column(Modifier.fillMaxWidth()) {
+    Column(Modifier.fillMaxWidth().wrapContentHeight().heightIn(min = 22.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             BandLabel("CH-01 · CPU", c.ch01)
             Spacer(Modifier.weight(1f))
@@ -145,7 +158,7 @@ private fun MemRow(label: String, usedMb: Int, totalMb: Int, tickColor: Color, p
         }
         if (fitted) {
             Spacer(Modifier.height(3.dp))
-            MemBar(usedMb.toFloat() / totalMb.toFloat(), tickColor, pattern)
+            MemBar(usedMb.toFloat() / totalMb.toFloat(), tickColor, pattern, height = m.barHDp.dp)
         }
     }
 }
@@ -155,7 +168,7 @@ private fun MemRow(label: String, usedMb: Int, totalMb: Int, tickColor: Color, p
 @Composable
 fun HudMemoryBand(slow: HudSlow) {
     val m = LocalHudMetrics.current
-    Column(Modifier.fillMaxWidth()) {
+    Column(Modifier.fillMaxWidth().wrapContentHeight().heightIn(min = 22.dp)) {
         MemRow(
             "CH-02 · RAM",
             usedMb = (slow.memUsedGb * 1024f).toInt(),
@@ -189,7 +202,7 @@ fun HudPowerBand(slow: HudSlow) {
     val c = LocalHudColors.current
     val m = LocalHudMetrics.current
     val charging = slow.charging
-    Column(Modifier.fillMaxWidth()) {
+    Column(Modifier.fillMaxWidth().wrapContentHeight().heightIn(min = 22.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             BandLabel("CH-04 · PWR", c.ch04)
             Spacer(Modifier.weight(1f))
@@ -201,7 +214,8 @@ fun HudPowerBand(slow: HudSlow) {
         Spacer(Modifier.height(4.dp))
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.weight(1f)) {
-                FuelMicro(slow.batteryPct, critical = slow.batteryPct < 0.2f, charging = charging)
+                FuelMicro(slow.batteryPct, critical = slow.batteryPct < 0.2f, charging = charging,
+                    height = m.barHDp.dp * 2)
             }
             if (slow.voltage > 0f) {
                 Spacer(Modifier.width(8.dp))
@@ -224,7 +238,7 @@ fun HudPowerBand(slow: HudSlow) {
 fun HudGpuBand(slow: HudSlow) {
     val c = LocalHudColors.current
     val m = LocalHudMetrics.current
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.fillMaxWidth().wrapContentHeight().heightIn(min = 22.dp), verticalAlignment = Alignment.CenterVertically) {
         BandLabel("CH-06 · GPU", c.ch06)
         Spacer(Modifier.weight(1f))
         when {
@@ -242,7 +256,7 @@ fun HudGpuBand(slow: HudSlow) {
 fun HudNetBand(slow: HudSlow) {
     val c = LocalHudColors.current
     val m = LocalHudMetrics.current
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.fillMaxWidth().wrapContentHeight().heightIn(min = 22.dp), verticalAlignment = Alignment.CenterVertically) {
         BandLabel("CH-03 · NET", c.ch03)
         Spacer(Modifier.weight(1f))
         StrokedText("↓ ${FmtHud.rate(slow.netDown)}   ↑ ${FmtHud.rate(slow.netUp)}", hudStyle(m.valueSp), fill = c.ink)

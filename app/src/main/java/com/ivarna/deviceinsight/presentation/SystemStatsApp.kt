@@ -24,6 +24,12 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.ivarna.deviceinsight.presentation.calibration.CalibrationScreen
 import com.ivarna.deviceinsight.presentation.dashboard.DashboardScreen
+import com.ivarna.deviceinsight.presentation.dashboard.channels.GpuChannel
+import com.ivarna.deviceinsight.presentation.dashboard.channels.MemoryChannel
+import com.ivarna.deviceinsight.presentation.dashboard.channels.NetworkChannel
+import com.ivarna.deviceinsight.presentation.dashboard.channels.PowerChannel
+import com.ivarna.deviceinsight.presentation.dashboard.channels.ProcessorChannel
+import com.ivarna.deviceinsight.presentation.dashboard.channels.StorageChannel
 import com.ivarna.deviceinsight.presentation.hardware.HardwareScreen
 import com.ivarna.deviceinsight.presentation.overlay.OverlayScreen
 import com.ivarna.deviceinsight.presentation.settings.SettingsScreen
@@ -87,11 +93,14 @@ fun SystemStatsApp(initialRoute: String? = null) {
     var hardwareTab by remember { mutableStateOf<Int?>(null) }
     LaunchedEffect(initialRoute) {
         when (initialRoute) {
-            "overview", "CH-01", "CH-02" -> navController.navigate(ScreenRoute.Dashboard.route) { launchSingleTop = true }
-            "CH-03" -> { hardwareTab = 4; navController.navigate(ScreenRoute.Hardware.route) { launchSingleTop = true } }
-            "CH-04" -> { hardwareTab = 5; navController.navigate(ScreenRoute.Hardware.route) { launchSingleTop = true } }
-            "CH-05" -> { hardwareTab = 9; navController.navigate(ScreenRoute.Hardware.route) { launchSingleTop = true } }
-            "CH-06" -> { hardwareTab = 3; navController.navigate(ScreenRoute.Hardware.route) { launchSingleTop = true } }
+            "overview" -> navController.navigate(ScreenRoute.Dashboard.route) { launchSingleTop = true }
+            // BENCH tile taps land on the matching channel page (both NavHosts serve these routes)
+            "CH-01", "processor" -> navController.navigate("processor") { launchSingleTop = true }
+            "CH-02" -> navController.navigate("memory") { launchSingleTop = true }
+            "CH-03" -> navController.navigate("network") { launchSingleTop = true }
+            "CH-04" -> navController.navigate("power") { launchSingleTop = true }
+            "CH-05" -> navController.navigate("storage") { launchSingleTop = true }
+            "CH-06" -> navController.navigate("gpu") { launchSingleTop = true }
             "processes" -> navController.navigate(ScreenRoute.Tasks.route) { launchSingleTop = true }
             "calibrate" -> navController.navigate(ScreenRoute.Overlay.route) { launchSingleTop = true }
             "hud-config" -> navController.navigate(ScreenRoute.Overlay.route) { launchSingleTop = true }
@@ -207,10 +216,25 @@ fun SystemStatsApp(initialRoute: String? = null) {
                             popEnterTransition = { fadeIn(tween(160)) },
                             popExitTransition = { fadeOut(tween(160)) }
                         ) {
-                            composable(ScreenRoute.Dashboard.route) { DashboardScreen() }
+                            composable(ScreenRoute.Dashboard.route) {
+                                DashboardScreen(onChannel = { route ->
+                                    navController.navigate(route) { launchSingleTop = true }
+                                })
+                            }
                             composable(ScreenRoute.Hardware.route) { HardwareScreen(initialTab = hardwareTab) }
                             composable(ScreenRoute.Overlay.route) { OverlayScreen() }
                             composable(ScreenRoute.Tasks.route) { TasksScreen() }
+                            composable("processor") { ProcessorChannel(onBack = { navController.popBackStack() }) }
+                            composable("memory") {
+                                MemoryChannel(
+                                    onBack = { navController.popBackStack() },
+                                    onTasks = { navController.navigate(ScreenRoute.Tasks.route) { launchSingleTop = true } }
+                                )
+                            }
+                            composable("network") { NetworkChannel(onBack = { navController.popBackStack() }) }
+                            composable("power") { PowerChannel(onBack = { navController.popBackStack() }) }
+                            composable("storage") { StorageChannel(onBack = { navController.popBackStack() }) }
+                            composable("gpu") { GpuChannel(onBack = { navController.popBackStack() }) }
                             composable(ScreenRoute.Settings.route) {
                                 SettingsScreen(
                                     currentMedium = currentMedium,
@@ -258,10 +282,25 @@ fun SystemStatsApp(initialRoute: String? = null) {
                         popEnterTransition = { fadeIn(tween(160)) },
                         popExitTransition = { fadeOut(tween(160)) }
                     ) {
-                        composable(ScreenRoute.Dashboard.route) { DashboardScreen() }
+                        composable(ScreenRoute.Dashboard.route) {
+                            DashboardScreen(onChannel = { route ->
+                                navController.navigate(route) { launchSingleTop = true }
+                            })
+                        }
                         composable(ScreenRoute.Hardware.route) { HardwareScreen(initialTab = hardwareTab) }
                         composable(ScreenRoute.Overlay.route) { OverlayScreen() }
                         composable(ScreenRoute.Tasks.route) { TasksScreen() }
+                        composable("processor") { ProcessorChannel(onBack = { navController.popBackStack() }) }
+                        composable("memory") {
+                            MemoryChannel(
+                                onBack = { navController.popBackStack() },
+                                onTasks = { navController.navigate(ScreenRoute.Tasks.route) { launchSingleTop = true } }
+                            )
+                        }
+                        composable("network") { NetworkChannel(onBack = { navController.popBackStack() }) }
+                        composable("power") { PowerChannel(onBack = { navController.popBackStack() }) }
+                        composable("storage") { StorageChannel(onBack = { navController.popBackStack() }) }
+                        composable("gpu") { GpuChannel(onBack = { navController.popBackStack() }) }
                         composable(ScreenRoute.Settings.route) {
                             SettingsScreen(
                                 currentMedium = currentMedium,

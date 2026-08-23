@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Same crosshair mark, paper-white strokes — for CARBON / BLUEPRINT alias backgrounds
+     where ink strokes would vanish into the dark field. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:translateX="21"
+        android:translateY="21"
+        android:scaleX="2.75"
+        android:scaleY="2.75">
+        <path
+            android:strokeColor="#FFF4F1E8"
+            android:strokeWidth="1.5"
+            android:fillColor="#00000000"
+            android:pathData="M12,4.5 L12,19.5 M4.5,12 L19.5,12" />
+        <path
+            android:strokeColor="#FFF4F1E8"
+            android:strokeWidth="1.5"
+            android:fillColor="#00000000"
+            android:pathData="M12,7.5 A4.5,4.5 0 1,0 12,16.5 A4.5,4.5 0 1,0 12,7.5" />
+        <path
+            android:fillColor="#FFF4F1E8"
+            android:pathData="M11.1,11.1 L12.9,11.1 L12.9,12.9 L11.1,12.9 Z" />
+        <!-- Signal Orange center dot — matches masthead CrosshairMark accent -->
+        <path
+            android:fillColor="#FFFF5A1F"
+            android:pathData="M12,10 A2,2 0 1,0 12,14 A2,2 0 1,0 12,10 Z" />
+    </group>
+</vector>
