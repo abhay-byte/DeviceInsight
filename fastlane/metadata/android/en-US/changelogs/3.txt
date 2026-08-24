@@ -1,0 +1,4 @@
+• CALIPER design language: Device dossier tabs (Battery, Hardware/Cameras, Thermal, Sensors, Storage) rebuilt with flat ink/paper panels, hairline rules, dotted leaders and HatchBar allocation maps.
+• Optimized rendering: removed gradient brushes, memoized formatters/grouping, tabular numerals and 0dp panels for GPU-efficient drawing.
+• Fixed Battery Health truncation and panel spacing for cleaner dossier sheets.
+• Stability and accessibility polish across Device screens.

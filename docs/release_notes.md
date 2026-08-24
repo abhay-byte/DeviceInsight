@@ -1,5 +1,21 @@
 # DeviceInsight Release Notes
 
+## Version 1.0.2 (Build 3) — CALIPER Dossier Polish & Flat Rendering
+
+### 🎯 CALIPER Redesign
+- **Battery (CH-04 POWER)**: rebuilt as drafting-paper fuel sheet — `LinearGauge` with needle spring, voltage/temp Odometer, `ThermalGauge` ramp and dotted-leader spec rows. Fixes Health/voltage truncation from gradient overflow.
+- **Hardware — Cameras & USB (MISC)**: flat `PanelCard` inventory with `FIG.1` caption, `SpecRow` dotted leaders and aerospace `FeatureRow` (`● FITTED/○ NOT FITTED`), focus modes as hairline chips. No Brush/Gradient overdraw.
+- **Thermal**: `ThermalHeader` with `THERMAL · SENSORS` status stamp and ramp gauge, `StatBadge` max/avg/min, per-sensor `PanelCard` + 6 dp hairline ramp bar (amber→vermilion→fault via `Channels`), memoized grouping.
+- **Sensors**: `SENSORS · SUITE` header with `FP` stamp, flat category summary, grouped ledger with `SpecRow` per sensor and `Mono` powder. Removed `CircleShape`/`Brush` CIF.
+- **Storage (CH-05)**: `HatchBar` allocation map (`SOLID` used / `DOTS` free) with legend, `CH-05 · STORAGE` `PanelCard`s for internal/external, dotted directory/mount spec rows.
+
+### ⚡ Optimizations
+- Removed all `Brush.linear/verticalGradient` shader allocs; flat `panel/hairline` fills → lower GPU overdraw, 88/10/2 ink ratio compliant.
+- Memoized `voltage/temp` formatters, `groupBy` and `fraction` via `remember`; `Arrangement.spacedBy(12.dp)`; tabular `tnum` throughout.
+- Eliminated 56 dp top / 160 dp bottom spacers; outer `verticalScroll` + `EndOfSheet` handles dossier paging.
+
+---
+
 ## Version 1.0.1 (Build 2) — Performance & Smoothness Update
 
 ### 🚀 Highlights & Performance Improvements
