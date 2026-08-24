@@ -1,37 +1,142 @@
 package com.ivarna.deviceinsight.presentation.hardware.components
 
+import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import com.ivarna.deviceinsight.domain.model.CameraInfo
 import com.ivarna.deviceinsight.domain.model.HardwareInfo
 import com.ivarna.deviceinsight.domain.model.UsbDeviceInfo
 import com.ivarna.deviceinsight.ui.caliper.Caliper
+import com.ivarna.deviceinsight.ui.caliper.HatchPattern
 import com.ivarna.deviceinsight.ui.caliper.components.*
+import com.ivarna.deviceinsight.ui.caliper.hatch
+import com.ivarna.deviceinsight.ui.caliper.rememberCaliperHaptics
 
 @Composable
-fun DevicesTab(info: HardwareInfo) {
+fun DevicesTab(info: HardwareInfo, onCameraGrantedReload: () -> Unit = {}) {
+    val context = LocalContext.current
+    val c = Caliper.colors
+    val haptics = rememberCaliperHaptics()
+    var cameraGranted by remember {
+        mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED)
+    }
+    var showRationale by remember { mutableStateOf(false) }
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        cameraGranted = granted
+        if (granted) { haptics.confirm(); onCameraGrantedReload() } else { showRationale = true; haptics.tick() }
+    }
+    // re-check on resume (e.g., returning from Settings)
+    val lifecycleOwner = LocalLifecycleOwner.current
+    androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
+        val obs = androidx.lifecycle.LifecycleEventObserver { _, ev ->
+            if (ev == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                val now = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+                val wasGranted = cameraGranted
+                cameraGranted = now
+                if (now) showRationale = false
+                if (now && !wasGranted) onCameraGrantedReload()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(obs)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(obs) }
+    }
+
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         DevicesHeader(
-            cameraCount = info.cameras.size,
+            cameraCount = if (cameraGranted) info.cameras.size else 0,
             usbCount = info.usbDevices.size
         )
 
-        if (info.cameras.isNotEmpty()) {
+        // CAMERAS — channel-locked hatch when permission not granted (CALIPER §5.14 + §4.5)
+        if (!cameraGranted) {
+            SectionLabel(name = "CAMERAS", count = 0)
+            PanelCard(
+                title = "CAMERAS · CHANNEL LOCKED",
+                status = { Text("LOCKED", style = Caliper.type.meta, color = c.fault) },
+                modifier = Modifier
+                    .border(1.dp, c.hairline)
+                    .drawBehind { hatch(Rect(Offset.Zero, size), HatchPattern.DOTS, c.ink40.copy(alpha = 0.12f)) }
+            ) {
+                Text(
+                    "Camera roster is locked — grant camera to inventory lenses, resolutions and focal lengths. The shutter never opens; only the hardware list is read.",
+                    style = Caliper.type.dataS, color = c.ink60
+                )
+                Spacer(Modifier.height(10.dp))
+                Box(
+                    Modifier.fillMaxWidth().height(14.dp)
+                        .border(1.dp, c.hairline)
+                        .drawBehind { hatch(Rect(Offset.Zero, size), HatchPattern.DOTS, c.ink40.copy(alpha = 0.25f)) }
+                )
+                Spacer(Modifier.height(10.dp))
+                if (showRationale) {
+                    MarginNote(
+                        message = "Camera not granted. Use the key below — this is the only place that opens the system popup. No auto dialog elsewhere.",
+                        title = "NOTE 002"
+                    )
+                    Spacer(Modifier.height(10.dp))
+                }
+                HardKey("GRANT CAMERA", variant = HardKeyVariant.PRIMARY,
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = { launcher.launch(Manifest.permission.CAMERA) })
+                Spacer(Modifier.height(8.dp))
+                Text("or grant in Settings → 02 PERMISSIONS · also appears only on explicit tap", style = Caliper.type.meta, color = c.ink40)
+                Spacer(Modifier.height(8.dp))
+                HardKey("OPEN SYSTEM SETTINGS", variant = HardKeyVariant.SECONDARY,
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = {
+                        try {
+                            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                data = Uri.parse("package:${context.packageName}")
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            context.startActivity(intent)
+                        } catch (_: Exception) {
+                            try { context.startActivity(Intent(Settings.ACTION_SETTINGS)) } catch (_: Exception) {}
+                        }
+                    })
+            }
+        } else if (info.cameras.isNotEmpty()) {
             SectionLabel(name = "CAMERAS", count = info.cameras.size)
             info.cameras.forEach { camera ->
                 // key by id for stability
                 CameraCard(camera = camera)
+            }
+        } else {
+            // permission granted but no cameras found (e.g., emulator)
+            SectionLabel(name = "CAMERAS", count = 0)
+            Box(
+                Modifier.fillMaxWidth()
+                    .border(1.dp, c.hairline)
+                    .background(c.panel)
+                    .padding(12.dp)
+            ) {
+                Text("NO SIGNAL — no camera modules enumerated", style = Caliper.type.dataS, color = c.ink60)
             }
         }
 
@@ -42,12 +147,13 @@ fun DevicesTab(info: HardwareInfo) {
             }
         }
 
-        if (info.cameras.isEmpty() && info.usbDevices.isEmpty()) {
+        if (cameraGranted && info.cameras.isEmpty() && info.usbDevices.isEmpty()) {
             EmptyState(
                 title = "NO SIGNAL",
                 message = "no cameras or USB peripherals detected",
             )
         }
+        // when locked we already show the Channel Locked card above; no duplicate EmptyState
     }
 }
 

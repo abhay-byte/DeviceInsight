@@ -1,1 +1,1 @@
-Premium Android system monitoring with real-time CPU, RAM, battery, and network insights.
+Paper-precise instrument for CPU, memory, battery, thermal & storage telemetry.

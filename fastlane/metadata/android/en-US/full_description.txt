@@ -1,40 +1,41 @@
-Take complete control of your Android device with DeviceInsight — the ultimate real-time system monitor, hardware analyzer, and advanced task manager designed for power users, developers, and tech enthusiasts.
+DeviceInsight — the instrument for your phone. Measure everything. Label everything.
 
-Built natively with Jetpack Compose and featuring a stunning "Elegant Glassmorphism" and Material 3 design, DeviceInsight gives you a transparent window into what is happening under the hood of your smartphone or tablet. Whether you are gaming, developing apps, or troubleshooting performance issues, DeviceInsight delivers desktop-class system analytics right to your fingertips.
+The screen is a sheet of drafting paper. The phone is the instrument.
 
-🔥 KEY FEATURES & HIGHLIGHTS 🔥
+Built to CALIPER — the language of laboratory equipment: a Braun multimeter, an HP oscilloscope, a numbered binder sheet. Paper, not glass. Hairlines, not shadows. Channels, not cards. Numerals dominate; chrome whispers. Tabular figures, tick scales and hatch patterns carry the signal. No blur, no gradients.
 
-📊 Real-Time System Dashboard
-• CPU Monitoring: Track live core usage, frequency scaling, and thermal performance across all processor cores with smooth sparkline graphs.
-• Memory & RAM: Monitor active RAM utilization, cached processes, and available system memory in real time.
-• Storage Breakdown: Get precise insights into internal storage partitions, free space, and high-speed memory metrics.
-• Network Activity: Watch live upload and download bandwidth speeds, network connection types, and data throughput.
-• Battery Diagnostics: Track real-time power draw (in mA), voltage, battery health, temperature, and charging rates.
+Three media, same instrument: Paper (warm light), Carbon (charcoal) and Blueprint (cyanotype). Ink carries layout; color belongs to data only. A bench tool machined for you — not a template dashboard.
 
-⚙️ Advanced Task Manager & Process Controller
-• Inspect active background services, running apps, and system processes.
-• View detailed resource consumption per app, including CPU and RAM footprint.
-• Gain full visibility over process IDs (PID) and system behaviors to identify rogue battery drainers or performance bottlenecks.
+CHANNELS — Every metric is a numbered channel with color + hatch + label:
+CH-01 CPU solid · CH-02 MEMORY diagonal · CH-03 NETWORK cross-hatch · CH-04 POWER dots · CH-05 STORAGE vertical · CH-06 GPU horizontal. Thermal is a ramp — amber → vermilion → fault red — always with °C readout and zone.
 
-📱 Floating Performance Overlay (HUD)
-• Overlay critical system metrics directly on top of your games or apps.
-• Keep an eye on real-time FPS, CPU load, RAM usage, and battery temperature while playing demanding mobile games or benchmark testing.
-• Fully customizable overlay positioning, opacity, and refresh rates.
+№ 01 OVERVIEW — All channels nominal.
+Four ReadoutTiles with 60 s pen-dot sparklines, peak-hold ticks and asymmetric rules. Tap → channel. Pull to re-ink. Warning = pulsing LED + fault red.
 
-🧰 Deep Hardware & Software Specifications
-• Processor (SoC): Detailed architecture specs, ARM instruction sets, core cluster configurations, and ABI support.
-• Graphics (GPU): GPU vendor, OpenGL ES version, Vulkan capabilities, and rendering extensions.
-• Display Metrics: Screen resolution, pixel density (DPI), refresh rate (Hz), HDR support, and display panel info.
-• Sensors Suite: Live diagnostic readouts from your accelerometer, gyroscope, magnetometer, proximity sensor, ambient light, and more.
-• Camera & Media Capabilities: Deep analysis of hardware supported codecs, sensor resolutions, and physical capabilities.
-• System & Security: Android OS version, API level, security patch level, kernel version, build ID, and bootloader status.
+№ 02 ACTIVITY — Processor, Memory, Network, Power, Storage.
+Processor: odometer frequency, CoreRail mixing bars with peak-hold ⌃ and Hz, ScopeTrace (engineering grid, square pens, pen-dot, crosshair min/max/avg) and thermal ramp (neutral/warm/moderate/severe/throttling).
+Memory: HatchBar composition + hero 6.81/12 GB + top consumers ledger.
+Network: dual-trace ScopeTrace (down channel / up ink) + ↓/↑ odometers.
+Power: LinearGauge fuel strip with ticks, W/V/°C and discharge trace; charging = blinking needle.
+Storage: HatchBar cadastral map + dotted legend; tap segment → partition.
 
-🏠 Home Screen Widgets
-• Bring at-a-glance system telemetry directly to your home screen.
-• Highly customizable widgets designed to complement modern Android themes.
+№ 03 PROCESSES — Ledger → Dossier → SafetyLatch.
+0142  com.android.chrome  4.2% 312 MB
+     pid 22081 · 14:02:11 · ● foreground
+Sticky sections (USER APPS / SYSTEM / SELF), 04d index, tabular CPU%/RSS without shift. Sort by CPU, FIND field. Tap → perforated Dossier with mini sparklines, uid/oom_adj/seccomp and clinical kill: drag SAFE→ARM (hatched rail, haptic), then KILL ⏻ unlocks. ABORT always available.
 
-🛡️ Privacy-First & Lightweight
-• Zero Telemetry: Your device data stays on your device. DeviceInsight operates locally with zero bloatware, tracking ads, or unnecessary cloud connections.
-• Responsive Performance: Built for high efficiency with minimal background overhead.
+№ 04 DEVICE DOSSIER — Spec sheets + plates.
+Dotted leaders — model ........... Pixel 8 Pro — plus line-art plates: FIG.1 cluster topology, display chain, camera map, sensor inventory with serif captions.
+Eleven sheets: SYSTEM / CPU / DISPLAY / GPU / NETWORK / BATTERY / ANDROID / HARDWARE / THERMAL / STORAGE / SENSORS. Battery = fuel gauge + spec; Hardware = cameras/USB flat cards (focal/flash/OIS/ZOOM/AE/AWB, focus modes); Thermal = grouped ramp bars; Sensors = Motion/Position/Environment/Biometric strips; Storage = HatchBar + directory/mount rows. NOT FITTED = hairline strike + meta label. Tablet: two-pane.
 
-Experience the next level of Android system diagnostics. Download DeviceInsight today and discover what your device is truly capable of!
+HUD — CORNER BRACKETS
+FPS 119.8 [SF]  CPU 42% ▂▄▃  GPU 71%  RAM 6.8G  TEMP 58°C  NET ↓18.1 ↑2.4 MB/s
+One sanctioned 8dp scrim blur for legibility. Mono only, channel ticks, source stamp SF/GFX (honest measurement). Drag by crosshair, per-app profiles. 500 ms / 100 ms FPS, 1dp stroke for busy scenes.
+
+WIDGETS — BENCH INSTRUMENTS
+2×2 Single | 4×2 Dual | 4×4 Bench. Same ticks, readouts, hatched bars, pen-dot traces — same instrument, smaller. upd timestamp always shown. 30 s (1 s while charging).
+
+BUILT RIGHT
+Hatch + label redundancy (CVD-safe), 12:1 contrast. TalkBack: charts summarize min/max/avg. Physics motion — odometer roll, needle spring (0.82/420), pen draw 420 ms, stamp −3°. Honors reduced-motion/haptics/sound. Privacy-first, GPL-3.0, no telemetry/ads. Cached SoC/GPU/Camera/Sensor reads, history 60 s, rate 0.25–2.0 s.
+
+Set in Instrument Serif & IBM Plex Mono. Drawn on a 4pt grid. No gradients were used in the making of this instrument. REV A CALIPER — Measure everything. Label everything.

@@ -31,8 +31,13 @@ class ThermalProvider @Inject constructor() {
                                     tempRaw.toFloat()
                                 }
                                 
-                                if (temp != 0f) {
+                                // CALIPER: filter bogus zones — real phone silicon is -20…110°C
+                                // RMX1931 reports 72 zones but includes -274°C (absolute-zero) and 596°C spikes
+                                // which skew PEAK/AVG/MIN and trigger false CRITICAL. Keep only plausible.
+                                if (temp != 0f && temp in -20f..110f) {
                                     sensors.add(ThermalSensor(type, temp))
+                                } else if (temp != 0f) {
+                                    android.util.Log.d("ThermalProvider", "filter bogus $type=$temp°C raw=$tempRaw")
                                 }
                             }
                         } catch (e: Exception) {

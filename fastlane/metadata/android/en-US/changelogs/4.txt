@@ -1,0 +1,29 @@
+DeviceInsight 1.0.3 (Build 4) — CALIPER Calibration, Camera & Thermal Integrity
+
+This is a major calibration and data-integrity update. Every first-launch permission now follows CALIPER (Paper drafting language) and never auto-pops the system dialog. Camera inventory is deduped and thermal bogus zones are filtered. All calibration sheets are now warm Paper.
+
+COVER & FIRST-LAUNCH
+• New 00 · Device Insights cover: 96dp paper square, 2dp radius, ink crosshair with 3dp accent dot and 24dp inner hairline, Device/Insights serif 44sp, DEVICE INSIGHTS mono caps, INSTRUMENT·CALIPER REV A panel and BEGIN CALIBRATION. First thing on fresh install.
+• Entire calibration forced to Paper (#F4F1E8/#FBF9F3) — previously only 05 MEDIA was light while 01-04 were Carbon on dark system. Now 00 cover, 01 USAGE, 02 CAMERA, 03 OVERLAY, 04 ROOT and certificate are all Paper with graph-paper grid.
+• Fixed first-launch gate: LaunchedEffect now watches caliperMigratedFlow so fresh installs correctly show calibration instead of staying on Overview.
+• Media step removed: 05 MEDIA not used per feedback. Defaults to PAPER persisted on entry/finish. 4 numbered sheets (01-04) + cover + certificate, progress 00·✓ 01·✓ 02·✓ 03·✓ 04·✓.
+
+PERMISSIONS — NEVER AUTO, ALWAYS EXPLICIT
+• Removed MainActivity auto CAMERA request. System purple dialog now only on explicit HardKey tap.
+• 01 USAGE now actually grants: AppOpsManager check, FIG.1 USAGE PATH LOCKED/GRANTED with dotted hatch, GRANT USAGE ACCESS → ACTION_USAGE_ACCESS_SETTINGS and onResume re-check, CONTINUE→CAMERA when granted. SKIP shows ≈ estimates.
+• 02 CAMERA CALIPER gate: RequestPermission only on GRANT CAMERA tap, FIG.1 hatch preview, NOTE 002 rationale, permanent-deny → OPEN SYSTEM SETTINGS. No auto popup.
+• 03 OVERLAY now actually asks: Settings.canDrawOverlays check, FIG.2 HUD OVERLAY hatch, GRANT OVERLAY → ACTION_MANAGE_OVERLAY_PERMISSION (package: URI) with onResume re-check, CONTINUE→ROOT when granted.
+• Settings → 02 PERMISSIONS small card (only when CAMERA denied) with 12dp dotted hatch, NOTE 002, GRANT CAMERA and OPEN SETTINGS. Only place that opens the system popup.
+• DevicesTab CHANNEL LOCKED hatch with GRANT/OPEN SETTINGS and auto-reload via HardwareScreen onCameraGrantedReload.
+
+CAMERA — 10 → 4
+• RMX1931 HAL reports 10 devices (5× 4608×3456 same sensor, 2× 3264×2448 etc.). Added dedup by facing|maxSize|focal (e.g. 1|4608x3456|5.58) keeping first physical module. Logs dedup key for diagnostics.
+• Filtered tiny back auxiliary depth/macro <2 MP (1600×1200 1.9MP depth on RMX1931) — user expects 3 back + 1 front = 4, not 10. Front kept even if small. Count now MISC 4 cameras·2 USB, CAMERAS·4, sequential names without gaps. Provider gated: emptyList() when CAMERA not granted → CHANNEL LOCKED hatch.
+
+THERMAL — 596°C/-274°C → Real Silicon
+• ThermalProvider now filters temp in -20..110°C (real phone silicon). RMX1931 had 72 zones with -274 (absolute zero) and 588-618°C pa-therm2 spikes → 596°C PEAK / -274°C MIN / 41°C AVG and false CRITICAL. Now 65 sensors, PEAK 92°C (pa-therm1), AVG 49°C, MIN 4°C, 92.0°C throttling zone, CPU 52°C ramp honest. Logs filter bogus $type=$temp raw=$tempRaw.
+
+BUILD
+• versionCode 3→4, versionName 1.0.2→1.0.3 (build.gradle.kts + com.ivarna.deviceinsight.yml CurrentVersion 1.0.3/4, docs/release_notes). R8 minify + shrinkResources, signed 11M app-release.apk, tested on RMX1931/duchamp. Gradle stopped after release.
+
+CALIPER details: 0dp radius, 1dp hairline, dotted leaders, PanelCard/Stamps -3°, HardKey 48dp 0.98 press, graph-paper 24/120dp, tabular tnum, LedDot, Ease 0.2,0,0,1.

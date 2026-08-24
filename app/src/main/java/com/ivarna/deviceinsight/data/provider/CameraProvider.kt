@@ -21,8 +21,20 @@ class CameraProvider @Inject constructor(
     private var cachedCameras: List<CameraInfo>? = null
 
     fun getCameraInfo(): List<CameraInfo> {
+        // CALIPER: camera roster is gated — never trigger a system popup from the provider.
+        // If not granted, return empty and let the UI render CHANNEL LOCKED hatch.
+        if (androidx.core.content.ContextCompat.checkSelfPermission(
+                context, android.Manifest.permission.CAMERA
+            ) != android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            return emptyList()
+        }
         cachedCameras?.let { return it }
         val cameras = mutableListOf<CameraInfo>()
+        // Deduplicate HAL duplicates: same sensor exposed multiple times with identical
+        // facing + max JPEG size + focal length appears 5× on RMX1931 (4608×3456).
+        // Keep first of each unique physical module; filter tiny auxiliary depth/macro.
+        val seen = mutableSetOf<String>()
         val rearCounter = mutableMapOf<Int, Int>() // Track index per facing
         
         try {
@@ -31,15 +43,41 @@ class CameraProvider @Inject constructor(
 
             for (id in ids) {
                 val chars = cameraManager.getCameraCharacteristics(id)
+
+                val configs = chars.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
+                val jpegSizes = configs?.getOutputSizes(ImageFormat.JPEG)
                 
-                val facingType = when (chars.get(CameraCharacteristics.LENS_FACING)) {
+                // Skip cameras that don't support JPEG (internal/logical-only often don't)
+                if (jpegSizes.isNullOrEmpty()) continue
+                val maxJpeg = jpegSizes.maxByOrNull { it.width * it.height } ?: continue
+                val maxArea = maxJpeg.width * maxJpeg.height
+                // Filter tiny auxiliary (depth/macro) <2MP on back — user-visible expects 3+1, not 10
+                // Front is kept even if small; back tiny is usually depth (1.9MP on RMX1931)
+                val rawFacing = chars.get(CameraCharacteristics.LENS_FACING)
+                val isBack = rawFacing == CameraCharacteristics.LENS_FACING_BACK
+                if (isBack && maxArea < 2_000_000) {
+                    // still log for diagnostics but don't add to roster
+                    android.util.Log.d("CameraProvider", "filter small back id=$id ${maxJpeg.width}x${maxJpeg.height}")
+                    continue
+                }
+
+                val focalLengths = chars.get(CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS)
+                // dedup key: facing + max size + first focal (physical module identity)
+                val focalKey = focalLengths?.firstOrNull()?.let { String.format(java.util.Locale.US, "%.2f", it) } ?: "unk"
+                val dedupKey = "${rawFacing ?: -1}|${maxJpeg.width}x${maxJpeg.height}|$focalKey"
+                if (!seen.add(dedupKey)) {
+                    android.util.Log.d("CameraProvider", "dedup $id key=$dedupKey")
+                    continue
+                }
+
+                val facingType = when (rawFacing) {
                     CameraCharacteristics.LENS_FACING_FRONT -> "Front-Facing"
                     CameraCharacteristics.LENS_FACING_BACK -> "Rear-Facing"
                     CameraCharacteristics.LENS_FACING_EXTERNAL -> "External"
                     else -> "Unknown"
                 }
 
-                // Increment counter for this facing type
+                // Increment counter only for kept cameras (post-dedup/filter)
                 val currentCount = (facingCounts[facingType] ?: 0) + 1
                 facingCounts[facingType] = currentCount
                 
@@ -49,23 +87,15 @@ class CameraProvider @Inject constructor(
                     "$facingType Camera #$currentCount"
                 }
 
-                val configs = chars.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
-                val jpegSizes = configs?.getOutputSizes(ImageFormat.JPEG)
-                
-                // Skip cameras that don't support JPEG (internal/logical-only often don't)
-                if (jpegSizes.isNullOrEmpty()) continue
-
-                val resolution = jpegSizes.maxByOrNull { it.width * it.height }?.let {
-                    val mp = (it.width * it.height / 1_000_000f).roundToInt()
-                    "$mp MP (${it.width} × ${it.height})"
-                } ?: "Unknown"
+                val resolution = "${
+                    (maxArea / 1_000_000f).roundToInt()
+                } MP (${maxJpeg.width} × ${maxJpeg.height})"
 
                 val videoResolution = configs?.getOutputSizes(android.graphics.SurfaceTexture::class.java)?.maxByOrNull { it.width * it.height }?.let {
                     val mp = (it.width * it.height / 1_000_000f).let { res -> "%.1f".format(res) }
                     "$mp MP (${it.width} × ${it.height})"
                 } ?: "Unknown"
 
-                val focalLengths = chars.get(CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS)
                 val focalLengthStr = focalLengths?.joinToString(", ") { "%.2f mm".format(it) } ?: "Unknown"
 
                 val afModes = chars.get(CameraCharacteristics.CONTROL_AF_AVAILABLE_MODES)

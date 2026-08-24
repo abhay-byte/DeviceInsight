@@ -45,7 +45,7 @@ fun HardwareScreen(
     initialTab: Int? = null
 ) {
     val hardwareInfo by viewModel.hardwareInfo.collectAsStateWithLifecycle()
-    val lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
         val obs = androidx.lifecycle.LifecycleEventObserver { _, ev ->
             if (ev == androidx.lifecycle.Lifecycle.Event.ON_RESUME) viewModel.loadHardwareInfo()
@@ -53,6 +53,9 @@ fun HardwareScreen(
         lifecycleOwner.lifecycle.addObserver(obs)
         onDispose { lifecycleOwner.lifecycle.removeObserver(obs) }
     }
+    // CALIPER: after granting camera via DevicesTab's HardKey, the roster is still
+    // the pre-grant empty list held in hardwareInfo. Trigger a reload on grant.
+    val onCameraGrantedReload = { viewModel.loadHardwareInfo() }
     var tab by rememberSaveable { mutableIntStateOf(initialTab ?: 0) }
     val tabs = listOf("SYSTEM", "CPU", "DISPLAY", "GPU", "NETWORK", "BATTERY", "ANDROID", "HARDWARE", "THERMAL", "STORAGE", "SENSORS")
     val tabRange = tabs.indices
@@ -61,7 +64,7 @@ fun HardwareScreen(
     Column(Modifier.fillMaxSize()) {
         ScreenHeader("№ 02 — DEVICE DOSSIER", "Device.", "hardware spec sheets · plates")
         LoadThenShow(ready = hardwareInfo != null, modifier = Modifier.weight(1f)) {
-            DossierBody(hardwareInfo!!, tab, tabs, onSelect = { tab = it })
+            DossierBody(hardwareInfo!!, tab, tabs, onSelect = { tab = it }, onCameraGrantedReload = onCameraGrantedReload)
         }
     }
 }
@@ -71,7 +74,8 @@ private fun DossierBody(
     info: HardwareInfo,
     tab: Int,
     tabs: List<String>,
-    onSelect: (Int) -> Unit
+    onSelect: (Int) -> Unit,
+    onCameraGrantedReload: () -> Unit = {}
 ) {
     BoxWithConstraints(Modifier.fillMaxSize()) {
         // Two-pane dossier (key list + spec sheet, §5.2/§7 S-14). Content
@@ -121,7 +125,7 @@ private fun DossierBody(
                             .verticalScroll(rememberScrollState())
                             .padding(horizontal = 16.dp, vertical = 12.dp)
                     ) {
-                        DossierPage(info, page)
+                        DossierPage(info, page, onCameraGrantedReload)
                         Spacer(Modifier.height(24.dp))
                         EndOfSheet()
                     }
@@ -179,7 +183,7 @@ private fun DossierBody(
                             .verticalScroll(rememberScrollState())
                             .padding(horizontal = 16.dp, vertical = 12.dp)
                     ) {
-                        DossierPage(info, page)
+                        DossierPage(info, page, onCameraGrantedReload)
                         Spacer(Modifier.height(24.dp))
                         EndOfSheet()
                     }
@@ -190,7 +194,7 @@ private fun DossierBody(
 }
 
 @Composable
-private fun DossierPage(info: HardwareInfo, page: Int) {
+private fun DossierPage(info: HardwareInfo, page: Int, onCameraGrantedReload: () -> Unit = {}) {
     when (page) {
         0 -> SystemTab(info)
         1 -> CpuTab(info)
@@ -199,7 +203,7 @@ private fun DossierPage(info: HardwareInfo, page: Int) {
         4 -> NetworkTab(info)
         5 -> BatteryTab(info)
         6 -> AndroidTab(info)
-        7 -> DevicesTab(info)
+        7 -> DevicesTab(info, onCameraGrantedReload = onCameraGrantedReload)
         8 -> ThermalTab(info)
         9 -> StorageTab(info)
         10 -> SensorsTab(info)

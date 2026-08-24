@@ -41,6 +41,7 @@ import com.ivarna.deviceinsight.presentation.settings.SettingsViewModel
 import com.ivarna.deviceinsight.presentation.tasks.TasksScreen
 import com.ivarna.deviceinsight.ui.caliper.Caliper
 import com.ivarna.deviceinsight.ui.caliper.CaliperMotion
+import com.ivarna.deviceinsight.ui.caliper.CaliperTheme
 import com.ivarna.deviceinsight.ui.caliper.caliperGrid
 import com.ivarna.deviceinsight.ui.caliper.caliperMigratedFlow
 import com.ivarna.deviceinsight.ui.caliper.markCaliperMigrated
@@ -134,24 +135,38 @@ fun SystemStatsApp(initialRoute: String? = null) {
 
     // S-00 first-launch calibration gate (skippable). After finishing, the
     // one-time "recalibrated" MarginNote is shown via caliperMigrated flag.
+    // FIX: watch migrated flow — initialValue true avoids flash for existing users,
+    // but fresh installs emit false shortly after; LaunchedEffect then reveals calibration.
     val context = LocalContext.current
     val migrated by context.caliperMigratedFlow.collectAsStateWithLifecycle(initialValue = true)
     var showCalibration by remember { mutableStateOf(!migrated) }
     var showMigratedNote by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    LaunchedEffect(migrated) {
+        if (!migrated) showCalibration = true
+    }
 
     if (showCalibration) {
-        Column(Modifier.fillMaxSize().background(Caliper.colors.surface)) {
-            Masthead()
-            CalibrationScreen(
-                initialMedium = currentMedium,
-                onMedium = settingsViewModel::setMedium,
-                onFinish = {
-                    scope.launch { context.markCaliperMigrated() }
-                    showCalibration = false
-                    showMigratedNote = !migrated
-                }
-            )
+        // FIX: calibration must always be Paper (light drafting paper) even on dark system —
+        // user reported only 05 MEDIA was Paper while 01-04 were Carbon. Force Paper here.
+        CaliperTheme(medium = Medium.PAPER) {
+            Column(Modifier.fillMaxSize().background(Caliper.colors.surface)) {
+                Masthead()
+                CalibrationScreen(
+                    initialMedium = Medium.PAPER,
+                    onMedium = { medium ->
+                        // Media step removed — default to PAPER. Still persist if user ever picks.
+                        settingsViewModel.setMedium(medium)
+                    },
+                    onFinish = {
+                        // Ensure default Paper is persisted (media step removed per user request)
+                        settingsViewModel.setMedium(Medium.PAPER)
+                        scope.launch { context.markCaliperMigrated() }
+                        showCalibration = false
+                        showMigratedNote = !migrated
+                    }
+                )
+            }
         }
         return
     }

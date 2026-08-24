@@ -1,7 +1,5 @@
 package com.ivarna.deviceinsight
 
-import android.Manifest
-import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.view.WindowManager
@@ -9,7 +7,6 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
-import androidx.core.app.ActivityCompat
 import android.content.Intent
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.getValue
@@ -36,8 +33,6 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         enableHighRefreshRate()
 
-        requestPermissions()
-
         setContent {
             val currentMedium by settingsViewModel.medium.collectAsStateWithLifecycle()
 
@@ -56,20 +51,6 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         diRoute = intent.getStringExtra("di_route")
-    }
-
-    private fun requestPermissions() {
-        val permissions = mutableListOf(
-            Manifest.permission.CAMERA
-        )
-        
-        val permissionsToRequest = permissions.filter {
-            ActivityCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
-        }
-
-        if (permissionsToRequest.isNotEmpty()) {
-            ActivityCompat.requestPermissions(this, permissionsToRequest.toTypedArray(), 100)
-        }
     }
 
     private fun enableHighRefreshRate() {
