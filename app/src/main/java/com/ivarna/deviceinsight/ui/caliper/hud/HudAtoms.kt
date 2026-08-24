@@ -239,14 +239,27 @@ fun CoreBank(
 ) {
     val c = LocalHudColors.current
     val m = LocalHudMetrics.current
-    Row(modifier.fillMaxWidth(), horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(6.dp)) {
-        cores.forEachIndexed { index, core ->
-            // cluster rule at L: hairline divider between big/mid/little groups
-            val clusterStarts = clusterSizes.runningFold(0) { acc: Int, n: Int -> acc + n }.drop(1).toSet()
-            val divider = m.showGovLine && index > 0 && index in clusterStarts
-            Row(Modifier.weight(1f)) {
-                if (divider) Box(Modifier.width(1.dp).fillMaxHeight(0.8f).background(c.hairline))
-                CoreCell(core, c.ch01)
+    val perRow = m.coreBankCellsPerRow.coerceAtLeast(1)
+    val rows = cores.chunked(perRow)
+    // cluster divider set computed once per composition
+    val clusterStarts = clusterSizes.runningFold(0) { acc: Int, n: Int -> acc + n }.drop(1).toSet()
+    Column(modifier.fillMaxWidth(), verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(4.dp)) {
+        rows.forEach { row ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(4.dp)) {
+                row.forEachIndexed { idxInRow, core ->
+                    val globalIdx = cores.indexOf(core)
+                    val divider = m.showGovLine && globalIdx > 0 && globalIdx in clusterStarts && idxInRow == 0
+                    Row(Modifier.weight(1f)) {
+                        // fixed height: fillMaxHeight(f) inside a WRAP_CONTENT window resolves
+                        // against the screen max constraint and stretches the panel full-height
+                        if (divider) Box(Modifier.width(1.dp).height(18.dp).background(c.hairline))
+                        CoreCell(core, c.ch01)
+                    }
+                }
+                // pad last row so weights don't stretch on incomplete rows
+                repeat((perRow - row.size).coerceAtLeast(0)) {
+                    Spacer(Modifier.weight(1f))
+                }
             }
         }
     }

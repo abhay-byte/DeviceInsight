@@ -123,11 +123,11 @@ fun HudCpuBand(slow: HudSlow, showCoreBank: Boolean) {
             StrokedText(FmtHud.temp(slow.tempC), hudStyle(m.valueSp), fill = thermalColor(slow.tempC))
         }
         if (showCoreBank && slow.cores.isNotEmpty()) {
-            Spacer(Modifier.height(5.dp))
+            Spacer(Modifier.height(3.dp))
             CoreBank(slow.cores, slow.clusterSizes)
         }
         if (m.showGovLine && slow.cores.isNotEmpty()) {
-            Spacer(Modifier.height(3.dp))
+            Spacer(Modifier.height(2.dp))
             val peak = slow.cores.maxByOrNull { it.freqMhz }
             val govLine = buildString {
                 append("gov ${slow.governor ?: "—"}")
