@@ -57,15 +57,16 @@ fun LedDot(
     dotSize: Dp = 6.dp
 ) {
     val reduced = rememberReducedMotion()
-    val pulse by rememberInfiniteTransition(label = "led")
+    val pulse = rememberInfiniteTransition(label = "led")
         .animateFloat(0.6f, 1f,
             infiniteRepeatable(tween(1000, easing = LinearEasing), RepeatMode.Reverse), label = "ledAlpha")
-    val alpha = when {
-        !active -> 0.25f
-        pulsing && !reduced -> pulse
-        else -> 1f
-    }
+    // draw-phase State read — the pulse animates the 6dp dot without recomposing per frame
     Canvas(modifier.size(dotSize)) {
+        val alpha = when {
+            !active -> 0.25f
+            pulsing && !reduced -> pulse.value
+            else -> 1f
+        }
         drawCircle(color.copy(alpha = alpha), radius = size.minDimension / 2)
     }
 }

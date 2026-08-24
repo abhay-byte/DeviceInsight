@@ -16,6 +16,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -113,11 +114,11 @@ fun HudCpuBand(slow: HudSlow, showCoreBank: Boolean) {
             BandLabel("CH-01 · CPU", c.ch01)
             Spacer(Modifier.weight(1f))
             MiniOdometer(FmtHud.pct(slow.cpuPct), hudStyle(m.valueSp), c.ink)
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(6.dp))
             val avgFreq = slow.cores.map { it.freqMhz }.average().toInt()
             if (avgFreq > 0) {
-                StrokedText(FmtHud.ghz(avgFreq), hudStyle(m.valueSp), fill = c.ink60)
-                Spacer(Modifier.width(8.dp))
+                StrokedText(FmtHud.ghz(avgFreq * 1000), hudStyle(m.valueSp), fill = c.ink60)
+                Spacer(Modifier.width(6.dp))
             }
             StrokedText(FmtHud.temp(slow.tempC), hudStyle(m.valueSp), fill = thermalColor(slow.tempC))
         }
@@ -144,21 +145,26 @@ private fun MemRow(label: String, usedMb: Int, totalMb: Int, tickColor: Color, p
     val c = LocalHudColors.current
     val m = LocalHudMetrics.current
     val fitted = totalMb > 0
-    Column(Modifier.fillMaxWidth()) {
+    Column(Modifier.fillMaxWidth().clipToBounds()) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             HudTick(tickColor)
             Spacer(Modifier.width(5.dp))
-            Text(label, hudStyle(m.metaSp, trackingEm = 0.08f).copy(color = c.ink40))
-            Spacer(Modifier.weight(1f))
+            Text(label, hudStyle(m.metaSp, trackingEm = 0.08f).copy(color = c.ink40), modifier = Modifier.weight(1f, fill = false))
+            Spacer(Modifier.width(6.dp))
             if (fitted) {
-                Text("${FmtHud.mb(usedMb)}   ${FmtHud.pct(100f * usedMb / totalMb)}", hudStyle(m.valueSp).copy(color = c.ink))
+                val pct = (100f * usedMb / totalMb).coerceIn(0f, 100f)
+                Text(
+                    "${FmtHud.mb(usedMb)}  ${FmtHud.pct(pct)}",
+                    hudStyle(m.valueSp).copy(color = c.ink),
+                    modifier = Modifier.wrapContentHeight()
+                )
             } else {
                 Text("— NOT FITTED", hudStyle(m.valueSp).copy(color = c.ink40))
             }
         }
         if (fitted) {
             Spacer(Modifier.height(3.dp))
-            MemBar(usedMb.toFloat() / totalMb.toFloat(), tickColor, pattern, height = m.barHDp.dp)
+            MemBar((usedMb.toFloat() / totalMb.toFloat()).coerceIn(0f, 1f), tickColor, pattern, height = m.barHDp.dp)
         }
     }
 }
@@ -178,8 +184,9 @@ fun HudMemoryBand(slow: HudSlow) {
         )
         Spacer(Modifier.height(5.dp))
         // SWP — NOT FITTED when swapTotal==0 (plan acceptance); zram counts into used when present
+        // swapTotalMb is already MB (DashboardRepository: bytes/1MiB); don't re-divide
         val swapUsedMb = ((slow.swapUsedGb + slow.zramGb) * 1024f).toInt()
-        val swapTotalMb = if (slow.swapTotalMb > 0) (slow.swapTotalMb / 1024L).toInt()
+        val swapTotalMb = if (slow.swapTotalMb > 0) slow.swapTotalMb.toInt()
                           else if (slow.zramGb > 0f) (slow.zramGb * 1024f).toInt() else 0
         MemRow(
             "CH-02 · SWP",

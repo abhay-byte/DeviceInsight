@@ -32,7 +32,7 @@ enum class Tier(val wDp: Int, val hDp: Int) {
     T1(140, 140), T2(280, 140), T3(280, 210), T4(280, 280), T5(350, 280);
     companion object {
         fun of(wDp: Int, hDp: Int): Tier =
-            entries.lastOrNull { wDp >= it.wDp - 20 && hDp >= it.hDp - 20 } ?: T1
+            entries.lastOrNull { wDp >= it.wDp && hDp >= it.hDp } ?: T1
     }
 }
 
@@ -277,12 +277,14 @@ object BenchSampler {
             try {
                 governor = cpuUtil.getCurrentCpuGovernor()
                 // read frequencies directly from sysfs without Hilt SocMapper
+                // scaling_*_freq is KHz — convert to MHz (provider/DashboardMetrics unit) or
+                // downstream MHz/1000=GHz math prints "1785.60 GHz"
                 val cores = Runtime.getRuntime().availableProcessors()
                 freqs = (0 until cores).mapNotNull { i ->
-                    try { java.io.File("/sys/devices/system/cpu/cpu$i/cpufreq/scaling_cur_freq").readText().trim().toIntOrNull() } catch (_: Exception) { null }
+                    try { java.io.File("/sys/devices/system/cpu/cpu$i/cpufreq/scaling_cur_freq").readText().trim().toIntOrNull()?.div(1000) } catch (_: Exception) { null }
                 }
                 maxFreqs = (0 until cores).mapNotNull { i ->
-                    try { java.io.File("/sys/devices/system/cpu/cpu$i/cpufreq/cpuinfo_max_freq").readText().trim().toIntOrNull() } catch (_: Exception) { null }
+                    try { java.io.File("/sys/devices/system/cpu/cpu$i/cpufreq/cpuinfo_max_freq").readText().trim().toIntOrNull()?.div(1000) } catch (_: Exception) { null }
                 }
             } catch (_: Exception) { }
             val maxAll = maxFreqs.maxOrNull() ?: 0
@@ -445,8 +447,10 @@ object BenchState {
     }
 }
 
+// LIVE is a flat 1s tick — BenchUpdater's screen-on loop guarantees fresh samples while the
+// screen is on, so no charging/service condition is needed (idle fallback caused "not real-time")
 fun cadenceMs(cfg: BenchConfig, snap: BenchSnapshot): Long = when (cfg.cadence) {
-    Cadence.LIVE -> if (snap.charging || snap.serviceRunning) 1_000L else 30_000L
+    Cadence.LIVE -> 1_000L
     Cadence.AMBIENT -> 30_000L
     Cadence.BUDGET -> 15 * 60_000L
 }

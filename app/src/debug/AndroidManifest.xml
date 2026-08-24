@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Debug-only manifest additions — merged under the app namespace at :app:debug build. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <!-- exported=true: adb shell lost START_ANY_ACTIVITY on recent builds (API 36 ColorOS
+             denies non-exported starts). Debug builds only — release manifest never sees this. -->
+        <activity
+            android:name=".ui.caliper.widget.PreviewStudioActivity"
+            android:exported="true" />
+    </application>
+</manifest>

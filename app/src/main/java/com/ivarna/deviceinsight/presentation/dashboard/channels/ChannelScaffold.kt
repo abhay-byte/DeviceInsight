@@ -19,6 +19,7 @@ import com.ivarna.deviceinsight.data.monitor.MonitorBus
 import com.ivarna.deviceinsight.ui.caliper.components.EndOfSheet
 import com.ivarna.deviceinsight.ui.caliper.components.HardKey
 import com.ivarna.deviceinsight.ui.caliper.components.HardKeyVariant
+import com.ivarna.deviceinsight.ui.caliper.components.LoadThenShow
 import com.ivarna.deviceinsight.ui.caliper.components.ScreenHeader
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
@@ -37,13 +38,15 @@ class ChannelViewModel @Inject constructor(
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 }
 
-/** CALIPER S-02..S-06 channel page template: BACK · header · instruments · EndOfSheet. */
+/** CALIPER S-02..S-06 channel page template: BACK · header · instruments · EndOfSheet.
+ *  Instruments are gated by [LoadThenShow] — the page loads, then shows. */
 @Composable
 fun ChannelScaffold(
     sheetLabel: String,
     title: String,
     sub: String,
     onBack: () -> Unit,
+    ready: Boolean = true,
     content: @Composable ColumnScope.() -> Unit
 ) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
@@ -53,8 +56,12 @@ fun ChannelScaffold(
         )
         ScreenHeader(sheetLabel, title, sub)
         Spacer(Modifier.height(12.dp))
-        content()
-        Spacer(Modifier.height(24.dp))
-        EndOfSheet()
+        LoadThenShow(ready = ready) {
+            Column(Modifier.padding(horizontal = 16.dp)) {
+                content()
+                Spacer(Modifier.height(24.dp))
+                EndOfSheet()
+            }
+        }
     }
 }

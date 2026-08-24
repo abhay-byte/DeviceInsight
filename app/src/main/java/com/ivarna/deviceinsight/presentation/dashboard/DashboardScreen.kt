@@ -34,9 +34,10 @@ fun DashboardScreen(
         if (metrics == null) {
             CalibratingIndicator(percent = null)
         } else {
-            val m = metrics!!
-            // CH-01 CPU
-            ReadoutTile(
+            Column(Modifier.padding(horizontal = 16.dp)) {
+                val m = metrics!!
+                // CH-01 CPU
+                ReadoutTile(
                 channel = Channels.CPU,
                 value = Fmt.pct(m.cpuUsage * 100, 1),
                 subline = "${Fmt.temp(m.cpuTemperature)} · ${m.cpuTotalCores}C/${m.cpuTotalCores}T" +
@@ -119,6 +120,7 @@ fun DashboardScreen(
                 SpecRow("soc", deviceCard.cpuModel)
                 SpecRow("gpu", deviceCard.gpuModel)
                 SpecRow("android", deviceCard.androidVersion)
+            }
             }
         }
         EndOfSheet()

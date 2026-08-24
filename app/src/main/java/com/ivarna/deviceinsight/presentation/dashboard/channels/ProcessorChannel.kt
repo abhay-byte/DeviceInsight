@@ -25,7 +25,7 @@ fun ProcessorChannel(
     val snap by vm.bus.snapshot.collectAsStateWithLifecycle()
     val c = Caliper.colors
 
-    ChannelScaffold("№ 01.1 — PROCESSOR · S-02", "Processor.", "CH-01 · cpu load, clocks, cores", onBack) {
+    ChannelScaffold("№ 01.1 — PROCESSOR · S-02", "Processor.", "CH-01 · cpu load, clocks, cores", onBack, ready = m != null) {
         val metrics = m
         if (metrics == null) {
             CalibratingIndicator(percent = null)

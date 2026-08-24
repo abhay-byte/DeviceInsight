@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.*
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -292,6 +293,43 @@ fun CalibratingIndicator(percent: Float? = null) {
         Spacer(Modifier.height(10.dp))
         Text("CALIBRATING${percent?.let { " · ${it.roundToInt()}%" } ?: ""}",
             style = Caliper.type.meta, color = c.ink60)
+    }
+}
+
+/**
+ * LOAD-THEN-SHOW gate (§5.15): holds the calibrating reticle until [ready] AND
+ * the destination's enter transition has cleared ([settleMs]), then sweeps the
+ * sheet in with the standard fade+rise. Guarantees heavy first composition
+ * never lands mid-navigation — pages load, then show.
+ */
+@Composable
+fun LoadThenShow(
+    ready: Boolean,
+    modifier: Modifier = Modifier,
+    settleMs: Int = 240,
+    content: @Composable () -> Unit
+) {
+    val reveal = remember { MutableTransitionState(false) }
+    LaunchedEffect(ready) {
+        if (ready && !reveal.targetState) {
+            delay(settleMs.toLong())
+            reveal.targetState = true
+        }
+    }
+    if (!reveal.targetState) {
+        Box(modifier, contentAlignment = Alignment.TopCenter) {
+            CalibratingIndicator(percent = null)
+        }
+    } else {
+        AnimatedVisibility(
+            visibleState = reveal,
+            enter = fadeIn(tween(260, easing = CaliperMotion.Ease)) +
+                slideInVertically(tween(260, easing = CaliperMotion.Ease)) { it / 16 },
+            exit = fadeOut(tween(120)),
+            label = "load-then-show"
+        ) {
+            Box(modifier) { content() }
+        }
     }
 }
 

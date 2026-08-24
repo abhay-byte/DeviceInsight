@@ -84,6 +84,58 @@ class BenchSelfCheckTest {
     }
 
     @Test
+    fun tierExactBounds() {
+        // DI-WF-001 F1: exact bounds — no -20 tolerance; expectations derived from the formula
+        assertEquals(Tier.T1, Tier.of(139, 139))    // below T1 floor → T1 fallback
+        assertEquals(Tier.T1, Tier.of(140, 140))    // exact T1 floor
+        assertEquals(Tier.T1, Tier.of(279, 140))    // 1dp shy of T2 width stays T1
+        assertEquals(Tier.T2, Tier.of(280, 140))    // crosses into T2
+        assertEquals(Tier.T2, Tier.of(280, 209))    // 1dp shy of T3 height stays T2
+        assertEquals(Tier.T3, Tier.of(280, 210))    // exact T3 floor
+        assertEquals(Tier.T4, Tier.of(349, 280))    // 1dp shy of T5 width stays T4
+        assertEquals(Tier.T5, Tier.of(350, 280))    // exact T5 floor
+        assertEquals(Tier.T5, Tier.of(1000, 400))   // huge sizes clamp at top tier
+        assertEquals(Tier.T1, Tier.of(280, 100))    // wide but too short → T1
+    }
+
+    @Test
+    fun previewSnapshotDeterministic() {
+        val a = BenchDemo.previewSnapshot()
+        val b = BenchDemo.previewSnapshot()
+        assertEquals(a, b)
+        assertEquals(a.hashCode(), b.hashCode())
+        // structural stability for generator cache keys / state keys
+        assertEquals(a.cores.size, b.cores.size)
+        assertEquals(a.cpuHist.contentHash(), b.cpuHist.contentHash())
+        assertEquals(a.memComposition, b.memComposition)
+        assertEquals(a.topConsumers, b.topConsumers)
+        assertTrue("netHist must be populated (D8)", a.netHist.isNotEmpty())
+        assertTrue("gpuGles must be populated (D8)", a.gpuGles.isNotBlank())
+        assertTrue(a.batteryPresent)
+        assertEquals(0L, a.timestamp % 1000L) // fixed epoch — never System.currentTimeMillis
+    }
+
+    @Test
+    fun previewShotMatrix_shape() {
+        // 5 kinds x 3 media: single instruments at T2, bench at T4
+        assertEquals(15, BenchPreviewGenerator.SHOT_MATRIX.size)
+        Medium.entries.forEach { medium ->
+            listOf(WidgetKind.SCOPE, WidgetKind.STACK, WidgetKind.FUEL, WidgetKind.RASTER).forEach { kind ->
+                val shot = BenchPreviewGenerator.SHOT_MATRIX.first { it.kind == kind && it.medium == medium }
+                assertEquals(Tier.T2, shot.tier)
+                assertEquals("preview_${kind.name.lowercase()}_${medium.name.lowercase()}_280x140.png", shot.fileName)
+            }
+            val bench = BenchPreviewGenerator.SHOT_MATRIX.first { it.kind == WidgetKind.BENCH && it.medium == medium }
+            assertEquals(Tier.T4, bench.tier)
+            assertEquals("preview_bench_${medium.name.lowercase()}_280x280.png", bench.fileName)
+        }
+        // capture density is exactly 3x (480dpi) so px dims are tier*3
+        assertEquals(840, BenchPreviewGenerator.SHOT_MATRIX.first().wPx)
+        assertEquals(420, BenchPreviewGenerator.SHOT_MATRIX.first().hPx)
+        assertEquals(480, BenchPreviewGenerator.CAPTURE_DENSITY_DPI)
+    }
+
+    @Test
     fun blueprintPaletteIsInk() {
         assertEquals(WidgetPalettes.BLUEPRINT.ch01, WidgetPalettes.BLUEPRINT.ink)
         assertEquals(WidgetPalettes.BLUEPRINT.ch02, WidgetPalettes.BLUEPRINT.ink)
@@ -99,6 +151,28 @@ class BenchSelfCheckTest {
         assertEquals(4, c.compactChannels.size)
         assertEquals(Cadence.AMBIENT, c.cadence)
         assertEquals(60, c.traceWindowS)
+    }
+
+    @Test
+    fun enrichWithHistory_appendsAndCaps() {
+        val prev = BenchSnapshot(cpuHist = listOf(10f, 20f), memHist = listOf(30f), wattHist = listOf(1f), netHist = listOf(5f), gpuHist = listOf(7f))
+        val raw = BenchSnapshot(cpuPct = 30f, memUsedGb = 6f, memTotalGb = 12f, watts = 2f, netDown = 2048L, netUp = 0L, gpuPct = 40f)
+        val enriched = BenchUpdater.enrichWithHistory(raw, prev)
+        assertEquals(listOf(10f, 20f, 30f), enriched.cpuHist)
+        assertEquals(3, enriched.cpuHist.size)
+        assertEquals(2, enriched.memHist.size) // 30 + 50
+        assertEquals(50f, enriched.memHist.last(), 0.01f)
+        assertEquals(2, enriched.wattHist.size)
+        assertEquals(2f, enriched.wattHist.last(), 0.01f)
+        assertFalse(enriched.cpuHist.isEmpty())
+        // null prev → single entry
+        val first = BenchUpdater.enrichWithHistory(raw, null)
+        assertEquals(1, first.cpuHist.size)
+        assertEquals(30f, first.cpuHist.first(), 0.01f)
+        // cap at MAX_HIST (fill beyond)
+        val bigPrev = BenchSnapshot(cpuHist = List(400) { 1f })
+        val capped = BenchUpdater.enrichWithHistory(raw, bigPrev)
+        assertEquals(300, capped.cpuHist.size)
     }
 
     @Test
@@ -128,7 +202,7 @@ class BenchSelfCheckTest {
         val snapRunning = BenchSnapshot(charging = false, serviceRunning = true, timestamp = System.currentTimeMillis())
         assertEquals(1_000L, cadenceMs(BenchConfig(cadence = Cadence.LIVE), snapCharging))
         assertEquals(1_000L, cadenceMs(BenchConfig(cadence = Cadence.LIVE), snapRunning))
-        assertEquals(30_000L, cadenceMs(BenchConfig(cadence = Cadence.LIVE), snapIdle))
+        assertEquals(1_000L, cadenceMs(BenchConfig(cadence = Cadence.LIVE), snapIdle))
         assertEquals(30_000L, cadenceMs(BenchConfig(cadence = Cadence.AMBIENT), snapCharging))
         assertEquals(15 * 60_000L, cadenceMs(BenchConfig(cadence = Cadence.BUDGET), snapCharging))
         assertEquals(900_000L, cadenceMs(BenchConfig(cadence = Cadence.BUDGET), snapIdle))

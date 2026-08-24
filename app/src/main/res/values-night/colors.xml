@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- BENCH widget first-paint tokens (night) — mirror Caliper CarbonColors (CaliperTheme.kt) -->
+    <color name="bench_panel">#1C1B17</color>
+    <color name="bench_ink60">#99EDE7DA</color>
+</resources>

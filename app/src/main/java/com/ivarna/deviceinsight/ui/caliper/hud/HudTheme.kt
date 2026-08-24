@@ -96,9 +96,9 @@ data class HudMetrics(
 
 object HudScales {
     fun of(s: HudScale): HudMetrics = when (s) {
-        HudScale.S -> HudMetrics(196, 10, 24, 12, 9, 8, 4, 8, false, false, false)
-        HudScale.M -> HudMetrics(260, 12, 28, 13, 9, 8, 6, 4, true, false, true)
-        HudScale.L -> HudMetrics(300, 14, 32, 14, 10, 9, 8, 4, true, true, true)
+        HudScale.S -> HudMetrics(156, 8, 20, 11, 8, 7, 3, 8, false, false, false)
+        HudScale.M -> HudMetrics(252, 12, 26, 12, 9, 8, 5, 4, true, false, true)
+        HudScale.L -> HudMetrics(340, 16, 34, 15, 10, 9, 7, 4, true, true, true)
     }
 }
 

@@ -181,14 +181,15 @@ fun Canvas.scope(
 
     // W2: ascii y-axis labels, 10sp ink40 on the right edge (T2–T3: 0/50/100 · T4+: all five)
     if (showYLabels) {
-        val lp = Paint().apply { color = pal.ink40.toArgb(); textSize = sp(context, 10f); isAntiAlias = true }
+        val lp = Paint().apply { color = pal.ink40.toArgb(); textSize = sp(context, 10f); isAntiAlias = true; textAlign = Paint.Align.RIGHT }
         val labels = if (showAllYLabels) listOf(100, 75, 50, 25, 0) else listOf(100, 50, 0)
         val fm = lp.fontMetrics
         val textH = fm.descent - fm.ascent
         labels.forEach { v ->
             val cy = h * (1f - v / 100f)
-            val ty = (cy - textH / 2f - fm.ascent).coerceIn(0f, (h - textH).coerceAtLeast(0f))
-            drawText("$v", w - 18f * density, ty, lp)
+            // clamp BASELINE so ascender/descender stay inside the bitmap (top "100" was clipped)
+            val ty = (cy - textH / 2f - fm.ascent).coerceIn(-fm.ascent, (h - fm.descent).coerceAtLeast(-fm.ascent))
+            drawText("$v", w - 4f * density, ty, lp)
         }
     }
 
@@ -197,7 +198,17 @@ fun Canvas.scope(
         val p = Paint().apply { color = pal.ink40.toArgb(); style = Paint.Style.STROKE; strokeWidth = 1f * density }
         drawLine(0f, midY, w, midY, p)
         val tp = Paint().apply { color = pal.ink60.toArgb(); textSize = 10f * density; isAntiAlias = true }
-        drawText("NO SIGNAL", w / 2 - 30 * density, h / 2 - 6 * density, tp)
+        // panel knockout so the label never collides with the grid/flat line
+        val label = "NO SIGNAL"
+        val fm2 = tp.fontMetrics
+        val textH2 = fm2.descent - fm2.ascent
+        val tw = tp.measureText(label)
+        val tx = (w - tw) / 2f
+        val tyy = midY - textH2 / 2f - fm2.ascent
+        val pad = 5f * density
+        drawRect(RectF(tx - pad, midY - textH2 / 2f - 2f * density, tx + tw + pad, midY + textH2 / 2f + 2f * density),
+            Paint().apply { color = pal.panel.toArgb() })
+        drawText(label, tx, tyy, tp)
         return
     }
 

@@ -1,5 +1,7 @@
 package com.ivarna.deviceinsight.presentation
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -9,7 +11,9 @@ import android.app.Activity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
@@ -36,6 +40,7 @@ import com.ivarna.deviceinsight.presentation.settings.SettingsScreen
 import com.ivarna.deviceinsight.presentation.settings.SettingsViewModel
 import com.ivarna.deviceinsight.presentation.tasks.TasksScreen
 import com.ivarna.deviceinsight.ui.caliper.Caliper
+import com.ivarna.deviceinsight.ui.caliper.CaliperMotion
 import com.ivarna.deviceinsight.ui.caliper.caliperGrid
 import com.ivarna.deviceinsight.ui.caliper.caliperMigratedFlow
 import com.ivarna.deviceinsight.ui.caliper.markCaliperMigrated
@@ -57,14 +62,12 @@ private const val ROUTE_DASHBOARD = "dashboard"
 private const val ROUTE_HARDWARE = "hardware"
 private const val ROUTE_OVERLAY = "overlay"
 private const val ROUTE_TASKS = "tasks"
-private const val ROUTE_SETTINGS = "settings"
 
 internal sealed class ScreenRoute(val route: String, val number: Int, val label: String) {
     data object Dashboard : ScreenRoute(ROUTE_DASHBOARD, 1, "OVERVIEW")
     data object Hardware : ScreenRoute(ROUTE_HARDWARE, 2, "DEVICE")
     data object Overlay : ScreenRoute(ROUTE_OVERLAY, 3, "OVERLAY")
     data object Tasks : ScreenRoute(ROUTE_TASKS, 4, "PROCESSES")
-    data object Settings : ScreenRoute(ROUTE_SETTINGS, 5, "SETTINGS")
 }
 
 // internal (not private) so [caliperRailOrder] is unit-testable (m5).
@@ -87,7 +90,11 @@ fun SystemStatsApp(initialRoute: String? = null) {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
-    val onSettings = { navController.navigate(ScreenRoute.Settings.route) { launchSingleTop = true } }
+    // SETTINGS is a frontmost full-bleed sheet, not a NavHost destination: the
+    // Overview below stays composed, so the back reveal is a pure transform
+    // (no dashboard rebuild → no dropped frames mid-transition).
+    var showSettings by rememberSaveable { mutableStateOf(false) }
+    val onSettings = { showSettings = true }
     val settingsViewModel: SettingsViewModel = hiltViewModel()
     val currentMedium by settingsViewModel.medium.collectAsStateWithLifecycle()
     var hardwareTab by remember { mutableStateOf<Int?>(null) }
@@ -112,10 +119,9 @@ fun SystemStatsApp(initialRoute: String? = null) {
         currentDestination?.hierarchy?.any { it.route == route.route } == true
     }?.number
 
-    // B2: SETTINGS owns its own ← BACK HardKey, so the global masthead and
-    // ModeRail step aside while that sheet is frontmost (full-bleed sheet).
-    val isSettings = currentDestination?.hierarchy
-        ?.any { it.route == ScreenRoute.Settings.route } == true
+    // B2: SETTINGS owns its own ← BACK HardKey; the sheet covers the chrome,
+    // so the masthead and ModeRail step aside while it is frontmost.
+    val isSettings = showSettings
 
     // B1: light status bars on Paper so clock/ink visible on light surface
     val view = LocalView.current
@@ -200,11 +206,6 @@ fun SystemStatsApp(initialRoute: String? = null) {
                             .weight(1f)
                             .fillMaxWidth()
                             .caliperGrid()
-                            .then(
-                                if (isSettings) Modifier.windowInsetsPadding(
-                                    WindowInsets.statusBars.union(WindowInsets.navigationBars)
-                                ) else Modifier
-                            )
                     ) {
                         NavHost(
                             navController = navController,
@@ -235,13 +236,6 @@ fun SystemStatsApp(initialRoute: String? = null) {
                             composable("power") { PowerChannel(onBack = { navController.popBackStack() }) }
                             composable("storage") { StorageChannel(onBack = { navController.popBackStack() }) }
                             composable("gpu") { GpuChannel(onBack = { navController.popBackStack() }) }
-                            composable(ScreenRoute.Settings.route) {
-                                SettingsScreen(
-                                    currentMedium = currentMedium,
-                                    onMediumSelected = settingsViewModel::setMedium,
-                                    onBack = { navController.popBackStack() }
-                                )
-                            }
                         }
                     }
                 }
@@ -266,11 +260,6 @@ fun SystemStatsApp(initialRoute: String? = null) {
                         .weight(1f)
                         .fillMaxWidth()
                         .caliperGrid()
-                        .then(
-                            if (isSettings) Modifier.windowInsetsPadding(
-                                WindowInsets.statusBars.union(WindowInsets.navigationBars)
-                            ) else Modifier
-                        )
                 ) {
                     NavHost(
                         navController = navController,
@@ -301,16 +290,36 @@ fun SystemStatsApp(initialRoute: String? = null) {
                         composable("power") { PowerChannel(onBack = { navController.popBackStack() }) }
                         composable("storage") { StorageChannel(onBack = { navController.popBackStack() }) }
                         composable("gpu") { GpuChannel(onBack = { navController.popBackStack() }) }
-                        composable(ScreenRoute.Settings.route) {
-                            SettingsScreen(
-                                currentMedium = currentMedium,
-                                onMediumSelected = settingsViewModel::setMedium,
-                                onBack = { navController.popBackStack() }
-                            )
-                        }
                     }
                 }
                 if (!isSettings) rail()
+            }
+        }
+
+        // № 05 — SETTINGS sheet: rises over the app (CaliperMotion.tBase), sinks
+        // back on dismiss. Underlying Overview never leaves composition.
+        BackHandler(enabled = showSettings) { showSettings = false }
+        AnimatedVisibility(
+            visible = showSettings,
+            enter = slideInVertically(tween(CaliperMotion.tBase, easing = CaliperMotion.Ease)) { it } +
+                fadeIn(tween(120)),
+            exit = slideOutVertically(tween(CaliperMotion.tBase, easing = CaliperMotion.Ease)) { it } +
+                fadeOut(tween(120)),
+            label = "settings-sheet"
+        ) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.background)
+                    .windowInsetsPadding(
+                        WindowInsets.statusBars.union(WindowInsets.navigationBars)
+                    )
+            ) {
+                SettingsScreen(
+                    currentMedium = currentMedium,
+                    onMediumSelected = settingsViewModel::setMedium,
+                    onBack = { showSettings = false }
+                )
             }
         }
     }

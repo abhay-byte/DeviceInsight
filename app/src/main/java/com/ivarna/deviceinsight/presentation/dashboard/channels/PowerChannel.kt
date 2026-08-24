@@ -24,7 +24,7 @@ fun PowerChannel(
     val snap by vm.bus.snapshot.collectAsStateWithLifecycle()
     val c = Caliper.colors
 
-    ChannelScaffold("№ 01.4 — POWER · S-05", "Power.", "CH-04 · battery and draw", onBack) {
+    ChannelScaffold("№ 01.4 — POWER · S-05", "Power.", "CH-04 · battery and draw", onBack, ready = m != null) {
         val metrics = m
         if (metrics == null) {
             CalibratingIndicator(percent = null)

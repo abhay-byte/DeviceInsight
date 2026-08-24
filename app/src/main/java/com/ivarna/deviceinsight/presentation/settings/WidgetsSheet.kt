@@ -173,12 +173,13 @@ private fun personality(kind: WidgetKind): String = when (kind) {
     WidgetKind.BENCH -> "BENCH — all channels"
 }
 
+// real captured widget renders (night-qualified: carbon PNGs shown in dark mode)
 private fun previewResFor(kind: WidgetKind): Int = when (kind) {
-    WidgetKind.SCOPE -> R.drawable.preview_scope_paper
-    WidgetKind.STACK -> R.drawable.preview_stack_paper
-    WidgetKind.FUEL -> R.drawable.preview_fuel_paper
-    WidgetKind.RASTER -> R.drawable.preview_raster_paper
-    WidgetKind.BENCH -> R.drawable.preview_bench_paper
+    WidgetKind.SCOPE -> R.drawable.preview_scope_280x140
+    WidgetKind.STACK -> R.drawable.preview_stack_280x140
+    WidgetKind.FUEL -> R.drawable.preview_fuel_280x140
+    WidgetKind.RASTER -> R.drawable.preview_raster_280x140
+    WidgetKind.BENCH -> R.drawable.preview_bench_280x280
 }
 
 private data class InstrumentInfo(

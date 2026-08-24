@@ -24,7 +24,7 @@ fun GpuChannel(
     val snap by vm.bus.snapshot.collectAsStateWithLifecycle()
     val c = Caliper.colors
 
-    ChannelScaffold("№ 01.6 — RASTER · S-07", "Raster.", "CH-06 · gpu load and clocks", onBack) {
+    ChannelScaffold("№ 01.6 — RASTER · S-07", "Raster.", "CH-06 · gpu load and clocks", onBack, ready = m != null) {
         val metrics = m
         if (metrics == null) {
             CalibratingIndicator(percent = null)

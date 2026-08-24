@@ -23,7 +23,7 @@ fun StorageChannel(
     val snap by vm.bus.snapshot.collectAsStateWithLifecycle()
     val c = Caliper.colors
 
-    ChannelScaffold("№ 01.5 — STORAGE · S-06", "Storage.", "CH-05 · internal volume", onBack) {
+    ChannelScaffold("№ 01.5 — STORAGE · S-06", "Storage.", "CH-05 · internal volume", onBack, ready = m != null) {
         val metrics = m
         if (metrics == null) {
             CalibratingIndicator(percent = null)

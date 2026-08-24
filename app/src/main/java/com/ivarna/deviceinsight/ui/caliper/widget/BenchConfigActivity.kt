@@ -2,14 +2,10 @@ package com.ivarna.deviceinsight.ui.caliper.widget
 
 import android.appwidget.AppWidgetManager
 import android.content.Intent
-import android.graphics.Canvas
-import android.graphics.Paint
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -17,24 +13,21 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.glance.appwidget.ExperimentalGlanceRemoteViewsApi
 import androidx.glance.appwidget.GlanceAppWidgetManager
+import androidx.glance.appwidget.GlanceRemoteViews
 import androidx.lifecycle.lifecycleScope
 import com.ivarna.deviceinsight.data.monitor.GlobalSnapshot
-import com.ivarna.deviceinsight.ui.caliper.Channel
-import com.ivarna.deviceinsight.ui.caliper.Channels
 import com.ivarna.deviceinsight.ui.caliper.Caliper
 import com.ivarna.deviceinsight.ui.caliper.CaliperTheme
 import com.ivarna.deviceinsight.ui.caliper.mediumFlow
-import com.ivarna.deviceinsight.ui.caliper.Fmt
-import com.ivarna.deviceinsight.ui.caliper.HatchPattern
 import com.ivarna.deviceinsight.ui.caliper.Medium
 import com.ivarna.deviceinsight.ui.caliper.components.*
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
@@ -70,6 +63,7 @@ class BenchConfigActivity : ComponentActivity() {
                         kind = kind,
                         systemMedium = systemMedium,
                         initial = saved ?: BenchConfig(),
+                        appWidgetId = appWidgetId,
                         onSave = { cfg -> saveConfig(cfg) },
                         onSkip = { saveConfig(BenchConfig()) },
                         onCancel = { setResult(RESULT_CANCELED); finish() }
@@ -124,6 +118,7 @@ private fun BenchConfigScreen(
     kind: WidgetKind,
     systemMedium: Medium,
     initial: BenchConfig,
+    appWidgetId: Int,
     onSave: (BenchConfig) -> Unit,
     onSkip: () -> Unit,
     onCancel: () -> Unit
@@ -140,19 +135,30 @@ private fun BenchConfigScreen(
     val medium = if (pick == MediaPick.FOLLOW) systemMedium else Medium.valueOf(pick.name)
 
     val cfg = BenchConfig(medium, followSystem, cadence, traceWindow, wattHero, compact)
-    // fresh process / stale bus → demo data, never an empty BUDGET panel; live only if <5 s old
-    val now = System.currentTimeMillis()
-    val live = GlobalSnapshot.current()
-    val snap = if (live != null && now - live.timestamp in 0 until 5_000L) live else benchDemoSnapshot(kind)
+    // real-time preview: re-sample every second while the page is visible — fresh live data
+    // when the monitor bus is warm, deterministic demo otherwise (never an empty BUDGET panel)
+    var snap by remember {
+        mutableStateOf(BenchDemo.previewSnapshot().copy(timestamp = System.currentTimeMillis()))
+    }
+    LaunchedEffect(Unit) {
+        while (true) {
+            val now = System.currentTimeMillis()
+            val live = GlobalSnapshot.current()
+            snap = if (live != null && now - live.timestamp in 0 until 5_000L) live
+                   else BenchDemo.previewSnapshot().copy(timestamp = now)
+            delay(1_000)
+        }
+    }
 
-    CaliperTheme(medium = medium) {
+    // page chrome follows the APP theme — the widget's media pick only affects the preview render
+    CaliperTheme(medium = systemMedium) {
         Column(
             modifier = Modifier.fillMaxSize().background(Caliper.colors.surface).verticalScroll(rememberScrollState()).padding(16.dp)
         ) {
             ScreenHeader("№ 05.2 — CALIBRATE", "Calibrate.", "${kind.name} instrument · configure the bench")
             Spacer(Modifier.height(12.dp))
 
-            PreviewPanel(kind, cfg, snap)
+            PreviewPanel(kind, cfg, snap, appWidgetId)
             Text(
                 "home screen · glance",
                 style = Caliper.type.meta,
@@ -212,230 +218,57 @@ private fun BenchConfigScreen(
     }
 }
 
-// ─────────────── Preview: Compose facsimile of the Glance T2 band tree ───────────────
-// Glance has no Compose ScopeTrace and cannot be embedded here — honest anatomy match,
-// not pixel-identical: header · hero · sublines · canvas band · footer upd.
 
+// --------------- Preview: REAL Glance pipeline (DI-WF-001 F2) ---------------
+// Renders the exact InstrumentBody the launcher ships - no Compose facsimile, no drift.
+// Honors live cfg edits (media pick, cadence, watt hero, window, compact channels).
+
+@OptIn(ExperimentalGlanceRemoteViewsApi::class)
 @Composable
-private fun PreviewPanel(kind: WidgetKind, cfg: BenchConfig, snap: BenchSnapshot) {
-    PanelCard(title = "PREVIEW", status = { Text(kind.name, style = Caliper.type.meta, color = Caliper.colors.ink40) }) {
-        val stale = snap.timestamp == 0L
-        when (kind) {
-            WidgetKind.SCOPE -> {
-                BandHeader("CH-01", "CPU", if (stale) "SIGNAL LOST" else "LIVE", Channels.CPU)
-                HeroLine(Fmt.pct(snap.cpuPct, 1), stale)
-                if (snap.freqGHz > 0) MetaSub(Fmt.hz((snap.freqGHz * 1e6).toLong()))
-                if (snap.tempC > 0) MetaSub(Fmt.temp(snap.tempC))
-                SparkCanvas(snap.cpuHist, Caliper.colors.channel(Channels.CPU), height = 72.dp)
-                if (!snap.governor.isNullOrBlank()) MetaSub(snap.governor!!)
-                BandFooter(updString(snap.timestamp), "${cfg.traceWindowS}s window", stale)
-            }
-            WidgetKind.STACK -> {
-                BandHeader("CH-02", "MEMORY", if (stale) "SIGNAL LOST" else "LIVE", Channels.MEMORY)
-                HeroLine(
-                    if (snap.memTotalGb > 0) String.format(java.util.Locale.US, "%.1f / %.0f GB", snap.memUsedGb, snap.memTotalGb) else "—",
-                    stale
-                )
-                HatchCanvas(snap.memComposition, height = 14.dp)
-                if (snap.memComposition.isNotEmpty()) MetaSub(compositionLabel(snap))
-                SparkCanvas(snap.memHist, Caliper.colors.channel(Channels.MEMORY), height = 28.dp)
-                BandFooter(updString(snap.timestamp), "${cfg.traceWindowS}s window", stale)
-            }
-            WidgetKind.FUEL -> {
-                BandHeader("CH-04", "POWER", if (snap.charging) "CHARGING" else if (stale) "SIGNAL LOST" else "LIVE", Channels.POWER)
-                HeroLine(if (cfg.wattHero) Fmt.wattsSigned(snap.watts) else Fmt.pct(snap.batteryPct * 100, 0), stale)
-                if (!cfg.wattHero) MetaSub(Fmt.wattsSigned(snap.watts))
-                FuelCanvas(snap.batteryPct, Caliper.colors.channel(Channels.POWER), snap.charging, height = 14.dp)
-                SparkCanvas(snap.wattHist, Caliper.colors.channel(Channels.POWER), height = 32.dp)
-                BandFooter(updString(snap.timestamp), "${cfg.traceWindowS}s window", stale)
-            }
-            WidgetKind.RASTER -> {
-                BandHeader("CH-06", "GPU", if (stale) "SIGNAL LOST" else "LIVE", Channels.GPU)
-                when {
-                    !snap.gpuFitted -> {
-                        Text("NOT FITTED", style = Caliper.type.dataM, color = Caliper.colors.ink40)
-                        if (snap.gpuName.isNotBlank()) MetaSub(snap.gpuName)
+private fun PreviewPanel(kind: WidgetKind, cfg: BenchConfig, snap: BenchSnapshot, appWidgetId: Int) {
+    val context = LocalContext.current
+    // preview at the widget's ACTUAL placed footprint (launcher options) — same tier the
+    // Exact-mode widget renders, so bands (thermal/rail) match what the user placed
+    val placed = remember(appWidgetId) {
+        val opts = if (appWidgetId != AppWidgetManager.INVALID_APPWIDGET_ID)
+            AppWidgetManager.getInstance(context).getAppWidgetOptions(appWidgetId) else null
+        val wDp = opts?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH)?.takeIf { it > 0 } ?: 280
+        val hDp = opts?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT)?.takeIf { it > 0 } ?: 140
+        Tier.of(wDp, hDp)
+    }
+    var rv by remember { mutableStateOf<android.widget.RemoteViews?>(null) }
+    LaunchedEffect(kind, placed, cfg, snap) {
+        val medium = try { resolvedMedium(context, cfg) } catch (_: Exception) { Medium.PAPER }
+        rv = try {
+            GlanceRemoteViews().compose(context, DpSize(placed.wDp.dp, placed.hDp.dp)) {
+                InstrumentBody(kind, placed, medium, cfg, snap, calibrating = false, awId = -1)
+            }.remoteViews
+        } catch (_: Exception) { null }
+    }
+    PanelCard(title = "PREVIEW", status = {
+        Text("${kind.name} · T${placed.ordinal + 1}", style = Caliper.type.meta, color = Caliper.colors.ink40)
+    }) {
+        val preview = rv
+        if (preview == null) {
+            Text("RENDERING...", style = Caliper.type.meta, color = Caliper.colors.ink40)
+        } else {
+            AndroidView(
+                factory = { c -> android.widget.FrameLayout(c) },
+                update = { host ->
+                    host.removeAllViews()
+                    runCatching {
+                        val v = preview.apply(host.context, host)
+                        host.addView(
+                            v,
+                            android.widget.FrameLayout.LayoutParams(
+                                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                                android.view.ViewGroup.LayoutParams.MATCH_PARENT
+                            )
+                        )
                     }
-                    snap.gpuRootLocked -> Text("CHANNEL LOCKED", style = Caliper.type.dataM, color = Caliper.colors.fault)
-                    else -> {
-                        HeroLine("${snap.gpuPct?.toInt() ?: 0}% · ${snap.gpuMHz ?: 0} MHz", stale)
-                        SparkCanvas(snap.gpuHist, Caliper.colors.channel(Channels.GPU), height = 28.dp)
-                        val datasheet = listOf(snap.gpuName, snap.gpuVulkan).filter { it.isNotBlank() }.distinct().joinToString(" · ")
-                        if (datasheet.isNotEmpty()) MetaSub(datasheet)
-                    }
-                }
-                BandFooter(updString(snap.timestamp), "${cfg.traceWindowS}s window", stale)
-            }
-            WidgetKind.BENCH -> {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text("DEVICEINSIGHT · BENCH", style = Caliper.type.meta, color = Caliper.colors.ink60)
-                    Spacer(Modifier.width(6.dp))
-                    Spacer(Modifier.weight(1f))
-                    Text(if (stale) "SIGNAL LOST" else "LIVE", style = Caliper.type.meta, color = if (stale) Caliper.colors.fault else Caliper.colors.ink40)
-                    Box(Modifier.padding(start = 6.dp).size(6.dp).background(if (stale) Caliper.colors.ink40 else Caliper.colors.accent))
-                }
-                Spacer(Modifier.height(8.dp))
-                cfg.compactChannels.take(4).forEach { chId ->
-                    val (label, value) = benchTileData(chId, snap)
-                    SpecRow("$chId · $label", value)
-                }
-                BandFooter(updString(snap.timestamp), "${cfg.compactChannels.size} channels", stale)
-            }
+                },
+                modifier = Modifier.fillMaxWidth().aspectRatio(placed.wDp.toFloat() / placed.hDp.toFloat())
+            )
         }
     }
-}
-
-@Composable
-private fun BandHeader(chId: String, name: String, status: String, ch: Channel) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(width = 4.dp, height = 12.dp).background(Caliper.colors.channel(ch)))
-        Spacer(Modifier.width(6.dp))
-        Text("$chId · $name", style = Caliper.type.meta, color = Caliper.colors.ink60)
-        Spacer(Modifier.width(6.dp))
-        Text(status, style = Caliper.type.meta, color = Caliper.colors.ink40)
-    }
-}
-
-@Composable
-private fun HeroLine(text: String, stale: Boolean) {
-    Text(text, style = Caliper.type.readoutL, color = if (stale) Caliper.colors.ink40 else Caliper.colors.ink)
-}
-
-@Composable
-private fun MetaSub(text: String) {
-    Text(text, style = Caliper.type.meta, color = Caliper.colors.ink60)
-}
-
-@Composable
-private fun BandFooter(upd: String, window: String, stale: Boolean) {
-    Spacer(Modifier.height(8.dp))
-    Row(Modifier.fillMaxWidth()) {
-        Text(if (stale) "upd SIGNAL LOST" else "upd $upd", style = Caliper.type.meta, color = if (stale) Caliper.colors.fault else Caliper.colors.ink40)
-        Spacer(Modifier.weight(1f))
-        Text(window, style = Caliper.type.meta, color = Caliper.colors.ink40)
-    }
-}
-
-/** polyline spark from real history — never ScopeTrace, never a fake curve */
-@Composable
-private fun SparkCanvas(values: List<Float>, color: Color, height: androidx.compose.ui.unit.Dp) {
-    if (values.isEmpty()) return
-    val hairline = Caliper.colors.hairline
-    Canvas(Modifier.fillMaxWidth().height(height)) {
-        val step = size.width / (values.size - 1).coerceAtLeast(1)
-        val max = values.maxOrNull()?.takeIf { it > 0.001f } ?: 1f
-        // graph-paper grid
-        for (i in 1..3) {
-            val x = size.width * i / 4f
-            drawLine(hairline, Offset(x, 0f), Offset(x, size.height), 1f)
-        }
-        drawLine(hairline, Offset(0f, size.height / 2f), Offset(size.width, size.height / 2f), 1f)
-        val path = Path()
-        values.forEachIndexed { i, v ->
-            val y = size.height * (1f - (v / max).coerceIn(0f, 1f)) * 0.92f + size.height * 0.04f
-            if (i == 0) path.moveTo(0f, y) else path.lineTo(i * step, y)
-        }
-        drawPath(path, color, style = Stroke(width = 2.dp.toPx()))
-    }
-}
-
-/** cadastral composition bar — SOLID/DIAGONAL/CROSS/VERTICAL patterns from memComposition */
-@Composable
-private fun HatchCanvas(segs: List<MemSeg>, height: androidx.compose.ui.unit.Dp) {
-    val c = Caliper.colors
-    val list = segs.ifEmpty { listOf(MemSeg(1f, HatchPattern.NONE, "")) }
-    Canvas(Modifier.fillMaxWidth().height(height).border(1.dp, c.hairline)) {
-        var x = 0f
-        list.forEach { seg ->
-            val w = size.width * seg.fraction.coerceIn(0f, 1f)
-            val col = when (seg.channelId) {
-                "CH-01" -> c.channel(Channels.CPU)
-                "CH-02" -> c.channel(Channels.MEMORY)
-                "CH-03" -> c.channel(Channels.NETWORK)
-                "CH-04" -> c.channel(Channels.POWER)
-                "CH-05" -> c.channel(Channels.STORAGE)
-                "CH-06" -> c.channel(Channels.GPU)
-                else -> c.ink40
-            }
-            val rectW = w.coerceAtLeast(0f)
-            drawRect(col.copy(alpha = if (seg.pattern == HatchPattern.NONE) 0f else 0.85f),
-                topLeft = Offset(x, 0f), size = androidx.compose.ui.geometry.Size(rectW, size.height))
-            when (seg.pattern) {
-                HatchPattern.DIAGONAL, HatchPattern.CROSS -> {
-                    val gap = 5.dp.toPx()
-                    var lx = x
-                    while (lx < x + rectW) {
-                        drawLine(col, Offset(lx, size.height), Offset(lx + size.height, 0f), 1.2f)
-                        if (seg.pattern == HatchPattern.CROSS) drawLine(col, Offset(lx, 0f), Offset(lx + size.height, size.height), 1.2f)
-                        lx += gap
-                    }
-                }
-                HatchPattern.VERTICAL -> {
-                    val gap = 5.dp.toPx()
-                    var lx = x
-                    while (lx < x + rectW) {
-                        drawLine(col, Offset(lx, 0f), Offset(lx, size.height), 1.2f)
-                        lx += gap
-                    }
-                }
-                else -> {}
-            }
-            x += rectW
-        }
-    }
-}
-
-/** fuel gauge strip: filled fraction + needle tick (+ charge accent) */
-@Composable
-private fun FuelCanvas(pct: Float, color: Color, charging: Boolean, height: androidx.compose.ui.unit.Dp) {
-    val c = Caliper.colors
-    Canvas(Modifier.fillMaxWidth().height(height).border(1.dp, c.hairline)) {
-        val f = pct.coerceIn(0f, 1f)
-        drawRect(color.copy(alpha = 0.85f), size = androidx.compose.ui.geometry.Size(size.width * f, size.height))
-        val nx = size.width * f
-        drawLine(c.ink, Offset(nx, 0f), Offset(nx, size.height), 2.dp.toPx())
-        if (charging) drawLine(c.accent, Offset(0f, 1.dp.toPx()), Offset(size.width, 1.dp.toPx()), 1.dp.toPx())
-    }
-}
-
-private fun compositionLabel(snap: BenchSnapshot): String {
-    var crossUsed = false
-    return snap.memComposition.filter { it.fraction >= 0.02f }.joinToString(" · ") { seg ->
-        when (seg.pattern) {
-            HatchPattern.SOLID -> "active"
-            HatchPattern.DIAGONAL -> "cached"
-            HatchPattern.CROSS -> { val l = if (!crossUsed && snap.zramGb > 0f) "zram" else "swap"; crossUsed = true; l }
-            else -> "free"
-        }
-    }
-}
-
-private fun benchTileData(chId: String, snap: BenchSnapshot): Pair<String, String> = when (chId) {
-    "CH-01" -> "CPU" to Fmt.pct(snap.cpuPct, 1)
-    "CH-02" -> "MEMORY" to if (snap.memTotalGb > 0) String.format(java.util.Locale.US, "%.1f GB", snap.memUsedGb) else "—"
-    "CH-03" -> "NETWORK" to if (snap.netDown > 0 || snap.netUp > 0) "↓ ${Fmt.rate(snap.netDown)} ↑ ${Fmt.rate(snap.netUp)}" else "—"
-    "CH-04" -> "POWER" to if (snap.batteryPresent) Fmt.wattsSigned(snap.watts) else "NOT FITTED"
-    "CH-05" -> "STORAGE" to if (snap.stoTotalGb > 0) String.format(java.util.Locale.US, "%.1f / %.0f GB", snap.stoUsedGb, snap.stoTotalGb) else "—"
-    "CH-06" -> "GPU" to if (snap.gpuFitted) "${snap.gpuPct?.toInt() ?: 0}% · ${snap.gpuMHz ?: 0} MHz" else "NOT FITTED"
-    else -> chId to "—"
-}
-
-private fun benchDemoSnapshot(kind: WidgetKind): BenchSnapshot {
-    return BenchSnapshot(
-        timestamp = System.currentTimeMillis(),
-        cpuPct = 38.4f,
-        freqGHz = 2.4f,
-        tempC = 46f,
-        memUsedGb = 6.8f,
-        memTotalGb = 12f,
-        batteryPct = 0.72f,
-        watts = -1.2f,
-        charging = false,
-        gpuFitted = false,
-        gpuName = "Preview GPU",
-        cpuHist = listOf(10f, 20f, 35f, 38f, 30f, 25f),
-        memHist = listOf(50f, 55f, 52f, 48f),
-        wattHist = listOf(-1.0f, -1.2f, -0.8f, -1.1f),
-        batteryPresent = true
-    )
 }

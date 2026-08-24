@@ -31,4 +31,8 @@
     <color name="white_87">#DEFFFFFF</color>
     <color name="white_60">#99FFFFFF</color>
     <color name="white_38">#61FFFFFF</color>
+
+    <!-- BENCH widget first-paint tokens — mirror Caliper PaperColors (CaliperTheme.kt) -->
+    <color name="bench_panel">#FBF9F3</color>
+    <color name="bench_ink60">#99191713</color>
 </resources>

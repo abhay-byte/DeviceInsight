@@ -29,7 +29,7 @@ fun MemoryChannel(
     val snap by vm.bus.snapshot.collectAsStateWithLifecycle()
     val c = Caliper.colors
 
-    ChannelScaffold("№ 01.2 — MEMORY · S-03", "Memory.", "CH-02 · pressure and composition", onBack) {
+    ChannelScaffold("№ 01.2 — MEMORY · S-03", "Memory.", "CH-02 · pressure and composition", onBack, ready = m != null) {
         val metrics = m
         if (metrics == null) {
             CalibratingIndicator(percent = null)

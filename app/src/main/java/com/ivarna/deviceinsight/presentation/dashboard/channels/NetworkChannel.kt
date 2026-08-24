@@ -30,7 +30,7 @@ fun NetworkChannel(
     val snap by vm.bus.snapshot.collectAsStateWithLifecycle()
     val c = Caliper.colors
 
-    ChannelScaffold("№ 01.3 — NETWORK · S-04", "Network.", "CH-03 · throughput, both directions", onBack) {
+    ChannelScaffold("№ 01.3 — NETWORK · S-04", "Network.", "CH-03 · throughput, both directions", onBack, ready = m != null) {
         val metrics = m
         if (metrics == null) {
             CalibratingIndicator(percent = null)
