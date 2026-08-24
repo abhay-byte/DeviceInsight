@@ -1,121 +1,111 @@
 package com.ivarna.deviceinsight.presentation.hardware.components
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Battery5Bar
-import androidx.compose.material.icons.filled.BatteryChargingFull
-import androidx.compose.material.icons.filled.ElectricBolt
-import androidx.compose.material.icons.filled.Thermostat
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.ivarna.deviceinsight.domain.model.HardwareInfo
+import com.ivarna.deviceinsight.ui.caliper.Caliper
+import com.ivarna.deviceinsight.ui.caliper.Channels
+import com.ivarna.deviceinsight.ui.caliper.Fmt
+import com.ivarna.deviceinsight.ui.caliper.components.*
+import java.util.Locale
 
 @Composable
 fun BatteryTab(info: HardwareInfo) {
     val battery = info.batteryDetailedInfo
-    val primary = MaterialTheme.colorScheme.primary
-    val tertiary = MaterialTheme.colorScheme.tertiary
-    val error = MaterialTheme.colorScheme.error
+    val c = Caliper.colors
 
-    // Determine color based on level
-    val levelColor = when {
-        info.batteryLevel > 60 -> MaterialTheme.colorScheme.tertiary
-        info.batteryLevel > 25 -> MaterialTheme.colorScheme.primary
-        else -> error
+    // memoized formatted strings — avoids re-formatting on recomposition
+    val voltageText = remember(info.batteryVoltage) {
+        String.format(Locale.US, "%.3f V", info.batteryVoltage / 1000f)
     }
+    val tempText = remember(info.batteryTemperature) { Fmt.temp(info.batteryTemperature) }
+    val levelFraction = remember(info.batteryLevel) { (info.batteryLevel.coerceIn(0, 100) / 100f) }
+    val isCritical = info.batteryLevel < 20
+    val isHot = info.batteryTemperature >= 45f
 
-    Column(modifier = Modifier.padding(bottom = 16.dp)) {
-
-        // ── Battery Hero Card ──────────────────────────────────────────────
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 6.dp)
-                .clip(RoundedCornerShape(0.dp))
-                .background(
-                    Brush.verticalGradient(
-                        listOf(levelColor.copy(alpha = 0.10f), levelColor.copy(alpha = 0.02f))
-                    )
-                )
-                .border(
-                    1.dp,
-                    Brush.linearGradient(
-                        listOf(levelColor.copy(alpha = 0.3f), levelColor.copy(alpha = 0.05f))
-                    ),
-                    RoundedCornerShape(0.dp)
-                )
-                .padding(horizontal = 20.dp, vertical = 18.dp)
-        ) {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Icon(
-                    imageVector = if (info.isCharging)
-                        Icons.Filled.BatteryChargingFull
-                    else
-                        Icons.Filled.Battery5Bar,
-                    contentDescription = null,
-                    tint = levelColor,
-                    modifier = Modifier.size(32.dp)
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "${info.batteryLevel}%",
-                    style = MaterialTheme.typography.displaySmall.copy(
-                        fontWeight = FontWeight.ExtraBold,
-                        fontFamily = FontFamily.Monospace
-                    ),
-                    color = levelColor
-                )
-                Text(
-                    text = if (info.isCharging) "Charging" else info.batteryStatus,
-                    style = MaterialTheme.typography.bodySmall.copy(letterSpacing = 0.5.sp),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f)
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly
-                ) {
-                    SummaryItem("Voltage",  "${info.batteryVoltage / 1000f} V", color = primary)
-                    SummaryItem("Temp",     "${info.batteryTemperature}°C",      color = if (info.batteryTemperature > 40f) error else tertiary)
-                    SummaryItem("Health",   info.batteryHealth,                  color = levelColor)
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        // ── FUEL — hero gauge (§5.7 LinearGauge, CH-04 POWER) ─────────────
+        PanelCard(
+            channel = Channels.POWER,
+            title = Channels.POWER.label + " · FUEL",
+            status = {
+                if (info.isCharging) {
+                    LedDot(active = true, color = c.channel(Channels.POWER))
+                    Spacer(Modifier.width(6.dp))
+                    Text("CHARGING", style = Caliper.type.meta, color = c.ink60)
+                } else {
+                    Text(info.batteryStatus.uppercase(), style = Caliper.type.meta, color = if (isCritical) c.fault else c.ink60)
                 }
             }
-        }
-
-        InfoSection(title = "Battery Details", icon = Icons.Filled.Battery5Bar) {
-            InfoRow("Power Source",   battery.powerSource)
-            InfoRow("Technology",     info.batteryTechnology)
-            InfoRow("Capacity",       battery.capacity)
-            InfoRow("Charge Counter", battery.chargeCounter,  monospace = true)
-            InfoRow("Charge Rate",    battery.currentNow,     monospace = true)
-            InfoRow("Cycles",         battery.chargingCycles.toString(), monospace = true)
-            if (info.isCharging) {
-                InfoRow("Remaining Charge Time", battery.remainingChargeTime)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.Bottom,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                OdometerText(
+                    text = "${info.batteryLevel}%",
+                    style = Caliper.type.readoutL,
+                    color = if (isCritical) c.fault else c.ink
+                )
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        text = voltageText,
+                        style = Caliper.type.dataS,
+                        color = c.ink60
+                    )
+                    Text(
+                        text = tempText,
+                        style = Caliper.type.meta,
+                        color = if (isHot) c.fault else c.ink60
+                    )
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+            LinearGauge(
+                fraction = levelFraction,
+                voltage = voltageText,
+                charging = info.isCharging,
+                critical = isCritical
+            )
+            Spacer(Modifier.height(6.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text("0", style = Caliper.type.meta, color = c.ink40)
+                Text("health · ${info.batteryHealth.lowercase()}", style = Caliper.type.meta, color = c.ink60)
+                Text("100", style = Caliper.type.meta, color = c.ink40)
             }
         }
 
-        InfoSection(title = "Live Readings", icon = Icons.Filled.ElectricBolt) {
-            InfoRow("Voltage",     "${info.batteryVoltage / 1000f} V", monospace = true, valueColor = primary)
-            InfoRow("Temperature", "${info.batteryTemperature}°C",     monospace = true,
-                valueColor = if (info.batteryTemperature > 40f) error else tertiary)
+        // ── Battery Details — spec sheet with dotted leaders (S-10) ──────────
+        InfoSection(title = "Battery Details") {
+            SpecRow("power source", battery.powerSource)
+            SpecRow("technology", info.batteryTechnology)
+            SpecRow("capacity", battery.capacity)
+            SpecRow("charge counter", battery.chargeCounter)
+            SpecRow("charge rate", battery.currentNow)
+            SpecRow("cycles", if (battery.chargingCycles >= 0) battery.chargingCycles.toString() else "—")
+            if (info.isCharging) {
+                SpecRow("remaining charge", battery.remainingChargeTime)
+            }
+        }
+
+        // ── Live Readings — thermal ramp (§5.7/§4.1 Thermal is a ramp) ───────
+        InfoSection(title = "Live Readings") {
+            SpecRow("voltage", voltageText)
+            SpecRow("temperature", tempText)
+            Spacer(Modifier.height(8.dp))
+            ThermalGauge(tempC = info.batteryTemperature, modifier = Modifier.fillMaxWidth())
         }
     }
 }
