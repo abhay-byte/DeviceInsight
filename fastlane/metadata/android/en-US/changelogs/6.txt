@@ -1,0 +1,17 @@
+DeviceInsight 1.0.5 (Build 6) — Truthful FPS HUD & Correct Display Refresh
+
+This update fixes the FPS HUD to show real, honest signal and corrects display refresh in standard mode.
+
+FPS HUD — TRUTHFUL SIGNAL, NOT 0/—
+• SurfaceFlinger now measures real frametime: (FrameCompleted - FrameStart)/1e6 -> 1000/avgMs, Jank via expected vsync ceil. Fixed System.nanoTime()-1s math and replaced 10Hz dumpsys storm with 1Hz DisplayManager ticker (OverlayService -> MonitorBus -> HudFast).
+• Android 15+ parser: RequestedLayerState{ pkg/SurfaceView ... } stripped to layer name, hex handle and parentId/z stripped, short pkg matching. Short 800ms cache, invalidated on package change/latency empty - was 30s brittle.
+• Layer selection: prefers SurfaceView/NativeActivity/Vulkan/GLSurfaceView/#, filters ActivityRecord/InputSink. Game vs UI routing fixed: games SF only (never gfxinfo which measures UI), UI SF -> gfxinfo FrameCompleted deltas -> histogram.
+• Privilege chain AUTO: ROOT (su) -> Shizuku UserService (IShellService.aidl, not reflection) -> STANDARD. ShellGateway cached hasSu, Tier policy per command.
+
+STANDARD MODE — HONEST REF
+• When dumpsys window/SurfaceFlinger/gfxinfo are blocked (Android 14/15/16 without root/Shizuku, Permission Denial for u0_aXXX), HUD no longer flashes 0/—. For UI apps shows honest REF (display panel rate) via DisplayManager; for games shows — (never fake 60).
+• Foreground resolver: dumpsys window mCurrentFocus/mFocusedApp -> dumpsys activity ResumedActivity -> UsageStatsManager (requires Usage Access) fallback. Never measures self.
+• Display refresh fix: replaced app-limited WindowManager.refreshRate (normal=60 bucket) with DisplayManager.getDisplay(DEFAULT_DISPLAY).mode.refreshRate + supportedModes activeModeId lookup. realme X2 Pro now correctly shows 90 REF (panel 90) not 60, while 60Hz mode still shows 60 REF. Fallback to dumpsys mActiveRenderFrameRate/renderFrameRate for ROOT/SHIZUKU, else 60.
+
+BUILD
+• versionCode 5->6, versionName 1.0.4->1.0.5 (app/build.gradle.kts + com.ivarna.deviceinsight.yml). R8 minify + shrinkResources, signed AAB/APK, verified on RMX1931 realme X2 Pro (Android 16 90Hz) and OPD2403 (Android 16 120Hz): Chrome/Firefox 90 REF STANDARD, logcat FPS 90 REF no crash, Gradle daemons stopped.

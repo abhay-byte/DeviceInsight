@@ -1,5 +1,27 @@
 # DeviceInsight Release Notes
 
+## Version 1.0.5 (Build 6) — Truthful FPS HUD & Correct Display Refresh
+
+### 📊 FPS HUD — Truthful Signal, Not 0/—
+
+- **SurfaceFlinger real frametime** — Fixed `SurfaceFlingerFpsDataSource.kt:118-162` to measure `(frameComplete - frameStart)/1e6` avg → `1000/avgMs` and `ceil(frameTime/refreshPeriod)` jank, replaced `System.nanoTime()-1s` math and `10Hz` dumpsys storm with `1Hz` `Dispatchers.IO` ticker (`OverlayService.kt:1Hz` → `MonitorBus` → `HudFast` → `HudPanel`). `parseLayerName` now strips `RequestedLayerState{ pkg/SurfaceView ... }` hex handle + `parentId/z` (Android 15+) and matches short pkg (`ForegroundAppResolver.kt` sanitize `null`).
+- **Layer selection + cache** — Prefers `SurfaceView/NativeActivity/Vulkan/GLSurfaceView/#` and filters `ActivityRecord/InputSink`; short `800ms` cache invalidated on package change/latency empty (was `30s` brittle). Package change clears `lastGood` so old game's FPS never leaks to new app, median-3 smoothing for display, `LAST_GOOD_HOLD 3500ms`.
+- **Routing honest by surface** — `FpsRepository.kt:55-92` games `SF` only (never `gfxinfo` which measures UI), UI `SF → gfxinfo FrameCompleted deltas (with header by name + package reset) → histogram`. `DMA` deferred (Adreno `dma_fence` inflates). `FpsMethod.SURFACEFLINGER/GFXINFO/DMA_FENCE/DISPLAY/NONE` with labels `SF/GFX/DMA/REF/—`, `FpsMonitor.kt:33-41` mapping.
+- **Privilege chain AUTO fixed** — `PrivilegePolicy.kt` `ROOT (su, cached hasSu) → SHIZUKU UserService IShellService.aidl` (not reflection) `→ STANDARD`; `ShellGateway.kt` cached `hasSu`, `ShellUserService.kt` binds `ShizukuAccess.kt` permission. `ForegroundAppResolver.kt:22-54` `resolve()` `mCurrentFocus|mFocusedApp` → `ResumedActivity` → `UsageStatsManager` (10s window), `pidOf` + `refreshRateHz`, self-filter, `extractPackage()` sanitize `"null"`.
+
+### 🖥️ STANDARD Mode — Honest REF Instead of Fake 60
+
+- **Fallback for unprivileged** — `FpsRepository.kt:82-92` when `raw==null && !isGame` ( `dumpsys window|SurfaceFlinger --list --latency|gfxinfo|display` blocked `Permission Denial` for `u0_aXXX` on Android 14/15/16, only `shell uid2000` can dump) shows `FpsSnapshot(DISPLAY=REF, STANDARD)` with `foreground.refreshRateHz ?: getDisplayRefreshHz() ?: 60` coerced `1..240`. Games intentionally keep `—` (no fake `REF`). `FpsMonitor` logs `FPS 90 REF pkg=chrome access=STANDARD`.
+- **Foreground UsageStats + correct panel Hz** — `ForegroundAppResolver.kt:30-56` `readFromUsageStats()` filtered self, `readActiveRenderFrameRate()` now `DisplayManager.getDisplay(DEFAULT_DISPLAY).mode.refreshRate` + `supportedModes` active `modeId` lookup → `max`, then `WindowManager.display.refreshRate`, then privileged `dumpsys display mActiveRenderFrameRate/renderFrameRate` (blocked in STANDARD) else `60`. Previously `WindowManager` returned app bucket `normal=60` (`FrameRateCategoryRate`) so `realme X2 Pro` panel `90Hz` (`modeId2 90` `mActiveRenderFrameRate=90`) showed `60 REF`; now correctly shows `90 REF` (and `60 REF` when panel `modeId1 60`). Verified `logcat FPS 90 REF` on `RMX1931` Chrome/Firefox vs `—` before.
+- **Tests & F-Droid** — `FpsRepositoryTest.kt` (8→9, `DISPLAY` fallback), `ForegroundAppResolverTest.kt` generic `executePolicy(any(),any())`, `Gfxinfo` package reset, `SurfaceFlinger` fixtures, `ShellGatewayIntegrationTest` 5, `PrivilegePolicyTest` 7, `mockk:1.13.10`, `aidl=true`, `lintDebug BUILD SUCCESSFUL`.
+
+### 🔧 Build
+
+- **Version bump** — `versionCode 5 → 6`, `versionName 1.0.4 → 1.0.5` in `app/build.gradle.kts` + `com.ivarna.deviceinsight.yml` (`CurrentVersion 1.0.5 / CurrentVersionCode 6`). `SettingsScreen.kt:277` still `${BuildConfig.VERSION_NAME} · Build ${BuildConfig.VERSION_CODE}` dynamic — no hardcoded UI strings.
+- **Artifacts** — `bundleRelease` R8 minify + `shrinkResources` `AAB` + `assembleRelease` `APK` signed via `../keys/deviceinsight-key.properties` (`storeFile`), tested `adb install -r` on `RMX1931 realme X2 Pro` (`Android 16 90Hz` `mActiveRenderFrameRate=90`) and `OPD2403` (`120Hz`): UI `90 REF` STANDARD, no crash on missing `Shizuku`/`su`, `01 USAGE` + `Chrome` foreground verified.
+
+---
+
 ## Version 1.0.4 (Build 5) — Connected Calibration, Overlay Preview & Navigation Integrity
 
 ### 📖 Calibration — Connected Pages, No REV

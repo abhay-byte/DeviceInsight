@@ -145,25 +145,51 @@ class ForegroundAppResolver @Inject constructor(
     }
 
     private fun readActiveRenderFrameRate(): Float {
-        // Prefer WindowManager
+        // 1. Panel mode via DisplayManager - no DUMP permission, returns physical panel Hz (90 on realme X2 Pro)
+        //    display.refreshRate is app bucket (normal=60) on Android 11+, so prefer mode.refreshRate.
+        try {
+            val dm = appContext.getSystemService(Context.DISPLAY_SERVICE) as? android.hardware.display.DisplayManager
+            val d: android.view.Display? = dm?.getDisplay(android.view.Display.DEFAULT_DISPLAY)
+                ?: if (android.os.Build.VERSION.SDK_INT >= 30) appContext.display
+                else {
+                    @Suppress("DEPRECATION")
+                    (appContext.getSystemService(Context.WINDOW_SERVICE) as? android.view.WindowManager)?.defaultDisplay
+                }
+            if (d != null) {
+                val modeRate = try { d.mode.refreshRate } catch (_: Throwable) { 0f }
+                if (modeRate > 0f && modeRate.isFinite()) return modeRate
+                val supported = try { d.supportedModes } catch (_: Throwable) { null }
+                if (!supported.isNullOrEmpty()) {
+                    val activeId = try { d.mode.modeId } catch (_: Throwable) { -1 }
+                    val active = supported.firstOrNull { it.modeId == activeId }?.refreshRate
+                    if (active != null && active > 0f && active.isFinite()) return active
+                    // Fallback to max supported (closest to panel max) rather than app-limited 60
+                    val max = supported.maxOfOrNull { it.refreshRate } ?: 0f
+                    if (max > 0f && max.isFinite()) return max
+                }
+                val rate = try { d.refreshRate } catch (_: Throwable) { 0f }
+                if (rate > 0f && rate.isFinite()) return rate
+            }
+        } catch (_: Throwable) {}
+        // 2. WindowManager fallback
         try {
             val wm = appContext.getSystemService(Context.WINDOW_SERVICE) as? android.view.WindowManager
-            val display = if (android.os.Build.VERSION.SDK_INT >= 30) {
-                appContext.display
-            } else {
+            val display = if (android.os.Build.VERSION.SDK_INT >= 30) appContext.display
+            else {
                 @Suppress("DEPRECATION") wm?.defaultDisplay
             }
             val rate = display?.refreshRate
-            if (rate != null && rate > 0f) return rate
+            if (rate != null && rate > 0f && rate.isFinite()) return rate
             val wmRate = wm?.defaultDisplay?.refreshRate
-            if (wmRate != null && wmRate > 0f) return wmRate
+            if (wmRate != null && wmRate > 0f && wmRate.isFinite()) return wmRate
         } catch (_: Throwable) {}
+        // 3. dumpsys display (privileged only - blocked in STANDARD without DUMP, but try for ROOT/SHIZUKU)
         val (displayResult, _) = shellGateway.executePolicy("dumpsys display 2>/dev/null")
         if (displayResult.isSuccess && displayResult.output.isNotBlank()) {
             val activeRate = Regex("""mActiveRenderFrameRate=([0-9.]+)""").find(displayResult.output)?.groupValues?.get(1)?.toFloatOrNull()
-            if (activeRate != null && activeRate > 0f) return activeRate
+            if (activeRate != null && activeRate > 0f && activeRate.isFinite()) return activeRate
             val renderRate = Regex("""renderFrameRate ([0-9.]+)""").find(displayResult.output)?.groupValues?.get(1)?.toFloatOrNull()
-            if (renderRate != null && renderRate > 0f) return renderRate
+            if (renderRate != null && renderRate > 0f && renderRate.isFinite()) return renderRate
         }
         return 60f
     }
