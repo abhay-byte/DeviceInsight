@@ -99,14 +99,29 @@ class FpsRepositoryTest {
         fg("com.example.game", isGame = true)
         coEvery { surfaceSource.readFps() } returns snap(60f, FpsMethod.SURFACEFLINGER, "com.example.game")
         repo.getFps()
-        // Transient failure would hold, but package changes
-        fg("com.other.app", isGame = false)
+        // Transient failure would hold, but package changes — for game, no DISPLAY fallback, so NONE
+        fg("com.other.game2", isGame = true)
         coEvery { surfaceSource.readFps() } returns null
         coEvery { gfxSource.readFps() } returns null
         val result = repo.getFps()
         assertEquals(FpsMethod.NONE, result.method)
         assertFalse(result.isStale)
         assertEquals(0f, result.currentFps)
+    }
+
+    @Test
+    fun clearsHeldSampleOnPackageChange_uiFallsBackToRefresh() = runBlocking {
+        fg("com.example.game", isGame = true)
+        coEvery { surfaceSource.readFps() } returns snap(60f, FpsMethod.SURFACEFLINGER, "com.example.game")
+        repo.getFps()
+        // Package changes to UI app where SF/GFX blocked -> should fallback to REF (display) not old game FPS
+        fg("com.other.app", isGame = false)
+        coEvery { surfaceSource.readFps() } returns null
+        coEvery { gfxSource.readFps() } returns null
+        val result = repo.getFps()
+        assertEquals(FpsMethod.DISPLAY, result.method)
+        assertFalse(result.isStale)
+        assertTrue(result.currentFps in 55f..65f) // refresh 60
     }
 
     @Test

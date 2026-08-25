@@ -22,8 +22,41 @@ class ForegroundAppResolver @Inject constructor(
     fun resolve(): ForegroundApp? {
         // Prefer fg_app daemon file if root available? DeviceInsight daemon not ported yet, so skip
         readFromDumpsys()?.let { return it }
-        return readFromActivityDumpsys()
+        readFromActivityDumpsys()?.let { return it }
+        return readFromUsageStats()
     }
+
+    /** UsageStats fallback for STANDARD mode where dumpsys is blocked (Android 14+). */
+    private fun readFromUsageStats(): ForegroundApp? {
+        return try {
+            val usm = appContext.getSystemService(Context.USAGE_STATS_SERVICE) as? android.app.usage.UsageStatsManager
+                ?: return null
+            // Check permission via AppOps
+            val appOps = appContext.getSystemService(Context.APP_OPS_SERVICE) as android.app.AppOpsManager
+            val mode = appOps.checkOpNoThrow(
+                android.app.AppOpsManager.OPSTR_GET_USAGE_STATS,
+                android.os.Process.myUid(),
+                appContext.packageName
+            )
+            if (mode != android.app.AppOpsManager.MODE_ALLOWED) return null
+            val end = System.currentTimeMillis()
+            val begin = end - 10_000L
+            val stats = usm.queryUsageStats(android.app.usage.UsageStatsManager.INTERVAL_DAILY, begin, end)
+                ?: return null
+            val sorted = stats.filter { it.packageName != appContext.packageName }
+                .sortedByDescending { it.lastTimeUsed }
+            val top = sorted.firstOrNull() ?: return null
+            val pkg = top.packageName ?: return null
+            if (pkg == appContext.packageName) return null
+            val pid = pidOf(pkg)
+            val refresh = readActiveRenderFrameRate()
+            ForegroundApp(pkg, pid, refresh)
+        } catch (_: Throwable) {
+            null
+        }
+    }
+
+    fun getDisplayRefreshHz(): Float = readActiveRenderFrameRate()
 
     fun isGameLikeSurface(packageName: String): Boolean {
         if (KNOWN_GAME_PACKAGES.any { packageName.startsWith(it) || packageName.contains(it) }) return true

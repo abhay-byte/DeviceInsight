@@ -32,6 +32,7 @@ enum class FpsMethod {
     DMA_FENCE,
     SURFACEFLINGER,
     GFXINFO,
+    DISPLAY,
     NONE
 }
 
@@ -39,5 +40,6 @@ fun FpsMethod.label(): String = when (this) {
     FpsMethod.DMA_FENCE -> "DMA"
     FpsMethod.SURFACEFLINGER -> "SF"
     FpsMethod.GFXINFO -> "GFX"
+    FpsMethod.DISPLAY -> "REF"
     FpsMethod.NONE -> "—"
 }

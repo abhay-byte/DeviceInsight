@@ -34,6 +34,7 @@ class FpsMonitor @Inject constructor(
                     FpsMethod.SURFACEFLINGER -> "SF"
                     FpsMethod.GFXINFO -> "GFX"
                     FpsMethod.DMA_FENCE -> "DMA"
+                    FpsMethod.DISPLAY -> "REF"
                     FpsMethod.NONE -> "—"
                 }
                 Log.d(TAG, "FPS ${snap.currentFps.toInt()} $src pkg=${snap.packageName} access=${snap.access} isStale=${snap.isStale}")

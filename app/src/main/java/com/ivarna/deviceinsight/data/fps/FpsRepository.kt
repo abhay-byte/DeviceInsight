@@ -55,7 +55,7 @@ class FpsRepositoryImpl @Inject constructor(
         if (isGame) {
             // Games: SF only, never gfxinfo (gfxinfo measures UI, not Vulkan/NativeActivity)
             rawSnapshot = surfaceFlingerSource.readFps()?.takeIf { it.currentFps > 0f && it.method != FpsMethod.NONE }
-            // No gfxinfo fallback for games — honest "—" if SF unavailable
+            // No gfxinfo fallback for games — honest "—" if SF unavailable (standard UI refresh fallback below handles UI only)
         } else {
             // UI: SF first, then gfxinfo fallback
             rawSnapshot = surfaceFlingerSource.readFps()?.takeIf { it.currentFps > 0f && it.method != FpsMethod.NONE }
@@ -74,6 +74,22 @@ class FpsRepositoryImpl @Inject constructor(
             } else if (age >= LAST_GOOD_HOLD_MS) {
                 lastGoodSnapshot = null
             }
+        }
+
+        // STANDARD fallback: when no privileged source succeeded (and no stale to hold), show display refresh at least for UI.
+        // This ensures overlay shows UI FPS (REF) even without root/Shizuku on Android 14/15/16 where dumpsys is blocked.
+        // Uses UsageStats or display refresh when dumpsys is blocked.
+        if (rawSnapshot == null && !isGame) {
+            val refresh = foreground?.refreshRateHz
+                ?: foregroundAppResolver.getDisplayRefreshHz().takeIf { it > 0f && it.isFinite() }
+                ?: 60f
+            // Use REF as honest display-rate indicator; not fake SF/GFX.
+            rawSnapshot = FpsSnapshot(
+                currentFps = refresh.coerceIn(1f, 240f),
+                method = FpsMethod.DISPLAY,
+                access = com.ivarna.deviceinsight.data.fps.privilege.PrivilegeTier.STANDARD,
+                packageName = pkg
+            )
         }
 
         // Update lastGood when we have fresh valid data
