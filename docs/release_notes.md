@@ -1,5 +1,38 @@
 # DeviceInsight Release Notes
 
+## Version 1.0.4 (Build 5) — Connected Calibration, Overlay Preview & Navigation Integrity
+
+### 📖 Calibration — Connected Pages, No REV
+
+- **Restored full 6-page wizard with swipe** — Reverted 2-page `Welcome → Setup` simplification (`832cfcc`/`06e7cd3`) back to `4ba82ab` full sheet set: `00 Cover`, `01 USAGE ACCESS`, `02 CAMERA`, `03 OVERLAY`, `04 ROOT PROBE`, `Certificate`. Pages are now `HorizontalPager(rememberPagerState(pageCount={6}))` with `beyondViewportPageCount=1` — swipe left/right connects every sheet; `HardKey` callbacks `scope.launch { pager.animateScrollToPage(n) }` also animate.
+- **Numbering follows Caliper design** — Bottom row `00 01 02 03 04` with `✓` for completed (`i < current` or `current>=5` all ✓), `ink` for active/visited vs `ink40` for pending, exactly as `4ba82ab` progress row. Pager `currentPage` drives it; no separate `step` state.
+- **REV/DOC removed** — Deleted `DOC № DI-0001 · REV 2.0` from `CoverSheet` (top) and `CertificateSheet` (`DeviceInsight` + date now only) and changed `INSTRUMENT · CALIPER  REV A` panel to `INSTRUMENT · CALIPER` per request. No repository revision shown in onboarding.
+- **Cover hint** — Added `swipe to navigate →` `meta` `ink40` hint under calibration note.
+
+### 🖥️ Overlay Preview — No More Clipping
+
+- **ScaledPreview fix** — `OverlayScreen.kt:288` custom `Layout` now measures HUD at true size (`Constraints.Infinity`) then `placeWithLayer(0,0){ scaleX/Y + TransformOrigin(0f,0f) }` with `0f,0f` top-left origin. Previously default center-origin shifted scaled `L` (340dp) at narrow width (e.g. 324dp inner → 0.95 scale) by `8.5dp` causing right-edge clipping against outer `clipToBounds`. Now visual aligns to layout `scaledWidth/Height` without shift.
+- **Single source of truth** — `HudPreviewHost` `hudWidth = HudScales.of(scale).widthDp.dp` (156/252/340 for S/M/L) + `frameWidth = min(desired, available)` + `innerAvailable = frameWidth - 16dp`; scaleFactor coerced `0.1..1f`. No duplicated constants.
+
+### 🧭 Navigation — Shared Rail Logic
+
+- **Extracted `selectRailTab`** — `SystemStatsApp.kt:96` `internal fun NavController.selectRailTab(route: ScreenRoute)` implements: `isAlreadyOnRoot` no-op else `isInSameGraph` → `popBackStack(route,false)` with fallback `navigate { popUpTo(route){inclusive=false} launchSingleTop }` else `navigateToTopLevel`. `ModeRail.onSelect` now single call `navController.selectRailTab(route)` instead of duplicated hierarchy checks.
+- **Regression test now exercises production branch** — `NavigationRegressionTest.kt` `selectTab` delegates to `navController.selectRailTab`; `overviewReselectionFromMemoryReturnsToOverviewRoot()` now `navController.navigate("memory")` → `selectTab(Dashboard)` asserts same-graph `popBackStack` to `dashboard` and second `selectTab(Dashboard)` no-op. Previously directly called `navigateToTopLevel` and never hit `popBackStack` branch.
+- **Bottom rail icons restored** — `CaliperChrome.kt:142` `ModeRail` horizontal/vertical lost `NumberKeyBox` (18dp numbered square `1-4`). Restored: horizontal `Row{ NumberKeyBox(n,sel); if(warning) LedDot }` + `Spacer(4.dp)` + `Text(label)`; vertical `Row{ NumberKeyBox; Spacer(10.dp); Text }`. `contentDescription` now `[n] label` for a11y. Verified on `RMX1931` bottom bar: `1 OVERVIEW` filled ink, `2 DEVICE`, `3 OVERLAY`, `4 PROCESSES`.
+
+### 🔐 Settings Wording — Optional ≠ Required
+
+- **Header** `SettingsScreen.kt:175` `ALL GRANTED/REQUIRED` → `ALL ENABLED / SETUP AVAILABLE` (both `ink60`, no `fault` red for optional). 
+- **Rows** `SpecRow` `REQUIRED` → `NOT GRANTED` for `usage/overlay/camera` to match `CalibrationSheet` `NOT GRANTED`/`GRANTED` stamps. `Overlay`/`Camera` are optional; presenting as `REQUIRED` was misleading.
+
+### 🔧 Lint & Build
+
+- **4 pre-existing lint errors fixed** — `MissingPermission` `Build.getSerial` (`DeviceProvider.kt:193` `SuppressLint`), `NewApi` `Tile.subtitle` `API 29` (`MediaTileService.kt:46` `SDK>=Q` guard), `NewApi` `wifiStandard` `API 30` (`NetworkProvider.kt:135` `SDK<R` return), `PermissionImpliesUnsupportedChromeOsHardware` (`AndroidManifest.xml:15` `<uses-feature hardware.camera required=false>`). `lintDebug` now `0` errors.
+- **Version bump** — `versionCode 4 → 5`, `versionName 1.0.3 → 1.0.4` in `app/build.gradle.kts` and `com.ivarna.deviceinsight.yml` (`CurrentVersion 1.0.4 / CurrentVersionCode 5`). `SettingsScreen` still uses `BuildConfig.VERSION_NAME · Build CODE` dynamically — no hardcoded strings.
+- **Artifacts** — `bundleRelease` (R8 minify + shrinkResources) `AAB` + `assembleRelease` `APK` signed via `../keys/deviceinsight-release.jks` (`storeFile deviceinsight-release.jks`), tested `adb uninstall/install` on `RMX1931` (realme X2 Pro) and verified swipe, overlay `L` at narrow width, `OVERVIEW → memory → OVERVIEW` reselection.
+
+---
+
 ## Version 1.0.3 (Build 4) — CALIPER Calibration, Camera & Thermal Integrity
 
 ### 📖 Cover & First-Launch

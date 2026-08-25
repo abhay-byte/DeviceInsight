@@ -1,0 +1,20 @@
+DeviceInsight 1.0.4 (Build 5) — Connected Calibration, Overlay Preview & Navigation Integrity
+
+This update connects the first-launch calibration, fixes overlay preview clipping, restores navigation rail icons and corrects optional-permission wording.
+
+CALIBRATION — CONNECTED + NO REV
+• Restored full 00 Cover / 01 USAGE / 02 CAMERA / 03 OVERLAY / 04 ROOT / Certificate sheets (6 pages) from pre-plan, now swipeable via HorizontalPager (pagerState, beyondViewport 1). Tap or swipe to advance; numbering 00·✓ 01·✓ etc. at bottom follows Caliper design and pager position.
+• Removed DOC № DI-0001 · REV 2.0 from Cover and Certificate and REV A from INSTRUMENT panel per feedback. Hint “swipe to navigate →” added.
+
+OVERLAY — PREVIEW FIX
+• ScaledPreview now measures HUD at true size and places with TransformOrigin(0f,0f) top-left. Fixes L (340dp) clipping at narrow widths (center-origin shifted 8.5dp). HudScales is single source of truth (156/252/340).
+
+NAVIGATION — SHARED LOGIC
+• Extracted NavController.selectRailTab — same-graph taps (e.g. Overview from Memory) now correctly popBackStack to root instead of cross-graph navigation. Test overviewReselectionFromMemoryReturnsToOverviewRoot now exercises production branch.
+• Bottom ModeRail restored NumberKeyBox 1-4 squares above labels (horizontal) and left of labels (vertical) with [n] label a11y. RMX1931 now shows 1 OVERVIEW filled, 2 DEVICE, 3 OVERLAY, 4 PROCESSES.
+
+SETTINGS — WORDING
+• Header ALL GRANTED/REQUIRED → ALL ENABLED / SETUP AVAILABLE (neutral ink60). Rows REQUIRED → NOT GRANTED for usage/overlay/camera (overlay & camera are optional).
+
+BUILD
+• versionCode 4→5, versionName 1.0.3→1.0.4. Lint 4 errors fixed (getSerial MissingPermission, Tile.subtitle & wifiStandard NewApi, camera uses-feature). R8 minify AAB/APK signed, verified on RMX1931.
