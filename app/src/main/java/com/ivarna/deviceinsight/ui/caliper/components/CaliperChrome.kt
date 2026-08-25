@@ -175,22 +175,18 @@ fun ModeRail(
                             }
                             .semantics {
                                 role = Role.Tab
-                                contentDescription = key.label
+                                contentDescription = "[${key.number}] ${key.label}"
                             },
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center
                     ) {
-                        if (key.warning) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                LedDot(color = c.fault, dotSize = 4.dp)
-                                Spacer(Modifier.width(4.dp))
-                                Text(key.label.uppercase(), style = Caliper.type.meta,
-                                    color = if (sel) c.ink else c.ink60)
-                            }
-                        } else {
-                            Text(key.label.uppercase(), style = Caliper.type.meta,
-                                color = if (sel) c.ink else c.ink60)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            NumberKeyBox(key.number, sel)
+                            if (key.warning) { Spacer(Modifier.width(4.dp)); LedDot(color = c.fault, dotSize = 4.dp) }
                         }
+                        Spacer(Modifier.height(4.dp))
+                        Text(key.label.uppercase(), style = Caliper.type.meta,
+                            color = if (sel) c.ink else c.ink60)
                         Spacer(Modifier.height(3.dp))
                         Canvas(Modifier.size(width = 10.dp, height = 4.dp)) {
                             if (sel) {
@@ -237,11 +233,13 @@ private fun VerticalRailKey(key: RailKey, selected: Boolean, onSelect: (RailKey)
             }
             .semantics {
                 role = Role.Tab
-                contentDescription = key.label
+                contentDescription = "[${key.number}] ${key.label}"
             }
             .padding(horizontal = 16.dp, vertical = 10.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
+            NumberKeyBox(key.number, selected)
+            Spacer(Modifier.width(10.dp))
             Text(key.label.uppercase(), style = Caliper.type.meta.copy(fontSize = 12.sp),
                 color = if (selected) c.ink else c.ink60)
             if (key.warning) { Spacer(Modifier.width(6.dp)); LedDot(color = c.fault, dotSize = 4.dp) }
