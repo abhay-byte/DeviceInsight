@@ -137,10 +137,8 @@ class DashboardRepositoryImpl @Inject constructor(
         val now = System.currentTimeMillis()
         val x = historyCounter++
         
-        var fps = fpsMonitor.getCurrentFps()
-        if (fps <= 0) {
-            fps = displayRefreshRateUtils.getRefreshRate()
-        }
+        // Do not fabricate FPS as display refresh — honest no-signal is better than fake 60
+        val fps = fpsMonitor.getCurrentFps()
          
         addToHistory(cpuHistory, com.ivarna.deviceinsight.domain.model.CpuDataPoint(x, now, cpu * 100))
         addToHistory(ramHistory, com.ivarna.deviceinsight.domain.model.MemoryDataPoint(x, now, ramUsage * 100))

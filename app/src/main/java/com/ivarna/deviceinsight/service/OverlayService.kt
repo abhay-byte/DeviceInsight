@@ -237,15 +237,16 @@ class OverlayService : Service(), LifecycleOwner, androidx.savedstate.SavedState
         scope.launch { monitorBus.fast.collect { fastState.value = it } }
     }
 
-    /** 10 Hz dumpsys probe on IO — adaptive backoff after 5× "—", honest source stamp. */
+    /** 1 Hz measurement window — one real FPS sample per second, shell work on IO. */
     private fun startFastTicker() {
         scope.launch(Dispatchers.IO) {
-            var consecutiveDash = 0
             while (isActive && isRunning.get()) {
+                val start = System.currentTimeMillis()
                 val sample = try { fpsMonitor.getCurrentFpsWithSource() } catch (_: Exception) { null }
-                if (sample == null || sample.source == "—") consecutiveDash++ else consecutiveDash = 0
                 monitorBus.pushFast(HudFast(sample?.fps ?: 0, sample?.source ?: "—"))
-                delay(if (consecutiveDash >= 5) 1000L else 100L)
+                // Keep roughly 1 Hz sample rate (measurement window ~1s). Recent median smoothing handles visual jitter.
+                val elapsed = System.currentTimeMillis() - start
+                delay((1000L - elapsed).coerceAtLeast(200L))
             }
         }
     }
