@@ -132,6 +132,7 @@ class NetworkProvider @Inject constructor(
     }
 
     fun getWifiStandard(): String {
+        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.R) return "Unknown"
         return try {
             val wifiInfo = wifiManager.connectionInfo ?: return "Unknown"
             val std = wifiInfo.wifiStandard

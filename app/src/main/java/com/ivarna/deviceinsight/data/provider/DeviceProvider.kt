@@ -190,6 +190,7 @@ class DeviceProvider @Inject constructor(
         return type
     }
 
+    @android.annotation.SuppressLint("MissingPermission", "HardwareIds")
     fun getSerial(): String {
         cachedSerial?.let { return it }
         val serial = try {

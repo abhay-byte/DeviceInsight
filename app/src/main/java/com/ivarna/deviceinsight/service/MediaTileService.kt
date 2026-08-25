@@ -43,7 +43,9 @@ class MediaTileService : TileService() {
             val medium = mediumFlow.first() ?: Medium.PAPER
             val tile = qsTile ?: return@launch
             tile.label = medium.name
-            tile.subtitle = getString(R.string.app_name)
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                tile.subtitle = getString(R.string.app_name)
+            }
             tile.contentDescription = "$medium drafting medium"
             tile.icon = androidx.core.graphics.drawable.IconCompat
                 .createWithResource(this@MediaTileService, R.drawable.ic_tile_caliper)

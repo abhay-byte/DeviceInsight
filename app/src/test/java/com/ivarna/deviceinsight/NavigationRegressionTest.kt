@@ -15,6 +15,7 @@ import com.ivarna.deviceinsight.presentation.GRAPH_PROCESSES
 import com.ivarna.deviceinsight.presentation.ScreenRoute
 import com.ivarna.deviceinsight.presentation.navigateToTopLevel
 import com.ivarna.deviceinsight.presentation.railRoutes
+import com.ivarna.deviceinsight.presentation.selectRailTab
 import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Test
@@ -48,22 +49,8 @@ class NavigationRegressionTest {
         }?.number
     }
 
-    private fun selectTab(route: ScreenRoute) {
-        val isAlreadyOnRoot = navController.currentDestination?.hierarchy?.any { it.route == route.route } == true
-        if (isAlreadyOnRoot) return
-        val isInSameGraph = navController.currentDestination?.hierarchy?.any { it.route == route.graph } == true
-        if (isInSameGraph) {
-            val popped = navController.popBackStack(route.route, false)
-            if (!popped) {
-                navController.navigate(route.route) {
-                    popUpTo(route.route) { inclusive = false }
-                    launchSingleTop = true
-                }
-            }
-        } else {
-            navController.navigateToTopLevel(route.route)
-        }
-    }
+    // Shared production logic — UI and test call the same function
+    private fun selectTab(route: ScreenRoute) = navController.selectRailTab(route)
 
     @Before
     fun setUp() {
@@ -125,24 +112,17 @@ class NavigationRegressionTest {
 
     @Test
     fun overviewReselectionFromMemoryReturnsToOverviewRoot() {
-        // Overview -> Memory
+        // Overview -> Memory (child of overview_graph)
         navController.navigate("memory")
         assertEquals("memory", navController.currentDestination?.route)
-        // Simulate tapping Overview while on Memory: should pop to dashboard
-        // Our fixed logic checks isAlreadyOnRoot (hierarchy contains dashboard) -> false, so it navigates
-        val isAlreadyOnRoot = navController.currentDestination?.hierarchy?.any { it.route == ScreenRoute.Dashboard.route } == true
-        assertEquals(false, isAlreadyOnRoot)
-        navController.navigateToTopLevel(ScreenRoute.Dashboard.route)
+        // Simulate tapping Overview while on Memory: production uses same-graph popBackStack
+        selectTab(ScreenRoute.Dashboard)
         assertEquals(ScreenRoute.Dashboard.route, navController.currentDestination?.route)
         assertEquals(ScreenRoute.Dashboard.number, selectedTab())
 
         // Already on dashboard, tapping Overview again should be no-op (still dashboard)
         val before = navController.currentDestination?.route
-        val isAlreadyOnRoot2 = navController.currentDestination?.hierarchy?.any { it.route == ScreenRoute.Dashboard.route } == true
-        assertEquals(true, isAlreadyOnRoot2)
-        // No navigation if already on root (helper would be no-op in UI, but navigateToTopLevel would still be called;
-        // we simulate UI guard: only navigate if not already on root)
-        if (!isAlreadyOnRoot2) navController.navigateToTopLevel(ScreenRoute.Dashboard.route)
+        selectTab(ScreenRoute.Dashboard)
         assertEquals(before, navController.currentDestination?.route)
     }
 

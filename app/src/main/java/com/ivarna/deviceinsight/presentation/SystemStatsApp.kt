@@ -93,6 +93,23 @@ fun NavController.navigateToTopLevel(route: String) {
     }
 }
 
+internal fun NavController.selectRailTab(route: ScreenRoute) {
+    val isAlreadyOnRoot = currentDestination?.hierarchy?.any { it.route == route.route } == true
+    if (isAlreadyOnRoot) return
+    val isInSameGraph = currentDestination?.hierarchy?.any { it.route == route.graph } == true
+    if (isInSameGraph) {
+        val popped = popBackStack(route.route, false)
+        if (!popped) {
+            navigate(route.route) {
+                popUpTo(route.route) { inclusive = false }
+                launchSingleTop = true
+            }
+        }
+    } else {
+        navigateToTopLevel(route.route)
+    }
+}
+
 private fun graphForRoute(route: String): String = when (route) {
     ROUTE_DASHBOARD, "processor", "memory", "network", "power", "storage", "gpu" -> GRAPH_OVERVIEW
     ROUTE_HARDWARE -> GRAPH_DEVICE
@@ -194,24 +211,7 @@ fun SystemStatsApp(initialRoute: String? = null) {
                 vertical = wide,
                 onSelect = { key ->
                     val route = railRoutes.first { it.number == key.number }
-                    val isAlreadyOnRoot = currentDestination?.hierarchy?.any { it.route == route.route } == true
-                    if (isAlreadyOnRoot) {
-                        // already on root, no-op
-                    } else {
-                        val isInSameGraph = currentDestination?.hierarchy?.any { it.route == route.graph } == true
-                        if (isInSameGraph) {
-                            // Reselecting current graph while on a child -> pop to its root
-                            val popped = navController.popBackStack(route.route, inclusive = false)
-                            if (!popped) {
-                                navController.navigate(route.route) {
-                                    popUpTo(route.route) { inclusive = false }
-                                    launchSingleTop = true
-                                }
-                            }
-                        } else {
-                            navController.navigateToTopLevel(route.route)
-                        }
-                    }
+                    navController.selectRailTab(route)
                 }
             )
         }

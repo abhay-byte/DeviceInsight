@@ -19,6 +19,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.TransformOrigin
 import com.ivarna.deviceinsight.ui.caliper.hud.HudScales
 import kotlin.math.roundToInt
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -306,10 +307,12 @@ private fun ScaledPreview(
         val finalWidth = scaledWidth.coerceAtMost(constraints.maxWidth)
         val finalHeight = scaledHeight.coerceAtMost(constraints.maxHeight)
         layout(finalWidth, finalHeight) {
-            // Place with layer scaling so both visual and layout are scaled
+            // Place with layer scaling so both visual and layout are scaled.
+            // Top-left origin prevents center-origin shift that would clip against clipToBounds().
             placeable.placeWithLayer(0, 0) {
                 scaleX = scale
                 scaleY = scale
+                transformOrigin = TransformOrigin(0f, 0f)
             }
         }
     }

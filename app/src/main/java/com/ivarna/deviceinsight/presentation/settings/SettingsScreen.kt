@@ -172,13 +172,13 @@ fun SettingsScreen(
                 title = "PERMISSIONS",
                 status = {
                     val allGranted = hasUsage && hasOverlay && cameraGranted
-                    Text(if (allGranted) "ALL GRANTED" else "REQUIRED", style = Caliper.type.meta, color = if (allGranted) c.ink60 else c.fault)
+                    Text(if (allGranted) "ALL ENABLED" else "SETUP AVAILABLE", style = Caliper.type.meta, color = if (allGranted) c.ink60 else c.ink60)
                 },
                 modifier = Modifier.padding(horizontal = 16.dp)
             ) {
-                SpecRow("usage", if (hasUsage) "GRANTED" else "REQUIRED")
-                SpecRow("overlay", if (hasOverlay) "GRANTED" else "REQUIRED")
-                SpecRow("camera", if (cameraGranted) "GRANTED" else "REQUIRED")
+                SpecRow("usage", if (hasUsage) "GRANTED" else "NOT GRANTED")
+                SpecRow("overlay", if (hasOverlay) "GRANTED" else "NOT GRANTED")
+                SpecRow("camera", if (cameraGranted) "GRANTED" else "NOT GRANTED")
                 Spacer(Modifier.height(10.dp))
                 if (!hasUsage) {
                     HardKey("GRANT USAGE ACCESS", variant = HardKeyVariant.PRIMARY, modifier = Modifier.fillMaxWidth(), onClick = {
