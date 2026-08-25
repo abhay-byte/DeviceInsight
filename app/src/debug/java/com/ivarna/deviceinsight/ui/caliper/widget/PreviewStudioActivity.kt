@@ -44,8 +44,7 @@ class PreviewStudioActivity : ComponentActivity() {
                 ) {
                     Masthead()
                     ScreenHeader(
-                        "№ DEBUG",
-                        "PREVIEW STUDIO.",
+                        "Preview Studio",
                         "real Glance→RemoteViews pipeline · 480dpi · fontScale 1.0"
                     )
                     PanelCard(title = "GENERATE") {

@@ -272,7 +272,7 @@ fun ProcessesScreen(
         val twoPane = maxWidth >= 560.dp
         val paneWidth = (maxWidth * 0.45f).coerceIn(280.dp, 352.dp)
         Column(Modifier.fillMaxSize()) {
-            ScreenHeader("№ 04 — PROCESSES", "Processes.",
+            ScreenHeader("Processes",
                 "${rows.size} listed · ${rows.sumOf { it.threads }} threads")
             SegKey(listOf("ALL", "APPS", "SYSTEM"), filter, { filter = it },
                 Modifier.padding(horizontal = 16.dp))

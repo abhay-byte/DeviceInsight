@@ -14,7 +14,6 @@ import com.ivarna.deviceinsight.ui.caliper.Channels
 import com.ivarna.deviceinsight.ui.caliper.Fmt
 import com.ivarna.deviceinsight.ui.caliper.components.*
 
-/** CH-06 — Raster. GPU history (real), honesty gates from the bench bus. */
 @Composable
 fun GpuChannel(
     onBack: () -> Unit,
@@ -24,7 +23,7 @@ fun GpuChannel(
     val snap by vm.bus.snapshot.collectAsStateWithLifecycle()
     val c = Caliper.colors
 
-    ChannelScaffold("№ 01.6 — RASTER · S-07", "Raster.", "CH-06 · gpu load and clocks", onBack, ready = m != null) {
+    ChannelScaffold("GPU", "gpu load and clocks", onBack, ready = m != null) {
         val metrics = m
         if (metrics == null) {
             CalibratingIndicator(percent = null)

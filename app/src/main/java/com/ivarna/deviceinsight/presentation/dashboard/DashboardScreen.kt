@@ -12,7 +12,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ivarna.deviceinsight.ui.caliper.*
 import com.ivarna.deviceinsight.ui.caliper.components.*
 
-/** № 01 — OVERVIEW (S-01 system ledger). Every tile taps through to its channel page. */
 @Composable
 fun DashboardScreen(
     viewModel: DashboardViewModel = hiltViewModel(),
@@ -25,9 +24,8 @@ fun DashboardScreen(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState())
     ) {
         ScreenHeader(
-            sheetLabel = "№ 01 — OVERVIEW · REV 2.0",
-            title = "Overview.",
-            sub = "all channels nominal",
+            title = "Overview",
+            subtitle = "all channels nominal",
         )
         Spacer(Modifier.height(4.dp))
 

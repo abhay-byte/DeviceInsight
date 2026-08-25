@@ -101,7 +101,7 @@ private fun StorageHeader(
     val percent = remember(fraction) { (fraction * 100).toInt() }
 
     PanelCard(
-        title = "CH-05 · STORAGE — OVERVIEW",
+        title = "STORAGE — OVERVIEW",
         channel = Channels.STORAGE,
         status = {
             Text("$percent%", style = Caliper.type.meta, color = if (percent >= 90) c.fault else c.ink)

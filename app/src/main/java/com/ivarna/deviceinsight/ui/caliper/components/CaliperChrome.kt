@@ -175,20 +175,24 @@ fun ModeRail(
                             }
                             .semantics {
                                 role = Role.Tab
-                                contentDescription = "[${key.number}] ${key.label}"
+                                contentDescription = key.label
                             },
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            NumberKeyBox(key.number, sel)
-                            if (key.warning) { Spacer(Modifier.width(4.dp)); LedDot(color = c.fault, dotSize = 4.dp) }
+                        if (key.warning) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                LedDot(color = c.fault, dotSize = 4.dp)
+                                Spacer(Modifier.width(4.dp))
+                                Text(key.label.uppercase(), style = Caliper.type.meta,
+                                    color = if (sel) c.ink else c.ink60)
+                            }
+                        } else {
+                            Text(key.label.uppercase(), style = Caliper.type.meta,
+                                color = if (sel) c.ink else c.ink60)
                         }
-                        Spacer(Modifier.height(4.dp))
-                        Text(key.label.uppercase(), style = Caliper.type.meta,
-                            color = if (sel) c.ink else c.ink60)
                         Spacer(Modifier.height(3.dp))
-                        Canvas(Modifier.size(width = 10.dp, height = 4.dp)) {   // caret ▲ + accent underline
+                        Canvas(Modifier.size(width = 10.dp, height = 4.dp)) {
                             if (sel) {
                                 val tri = Path().apply {
                                     moveTo(size.width / 2, size.height); lineTo(0f, 0f); lineTo(size.width, 0f); close()
@@ -233,18 +237,15 @@ private fun VerticalRailKey(key: RailKey, selected: Boolean, onSelect: (RailKey)
             }
             .semantics {
                 role = Role.Tab
-                contentDescription = "[${key.number}] ${key.label}"
+                contentDescription = key.label
             }
             .padding(horizontal = 16.dp, vertical = 10.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            NumberKeyBox(key.number, selected)
-            Spacer(Modifier.width(10.dp))
             Text(key.label.uppercase(), style = Caliper.type.meta.copy(fontSize = 12.sp),
                 color = if (selected) c.ink else c.ink60)
             if (key.warning) { Spacer(Modifier.width(6.dp)); LedDot(color = c.fault, dotSize = 4.dp) }
         }
-        // active = accent caret + accent underline spanning the rail key
         Canvas(Modifier.fillMaxWidth().height(4.dp).padding(top = 2.dp)) {
             if (selected) {
                 val cx = size.width / 2
@@ -258,15 +259,12 @@ private fun VerticalRailKey(key: RailKey, selected: Boolean, onSelect: (RailKey)
     }
 }
 
-// ─────────────────────────── ScreenHeader — numbered sheet ───────────────────────────
-
 @Composable
-fun ScreenHeader(sheetLabel: String, title: String, sub: String, warn: Boolean = false) {
+fun ScreenHeader(title: String, subtitle: String, warn: Boolean = false) {
     val c = Caliper.colors
     Column(Modifier.fillMaxWidth().padding(16.dp)) {
-        Text(sheetLabel.uppercase(), style = Caliper.type.meta, color = c.ink40)
         Text(title, style = Caliper.type.display1, color = c.ink)
-        Text(sub, style = Caliper.type.meta, color = if (warn) c.fault else c.ink40)
+        Text(subtitle, style = Caliper.type.meta, color = if (warn) c.fault else c.ink40)
         Spacer(Modifier.height(10.dp))
         DoubleRule()
     }
@@ -375,7 +373,6 @@ fun FaultState(code: String, cause: String, onRetry: () -> Unit) {
 fun CalibrationSweep(
     visible: Boolean,
     onFinished: () -> Unit,
-    docId: String = "DI-0001"
 ) {
     AnimatedVisibility(visible, enter = fadeIn(tween(160)), exit = fadeOut(tween(160))) {
         val c = Caliper.colors
@@ -403,7 +400,7 @@ fun CalibrationSweep(
                 drawPath(path, c.channel(Channels.CPU),
                     style = Stroke(2.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Square))
             }
-            if (progress.value >= 1f) StampBadge("CALIBRATED · $docId")
+            if (progress.value >= 1f) StampBadge("CALIBRATED")
         }
     }
 }

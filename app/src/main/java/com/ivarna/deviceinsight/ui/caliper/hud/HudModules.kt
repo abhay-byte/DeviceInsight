@@ -111,7 +111,7 @@ fun HudCpuBand(slow: HudSlow, showCoreBank: Boolean) {
     val m = LocalHudMetrics.current
     Column(Modifier.fillMaxWidth().wrapContentHeight().heightIn(min = 22.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            BandLabel("CH-01 · CPU", c.ch01)
+            BandLabel("CPU", c.ch01)
             Spacer(Modifier.weight(1f))
             MiniOdometer(FmtHud.pct(slow.cpuPct), hudStyle(m.valueSp), c.ink)
             Spacer(Modifier.width(6.dp))
@@ -176,7 +176,7 @@ fun HudMemoryBand(slow: HudSlow) {
     val m = LocalHudMetrics.current
     Column(Modifier.fillMaxWidth().wrapContentHeight().heightIn(min = 22.dp)) {
         MemRow(
-            "CH-02 · RAM",
+            "RAM",
             usedMb = (slow.memUsedGb * 1024f).toInt(),
             totalMb = (slow.memTotalGb * 1024f).toInt(),
             tickColor = LocalHudColors.current.ch02,
@@ -189,7 +189,7 @@ fun HudMemoryBand(slow: HudSlow) {
         val swapTotalMb = if (slow.swapTotalMb > 0) slow.swapTotalMb.toInt()
                           else if (slow.zramGb > 0f) (slow.zramGb * 1024f).toInt() else 0
         MemRow(
-            "CH-02 · SWP",
+            "SWAP",
             usedMb = swapUsedMb,
             totalMb = swapTotalMb,
             tickColor = LocalHudColors.current.ch02,
@@ -211,7 +211,7 @@ fun HudPowerBand(slow: HudSlow) {
     val charging = slow.charging
     Column(Modifier.fillMaxWidth().wrapContentHeight().heightIn(min = 22.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            BandLabel("CH-04 · PWR", c.ch04)
+            BandLabel("POWER", c.ch04)
             Spacer(Modifier.weight(1f))
             // signed watts, honest zero (≈ prefix per Fmt.wattsSigned)
             StrokedText(FmtHud.wattsSigned(slow.watts), hudStyle(m.valueSp), fill = if (charging) c.ch04 else c.ink)
@@ -246,7 +246,7 @@ fun HudGpuBand(slow: HudSlow) {
     val c = LocalHudColors.current
     val m = LocalHudMetrics.current
     Row(Modifier.fillMaxWidth().wrapContentHeight().heightIn(min = 22.dp), verticalAlignment = Alignment.CenterVertically) {
-        BandLabel("CH-06 · GPU", c.ch06)
+        BandLabel("GPU", c.ch06)
         Spacer(Modifier.weight(1f))
         when {
             !slow.gpuFitted -> Text("— NOT FITTED", hudStyle(m.valueSp).copy(color = c.ink40))
@@ -264,7 +264,7 @@ fun HudNetBand(slow: HudSlow) {
     val c = LocalHudColors.current
     val m = LocalHudMetrics.current
     Row(Modifier.fillMaxWidth().wrapContentHeight().heightIn(min = 22.dp), verticalAlignment = Alignment.CenterVertically) {
-        BandLabel("CH-03 · NET", c.ch03)
+        BandLabel("NETWORK", c.ch03)
         Spacer(Modifier.weight(1f))
         StrokedText("↓ ${FmtHud.rate(slow.netDown)}   ↑ ${FmtHud.rate(slow.netUp)}", hudStyle(m.valueSp), fill = c.ink)
     }

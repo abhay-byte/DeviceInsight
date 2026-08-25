@@ -15,7 +15,6 @@ import com.ivarna.deviceinsight.ui.caliper.Caliper
 import com.ivarna.deviceinsight.ui.caliper.Fmt
 import com.ivarna.deviceinsight.ui.caliper.components.*
 
-/** CH-01 — Processor. (CALIPER S-02 / CpuScreen sketch) */
 @Composable
 fun ProcessorChannel(
     onBack: () -> Unit,
@@ -25,7 +24,7 @@ fun ProcessorChannel(
     val snap by vm.bus.snapshot.collectAsStateWithLifecycle()
     val c = Caliper.colors
 
-    ChannelScaffold("№ 01.1 — PROCESSOR · S-02", "Processor.", "CH-01 · cpu load, clocks, cores", onBack, ready = m != null) {
+    ChannelScaffold("Processor", "cpu load, clocks, cores", onBack, ready = m != null) {
         val metrics = m
         if (metrics == null) {
             CalibratingIndicator(percent = null)

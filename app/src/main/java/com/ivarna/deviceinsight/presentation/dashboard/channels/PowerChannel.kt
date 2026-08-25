@@ -14,7 +14,6 @@ import com.ivarna.deviceinsight.ui.caliper.Caliper
 import com.ivarna.deviceinsight.ui.caliper.Channels
 import com.ivarna.deviceinsight.ui.caliper.components.*
 
-/** CH-04 — Power. Signed watts hero, real watt trace, T4 health/cycles only when non-null. */
 @Composable
 fun PowerChannel(
     onBack: () -> Unit,
@@ -24,7 +23,7 @@ fun PowerChannel(
     val snap by vm.bus.snapshot.collectAsStateWithLifecycle()
     val c = Caliper.colors
 
-    ChannelScaffold("№ 01.4 — POWER · S-05", "Power.", "CH-04 · battery and draw", onBack, ready = m != null) {
+    ChannelScaffold("Power", "battery and draw", onBack, ready = m != null) {
         val metrics = m
         if (metrics == null) {
             CalibratingIndicator(percent = null)

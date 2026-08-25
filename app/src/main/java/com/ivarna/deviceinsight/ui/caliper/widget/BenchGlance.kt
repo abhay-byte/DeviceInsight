@@ -316,10 +316,9 @@ private fun Header(
     ledOn: Boolean = true
 ) {
     Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.Vertical.CenterVertically) {
-        // Tick 4dp
         Box(modifier = GlanceModifier.width(4.dp).height(12.dp).background(ColorProvider(pal.channelFor(chId))), contentAlignment = Alignment.CenterStart) { }
         Spacer(GlanceModifier.width(6.dp))
-        Text("$chId · $chName", style = TextStyle(color = ColorProvider(pal.ink60), fontSize = wSp(11), fontWeight = FontWeight.Medium, fontFamily = FontFamily.Monospace), maxLines = 1)
+        Text(chName, style = TextStyle(color = ColorProvider(pal.ink60), fontSize = wSp(11), fontWeight = FontWeight.Medium, fontFamily = FontFamily.Monospace), maxLines = 1)
         Spacer(GlanceModifier.width(6.dp))
         Text(status, style = TextStyle(color = ColorProvider(pal.ink40), fontSize = wSp(11), fontFamily = FontFamily.Monospace), maxLines = 1)
         Spacer(GlanceModifier.defaultWeight())

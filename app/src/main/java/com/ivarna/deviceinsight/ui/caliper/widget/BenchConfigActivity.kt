@@ -155,7 +155,7 @@ private fun BenchConfigScreen(
         Column(
             modifier = Modifier.fillMaxSize().background(Caliper.colors.surface).verticalScroll(rememberScrollState()).padding(16.dp)
         ) {
-            ScreenHeader("№ 05.2 — CALIBRATE", "Calibrate.", "${kind.name} instrument · configure the bench")
+            ScreenHeader("Calibrate", "${kind.name} instrument")
             Spacer(Modifier.height(12.dp))
 
             PreviewPanel(kind, cfg, snap, appWidgetId)

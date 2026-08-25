@@ -18,7 +18,6 @@ import com.ivarna.deviceinsight.ui.caliper.Fmt
 import com.ivarna.deviceinsight.ui.caliper.HatchPattern
 import com.ivarna.deviceinsight.ui.caliper.components.*
 
-/** CH-02 — Memory. (CALIPER S-03). Composition from the bench bus, not the Hardware tab. */
 @Composable
 fun MemoryChannel(
     onBack: () -> Unit,
@@ -29,7 +28,7 @@ fun MemoryChannel(
     val snap by vm.bus.snapshot.collectAsStateWithLifecycle()
     val c = Caliper.colors
 
-    ChannelScaffold("№ 01.2 — MEMORY · S-03", "Memory.", "CH-02 · pressure and composition", onBack, ready = m != null) {
+    ChannelScaffold("Memory", "pressure and composition", onBack, ready = m != null) {
         val metrics = m
         if (metrics == null) {
             CalibratingIndicator(percent = null)

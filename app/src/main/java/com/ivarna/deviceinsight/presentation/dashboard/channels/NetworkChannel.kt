@@ -20,7 +20,6 @@ private object FormattingUtilsBridge {
         com.ivarna.deviceinsight.utils.FormattingUtils.formatFileSize(v.toLong())
 }
 
-/** CH-03 — Network. Dual spark when tx history exists; never a fake up-curve from rx. */
 @Composable
 fun NetworkChannel(
     onBack: () -> Unit,
@@ -30,7 +29,7 @@ fun NetworkChannel(
     val snap by vm.bus.snapshot.collectAsStateWithLifecycle()
     val c = Caliper.colors
 
-    ChannelScaffold("№ 01.3 — NETWORK · S-04", "Network.", "CH-03 · throughput, both directions", onBack, ready = m != null) {
+    ChannelScaffold("Network", "throughput, both directions", onBack, ready = m != null) {
         val metrics = m
         if (metrics == null) {
             CalibratingIndicator(percent = null)

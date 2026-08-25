@@ -71,10 +71,10 @@ fun WidgetsSheet(
         // BACK is the first control — not after the list
         HardKey("← BACK", variant = HardKeyVariant.SECONDARY,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp), onClick = onBack)
-        ScreenHeader("№ 05.1 — INSTRUMENTS", "Widgets.", "place on the bench · inspect the line")
+        ScreenHeader("Widgets", "place on the bench")
         Spacer(Modifier.height(12.dp))
 
-        Text("01 ADD", style = Caliper.type.meta, color = Caliper.colors.ink60)
+        Text("ADD", style = Caliper.type.meta, color = Caliper.colors.ink60)
         Spacer(Modifier.height(8.dp))
 
         // compact instrument strip — five mini tiles with paper previews
@@ -128,13 +128,12 @@ fun WidgetsSheet(
         } else if (ctx.findActivity() == null) {
             MarginNote(message = "pinning needs a regular activity context — reopen settings from the app", title = "NOTE")
         }
-        MarginNote(message = "manual path · 01 long-press home · 02 Widgets · 03 DeviceInsight · 04 pick kind", title = "MANUAL")
+        MarginNote(message = "manual path · long-press home · Widgets · DeviceInsight · pick kind", title = "MANUAL")
         Spacer(Modifier.height(16.dp))
         DoubleRule()
         Spacer(Modifier.height(16.dp))
 
-        // 02 ACTIVE — for the selected kind, short rows
-        Text("02 ACTIVE — ${selected.name}", style = Caliper.type.meta, color = Caliper.colors.ink60)
+        Text("ACTIVE — ${selected.name}", style = Caliper.type.meta, color = Caliper.colors.ink60)
         Spacer(Modifier.height(8.dp))
         val active = instruments.filter { it.kind == selected }
         if (active.isEmpty()) {

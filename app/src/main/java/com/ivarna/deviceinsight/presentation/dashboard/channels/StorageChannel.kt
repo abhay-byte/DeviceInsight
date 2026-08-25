@@ -13,7 +13,6 @@ import com.ivarna.deviceinsight.ui.caliper.Caliper
 import com.ivarna.deviceinsight.ui.caliper.Channels
 import com.ivarna.deviceinsight.ui.caliper.components.*
 
-/** CH-05 — Storage. Used/total bar only — no fake per-directory map this pass. */
 @Composable
 fun StorageChannel(
     onBack: () -> Unit,
@@ -23,7 +22,7 @@ fun StorageChannel(
     val snap by vm.bus.snapshot.collectAsStateWithLifecycle()
     val c = Caliper.colors
 
-    ChannelScaffold("№ 01.5 — STORAGE · S-06", "Storage.", "CH-05 · internal volume", onBack, ready = m != null) {
+    ChannelScaffold("Storage", "internal volume", onBack, ready = m != null) {
         val metrics = m
         if (metrics == null) {
             CalibratingIndicator(percent = null)

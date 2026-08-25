@@ -62,7 +62,7 @@ fun HardwareScreen(
     LaunchedEffect(initialTab) { if (initialTab != null && initialTab in tabRange) tab = initialTab }
 
     Column(Modifier.fillMaxSize()) {
-        ScreenHeader("№ 02 — DEVICE DOSSIER", "Device.", "hardware spec sheets · plates")
+        ScreenHeader("Device", "hardware details")
         LoadThenShow(ready = hardwareInfo != null, modifier = Modifier.weight(1f)) {
             DossierBody(hardwareInfo!!, tab, tabs, onSelect = { tab = it }, onCameraGrantedReload = onCameraGrantedReload)
         }

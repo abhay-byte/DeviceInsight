@@ -20,11 +20,13 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import com.ivarna.deviceinsight.ui.caliper.Medium
+import androidx.navigation.NavController
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
 import com.ivarna.deviceinsight.presentation.calibration.CalibrationScreen
 import com.ivarna.deviceinsight.presentation.dashboard.DashboardScreen
@@ -53,25 +55,23 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
 
-/**
- * Nav order — PINNED (caliper-001 m2). Task: Tasks (Application Active /
- * PROCESSES) must be the LAST key. Deviation from design §5.2/§6 IA
- * (OVERVIEW/ACTIVITY/PROCESSES/DEVICE) is intentional: minimal 4-key diff.
- * [1] OVERVIEW (Dashboard) · [2] DEVICE (Hardware) · [3] OVERLAY · [4] PROCESSES (Tasks)
- */
 private const val ROUTE_DASHBOARD = "dashboard"
 private const val ROUTE_HARDWARE = "hardware"
 private const val ROUTE_OVERLAY = "overlay"
 private const val ROUTE_TASKS = "tasks"
 
-internal sealed class ScreenRoute(val route: String, val number: Int, val label: String) {
-    data object Dashboard : ScreenRoute(ROUTE_DASHBOARD, 1, "OVERVIEW")
-    data object Hardware : ScreenRoute(ROUTE_HARDWARE, 2, "DEVICE")
-    data object Overlay : ScreenRoute(ROUTE_OVERLAY, 3, "OVERLAY")
-    data object Tasks : ScreenRoute(ROUTE_TASKS, 4, "PROCESSES")
+internal const val GRAPH_OVERVIEW = "overview_graph"
+internal const val GRAPH_DEVICE = "device_graph"
+internal const val GRAPH_OVERLAY = "overlay_graph"
+internal const val GRAPH_PROCESSES = "processes_graph"
+
+internal sealed class ScreenRoute(val route: String, val number: Int, val label: String, val graph: String) {
+    data object Dashboard : ScreenRoute(ROUTE_DASHBOARD, 1, "OVERVIEW", GRAPH_OVERVIEW)
+    data object Hardware : ScreenRoute(ROUTE_HARDWARE, 2, "DEVICE", GRAPH_DEVICE)
+    data object Overlay : ScreenRoute(ROUTE_OVERLAY, 3, "OVERLAY", GRAPH_OVERLAY)
+    data object Tasks : ScreenRoute(ROUTE_TASKS, 4, "PROCESSES", GRAPH_PROCESSES)
 }
 
-// internal (not private) so [caliperRailOrder] is unit-testable (m5).
 internal val railRoutes = listOf(
     ScreenRoute.Dashboard,
     ScreenRoute.Hardware,
@@ -79,12 +79,27 @@ internal val railRoutes = listOf(
     ScreenRoute.Tasks,
 )
 
-/** Pinned visual+TalkBack order: [1] OVERVIEW · [2] DEVICE · [3] OVERLAY · [4] PROCESSES (Tasks last). */
 internal val caliperRailOrder: List<Pair<Int, String>> = railRoutes.map { it.number to it.label }
 
-// ≥600dp = WindowWidthSizeClass.Medium/Expanded per §5.2 — switches ModeRail to a
-// left rail. BoxWithConstraints gate keeps the same threshold without a new dep.
 private const val WIDE_MIN_DP = 600
+
+fun NavController.navigateToTopLevel(route: String) {
+    navigate(route) {
+        popUpTo(graph.findStartDestination().id) {
+            saveState = true
+        }
+        launchSingleTop = true
+        restoreState = true
+    }
+}
+
+private fun graphForRoute(route: String): String = when (route) {
+    ROUTE_DASHBOARD, "processor", "memory", "network", "power", "storage", "gpu" -> GRAPH_OVERVIEW
+    ROUTE_HARDWARE -> GRAPH_DEVICE
+    ROUTE_OVERLAY -> GRAPH_OVERLAY
+    ROUTE_TASKS -> GRAPH_PROCESSES
+    else -> route
+}
 
 @Composable
 fun SystemStatsApp(initialRoute: String? = null) {
@@ -101,24 +116,28 @@ fun SystemStatsApp(initialRoute: String? = null) {
     var hardwareTab by remember { mutableStateOf<Int?>(null) }
     LaunchedEffect(initialRoute) {
         when (initialRoute) {
-            "overview" -> navController.navigate(ScreenRoute.Dashboard.route) { launchSingleTop = true }
-            // BENCH tile taps land on the matching channel page (both NavHosts serve these routes)
+            "overview" -> navController.navigateToTopLevel(ScreenRoute.Dashboard.route)
             "CH-01", "processor" -> navController.navigate("processor") { launchSingleTop = true }
             "CH-02" -> navController.navigate("memory") { launchSingleTop = true }
             "CH-03" -> navController.navigate("network") { launchSingleTop = true }
             "CH-04" -> navController.navigate("power") { launchSingleTop = true }
             "CH-05" -> navController.navigate("storage") { launchSingleTop = true }
             "CH-06" -> navController.navigate("gpu") { launchSingleTop = true }
-            "processes" -> navController.navigate(ScreenRoute.Tasks.route) { launchSingleTop = true }
-            "calibrate" -> navController.navigate(ScreenRoute.Overlay.route) { launchSingleTop = true }
-            "hud-config" -> navController.navigate(ScreenRoute.Overlay.route) { launchSingleTop = true }
-            else -> if (initialRoute?.startsWith("dossier:") == true) navController.navigate(ScreenRoute.Tasks.route) { launchSingleTop = true }
+            "processes" -> navController.navigateToTopLevel(ScreenRoute.Tasks.route)
+            "calibrate" -> navController.navigateToTopLevel(ScreenRoute.Overlay.route)
+            "hud-config" -> navController.navigateToTopLevel(ScreenRoute.Overlay.route)
+            else -> if (initialRoute?.startsWith("dossier:") == true) navController.navigateToTopLevel(ScreenRoute.Tasks.route)
         }
     }
 
-    val selectedRail = railRoutes.firstOrNull { route ->
-        currentDestination?.hierarchy?.any { it.route == route.route } == true
-    }?.number
+    val selectedRail = remember(currentDestination) {
+        railRoutes.firstOrNull { rail ->
+            currentDestination?.hierarchy?.any { dest -> dest.route == rail.route || dest.route == rail.graph } == true
+        }?.number
+            ?: railRoutes.firstOrNull { rail ->
+                currentDestination?.hierarchy?.any { dest -> graphForRoute(dest.route ?: "") == rail.graph } == true
+            }?.number
+    }
 
     // B2: SETTINGS owns its own ← BACK HardKey; the sheet covers the chrome,
     // so the masthead and ModeRail step aside while it is frontmost.
@@ -133,37 +152,27 @@ fun SystemStatsApp(initialRoute: String? = null) {
         WindowCompat.getInsetsController(window, view).isAppearanceLightNavigationBars = useDarkIcons
     }
 
-    // S-00 first-launch calibration gate (skippable). After finishing, the
-    // one-time "recalibrated" MarginNote is shown via caliperMigrated flag.
-    // FIX: watch migrated flow — initialValue true avoids flash for existing users,
-    // but fresh installs emit false shortly after; LaunchedEffect then reveals calibration.
     val context = LocalContext.current
     val migrated by context.caliperMigratedFlow.collectAsStateWithLifecycle(initialValue = true)
     var showCalibration by remember { mutableStateOf(!migrated) }
-    var showMigratedNote by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     LaunchedEffect(migrated) {
         if (!migrated) showCalibration = true
     }
 
     if (showCalibration) {
-        // FIX: calibration must always be Paper (light drafting paper) even on dark system —
-        // user reported only 05 MEDIA was Paper while 01-04 were Carbon. Force Paper here.
         CaliperTheme(medium = Medium.PAPER) {
             Column(Modifier.fillMaxSize().background(Caliper.colors.surface)) {
                 Masthead()
                 CalibrationScreen(
                     initialMedium = Medium.PAPER,
                     onMedium = { medium ->
-                        // Media step removed — default to PAPER. Still persist if user ever picks.
                         settingsViewModel.setMedium(medium)
                     },
                     onFinish = {
-                        // Ensure default Paper is persisted (media step removed per user request)
                         settingsViewModel.setMedium(Medium.PAPER)
                         scope.launch { context.markCaliperMigrated() }
                         showCalibration = false
-                        showMigratedNote = !migrated
                     }
                 )
             }
@@ -176,7 +185,6 @@ fun SystemStatsApp(initialRoute: String? = null) {
             .fillMaxSize()
             .background(Caliper.colors.surface)
     ) {
-        // M2: ≥600dp → left instrument rail; Processes/Device screens go two-pane.
         val wide = maxWidth >= WIDE_MIN_DP.dp
 
         val rail = @Composable {
@@ -186,14 +194,8 @@ fun SystemStatsApp(initialRoute: String? = null) {
                 vertical = wide,
                 onSelect = { key ->
                     val route = railRoutes.first { it.number == key.number }
-                    if (currentDestination?.hierarchy?.any { it.route == route.route } != true) {
-                        navController.navigate(route.route) {
-                            popUpTo(navController.graph.findStartDestination().id) {
-                                saveState = true
-                            }
-                            launchSingleTop = true
-                            restoreState = true
-                        }
+                    if (selectedRail != route.number) {
+                        navController.navigateToTopLevel(route.route)
                     }
                 }
             )
@@ -209,13 +211,6 @@ fun SystemStatsApp(initialRoute: String? = null) {
                             // degraded/rootVerified wired by each screen's ViewModel as needed
                         )
                     }
-                    if (showMigratedNote && !isSettings) {
-                        MarginNote(
-                            message = "Your instrument has been recalibrated to the CALIPER standard.",
-                            title = "NOTE 001",
-                            onDismiss = { showMigratedNote = false }
-                        )
-                    }
                     Box(
                         Modifier
                             .weight(1f)
@@ -224,7 +219,7 @@ fun SystemStatsApp(initialRoute: String? = null) {
                     ) {
                         NavHost(
                             navController = navController,
-                            startDestination = ScreenRoute.Dashboard.route,
+                            startDestination = GRAPH_OVERVIEW,
                             enterTransition = {
                                 fadeIn(tween(160)) + slideInVertically(tween(160)) { it / 8 }
                             },
@@ -232,25 +227,33 @@ fun SystemStatsApp(initialRoute: String? = null) {
                             popEnterTransition = { fadeIn(tween(160)) },
                             popExitTransition = { fadeOut(tween(160)) }
                         ) {
-                            composable(ScreenRoute.Dashboard.route) {
-                                DashboardScreen(onChannel = { route ->
-                                    navController.navigate(route) { launchSingleTop = true }
-                                })
+                            navigation(startDestination = ScreenRoute.Dashboard.route, route = GRAPH_OVERVIEW) {
+                                composable(ScreenRoute.Dashboard.route) {
+                                    DashboardScreen(onChannel = { route ->
+                                        navController.navigate(route) { launchSingleTop = true }
+                                    })
+                                }
+                                composable("processor") { ProcessorChannel(onBack = { navController.popBackStack() }) }
+                                composable("memory") {
+                                    MemoryChannel(
+                                        onBack = { navController.popBackStack() },
+                                        onTasks = { navController.navigateToTopLevel(ScreenRoute.Tasks.route) }
+                                    )
+                                }
+                                composable("network") { NetworkChannel(onBack = { navController.popBackStack() }) }
+                                composable("power") { PowerChannel(onBack = { navController.popBackStack() }) }
+                                composable("storage") { StorageChannel(onBack = { navController.popBackStack() }) }
+                                composable("gpu") { GpuChannel(onBack = { navController.popBackStack() }) }
                             }
-                            composable(ScreenRoute.Hardware.route) { HardwareScreen(initialTab = hardwareTab) }
-                            composable(ScreenRoute.Overlay.route) { OverlayScreen() }
-                            composable(ScreenRoute.Tasks.route) { TasksScreen() }
-                            composable("processor") { ProcessorChannel(onBack = { navController.popBackStack() }) }
-                            composable("memory") {
-                                MemoryChannel(
-                                    onBack = { navController.popBackStack() },
-                                    onTasks = { navController.navigate(ScreenRoute.Tasks.route) { launchSingleTop = true } }
-                                )
+                            navigation(startDestination = ScreenRoute.Hardware.route, route = GRAPH_DEVICE) {
+                                composable(ScreenRoute.Hardware.route) { HardwareScreen(initialTab = hardwareTab) }
                             }
-                            composable("network") { NetworkChannel(onBack = { navController.popBackStack() }) }
-                            composable("power") { PowerChannel(onBack = { navController.popBackStack() }) }
-                            composable("storage") { StorageChannel(onBack = { navController.popBackStack() }) }
-                            composable("gpu") { GpuChannel(onBack = { navController.popBackStack() }) }
+                            navigation(startDestination = ScreenRoute.Overlay.route, route = GRAPH_OVERLAY) {
+                                composable(ScreenRoute.Overlay.route) { OverlayScreen() }
+                            }
+                            navigation(startDestination = ScreenRoute.Tasks.route, route = GRAPH_PROCESSES) {
+                                composable(ScreenRoute.Tasks.route) { TasksScreen() }
+                            }
                         }
                     }
                 }
@@ -260,14 +263,6 @@ fun SystemStatsApp(initialRoute: String? = null) {
                 if (!isSettings) {
                     Masthead(
                         onSettingsClick = onSettings
-                        // degraded/rootVerified wired by each screen's ViewModel as needed
-                    )
-                }
-                if (showMigratedNote && !isSettings) {
-                    MarginNote(
-                        message = "Your instrument has been recalibrated to the CALIPER standard.",
-                        title = "NOTE 001",
-                        onDismiss = { showMigratedNote = false }
                     )
                 }
                 Box(
@@ -278,7 +273,7 @@ fun SystemStatsApp(initialRoute: String? = null) {
                 ) {
                     NavHost(
                         navController = navController,
-                        startDestination = ScreenRoute.Dashboard.route,
+                        startDestination = GRAPH_OVERVIEW,
                         enterTransition = {
                             fadeIn(tween(160)) + slideInVertically(tween(160)) { it / 8 }
                         },
@@ -286,32 +281,40 @@ fun SystemStatsApp(initialRoute: String? = null) {
                         popEnterTransition = { fadeIn(tween(160)) },
                         popExitTransition = { fadeOut(tween(160)) }
                     ) {
-                        composable(ScreenRoute.Dashboard.route) {
-                            DashboardScreen(onChannel = { route ->
-                                navController.navigate(route) { launchSingleTop = true }
-                            })
+                        navigation(startDestination = ScreenRoute.Dashboard.route, route = GRAPH_OVERVIEW) {
+                            composable(ScreenRoute.Dashboard.route) {
+                                DashboardScreen(onChannel = { route ->
+                                    navController.navigate(route) { launchSingleTop = true }
+                                })
+                            }
+                            composable("processor") { ProcessorChannel(onBack = { navController.popBackStack() }) }
+                            composable("memory") {
+                                MemoryChannel(
+                                    onBack = { navController.popBackStack() },
+                                    onTasks = { navController.navigateToTopLevel(ScreenRoute.Tasks.route) }
+                                )
+                            }
+                            composable("network") { NetworkChannel(onBack = { navController.popBackStack() }) }
+                            composable("power") { PowerChannel(onBack = { navController.popBackStack() }) }
+                            composable("storage") { StorageChannel(onBack = { navController.popBackStack() }) }
+                            composable("gpu") { GpuChannel(onBack = { navController.popBackStack() }) }
                         }
-                        composable(ScreenRoute.Hardware.route) { HardwareScreen(initialTab = hardwareTab) }
-                        composable(ScreenRoute.Overlay.route) { OverlayScreen() }
-                        composable(ScreenRoute.Tasks.route) { TasksScreen() }
-                        composable("processor") { ProcessorChannel(onBack = { navController.popBackStack() }) }
-                        composable("memory") {
-                            MemoryChannel(
-                                onBack = { navController.popBackStack() },
-                                onTasks = { navController.navigate(ScreenRoute.Tasks.route) { launchSingleTop = true } }
-                            )
+                        navigation(startDestination = ScreenRoute.Hardware.route, route = GRAPH_DEVICE) {
+                            composable(ScreenRoute.Hardware.route) { HardwareScreen(initialTab = hardwareTab) }
                         }
-                        composable("network") { NetworkChannel(onBack = { navController.popBackStack() }) }
-                        composable("power") { PowerChannel(onBack = { navController.popBackStack() }) }
-                        composable("storage") { StorageChannel(onBack = { navController.popBackStack() }) }
-                        composable("gpu") { GpuChannel(onBack = { navController.popBackStack() }) }
+                        navigation(startDestination = ScreenRoute.Overlay.route, route = GRAPH_OVERLAY) {
+                            composable(ScreenRoute.Overlay.route) { OverlayScreen() }
+                        }
+                        navigation(startDestination = ScreenRoute.Tasks.route, route = GRAPH_PROCESSES) {
+                            composable(ScreenRoute.Tasks.route) { TasksScreen() }
+                        }
                     }
                 }
                 if (!isSettings) rail()
             }
         }
 
-        // № 05 — SETTINGS sheet: rises over the app (CaliperMotion.tBase), sinks
+        // SETTINGS sheet: rises over the app (CaliperMotion.tBase), sinks
         // back on dismiss. Underlying Overview never leaves composition.
         BackHandler(enabled = showSettings) { showSettings = false }
         AnimatedVisibility(

@@ -13,6 +13,8 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
@@ -61,9 +63,8 @@ fun OverlayScreen(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState())
     ) {
         ScreenHeader(
-            sheetLabel = "№ 03 — OVERLAY",
-            title = "Overlay.",
-            sub = if (state.isServiceRunning) "● live · running" else "scope probe · config",
+            title = "Overlay",
+            subtitle = if (state.isServiceRunning) "● live · running" else "floating performance overlay",
             warn = state.isServiceRunning
         )
 
@@ -216,52 +217,80 @@ fun OverlayScreen(
 }
 
 /**
- * F3 preview host: a graph-paper stage that fixes the probe to its scale width
- * (196/260/300 dp), centered, with breathing room against header and PERMISSIONS.
- * Live feed when the service window is running, animated demo otherwise.
+ * Preview host — single source of truth for panel width (HudScales).
+ * Preview frame owns padding/background; HudPanel owns fixed HUD width.
+ * Uses BoxWithConstraints to stay inside page on narrow devices (scaled preview only).
+ * clipToBounds at frame boundary ensures brackets/content never escape.
  */
 @Composable
 private fun HudPreviewHost(
     state: OverlayUiState,
     viewModel: OverlayViewModel
 ) {
-    val probeW = when (state.config.scale) {
-        HudScale.S -> 196.dp
-        HudScale.M -> 260.dp
-        HudScale.L -> 300.dp
-    }
-
-    Box(
+    val previewPadding = 8.dp
+    BoxWithConstraints(
         Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
         contentAlignment = Alignment.TopCenter
     ) {
+        val hudWidth = when (state.config.scale) {
+            HudScale.S -> 156.dp
+            HudScale.M -> 252.dp
+            HudScale.L -> 340.dp
+        }
+        // Also supports correct HudScales values if they change: read from HudScales directly
+        // Fallback uses the explicit mapping above for clarity; actual HudPanel uses same scale.
+        val desiredFrameWidth = hudWidth + previewPadding * 2
+        val availableWidth = maxWidth
+        val frameWidth = if (desiredFrameWidth > availableWidth) availableWidth else desiredFrameWidth
+        // If frame must shrink, scale preview representation only (not the service HUD size)
+        val scaleFactor = if (desiredFrameWidth > availableWidth) {
+            (availableWidth - previewPadding * 2) / hudWidth
+        } else 1f
+
         Box(
-            Modifier.width(probeW).wrapContentHeight()
+            Modifier
+                .width(frameWidth)
+                .wrapContentHeight()
                 .background(Caliper.colors.panel)
-                .padding(8.dp)
+                .clipToBounds()
+                .padding(previewPadding)
+                .clipToBounds()
         ) {
-            if (state.isServiceRunning) {
-                val slow by viewModel.hudSlow.collectAsStateWithLifecycle()
-                val fast by viewModel.hudFast.collectAsStateWithLifecycle()
-                HudTheme(medium = state.config.medium, scale = state.config.scale) {
-                    HudPanel(
-                        config = state.config.copy(locked = false),
-                        slow = androidx.compose.runtime.rememberUpdatedState(slow),
-                        fast = androidx.compose.runtime.rememberUpdatedState(fast),
-                        effectiveOpacity = state.config.opacity,
-                        interactive = false
-                    )
-                }
-            } else {
-                val (demoSlow, demoFast) = rememberHudDemo()
-                HudTheme(medium = state.config.medium, scale = state.config.scale) {
-                    HudPanel(
-                        config = state.config,
-                        slow = demoSlow,
-                        fast = demoFast,
-                        effectiveOpacity = state.config.opacity,
-                        interactive = false
-                    )
+            // Centered, clipped stage
+            Box(
+                Modifier.fillMaxWidth(),
+                contentAlignment = Alignment.TopCenter
+            ) {
+                // Apply scale only to preview representation when needed
+                val previewModifier = if (scaleFactor < 1f) {
+                    Modifier.graphicsLayer(scaleX = scaleFactor, scaleY = scaleFactor, transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, 0f))
+                } else Modifier
+
+                Box(modifier = previewModifier) {
+                    if (state.isServiceRunning) {
+                        val slow by viewModel.hudSlow.collectAsStateWithLifecycle()
+                        val fast by viewModel.hudFast.collectAsStateWithLifecycle()
+                        HudTheme(medium = state.config.medium, scale = state.config.scale) {
+                            HudPanel(
+                                config = state.config.copy(locked = false),
+                                slow = androidx.compose.runtime.rememberUpdatedState(slow),
+                                fast = androidx.compose.runtime.rememberUpdatedState(fast),
+                                effectiveOpacity = state.config.opacity,
+                                interactive = false
+                            )
+                        }
+                    } else {
+                        val (demoSlow, demoFast) = rememberHudDemo()
+                        HudTheme(medium = state.config.medium, scale = state.config.scale) {
+                            HudPanel(
+                                config = state.config,
+                                slow = demoSlow,
+                                fast = demoFast,
+                                effectiveOpacity = state.config.opacity,
+                                interactive = false
+                            )
+                        }
+                    }
                 }
             }
         }

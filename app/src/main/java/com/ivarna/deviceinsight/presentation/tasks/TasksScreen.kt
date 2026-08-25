@@ -52,9 +52,8 @@ fun TasksScreen(
     if (!hasPermission) {
         Column(Modifier.fillMaxSize().padding(16.dp)) {
             ScreenHeader(
-                sheetLabel = "№ 04 — PROCESSES",
-                title = "Processes.",
-                sub = "usage access required",
+                title = "Processes",
+                subtitle = "usage access required",
                 warn = true
             )
             Spacer(Modifier.height(16.dp))

@@ -38,13 +38,11 @@ class ChannelViewModel @Inject constructor(
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 }
 
-/** CALIPER S-02..S-06 channel page template: BACK · header · instruments · EndOfSheet.
- *  Instruments are gated by [LoadThenShow] — the page loads, then shows. */
+/** Channel page template: BACK · header · instruments · EndOfSheet. */
 @Composable
 fun ChannelScaffold(
-    sheetLabel: String,
     title: String,
-    sub: String,
+    subtitle: String,
     onBack: () -> Unit,
     ready: Boolean = true,
     content: @Composable ColumnScope.() -> Unit
@@ -54,7 +52,7 @@ fun ChannelScaffold(
             "← BACK", variant = HardKeyVariant.SECONDARY,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp), onClick = onBack
         )
-        ScreenHeader(sheetLabel, title, sub)
+        ScreenHeader(title, subtitle)
         Spacer(Modifier.height(12.dp))
         LoadThenShow(ready = ready) {
             Column(Modifier.padding(horizontal = 16.dp)) {

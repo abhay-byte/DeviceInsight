@@ -126,10 +126,9 @@ fun SettingsScreen(
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                     onClick = onBack)
             }
-            ScreenHeader("№ 05 — SETTINGS", "Settings.", "control panel · caliper standard")
+            ScreenHeader("Settings", "control panel")
 
-            // 01 PRESENTATION
-            Text("01 PRESENTATION", style = Caliper.type.meta, color = c.ink60,
+            Text("PRESENTATION", style = Caliper.type.meta, color = c.ink60,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
             Spacer(Modifier.height(4.dp))
             Text("media", style = Caliper.type.label, color = c.ink40,
@@ -161,7 +160,7 @@ fun SettingsScreen(
             Spacer(Modifier.height(10.dp))
 
             if (!cameraGranted) {
-                Text("02 PERMISSIONS", style = Caliper.type.meta, color = c.ink60,
+                Text("PERMISSIONS", style = Caliper.type.meta, color = c.ink60,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
                 Spacer(Modifier.height(6.dp))
                 PanelCard(
@@ -186,7 +185,7 @@ fun SettingsScreen(
                                 "Camera was denied. Open system settings to enable, or continue with a locked roster — no popup will reappear on its own."
                             else
                                 "Camera not granted. Roster stays locked. This card is the only place that opens the system popup — no auto dialog elsewhere.",
-                            title = "NOTE 002",
+                            title = "NOTE",
                             modifier = Modifier.fillMaxWidth()
                         )
                         Spacer(Modifier.height(10.dp))
@@ -218,8 +217,7 @@ fun SettingsScreen(
                 Spacer(Modifier.height(10.dp))
             }
 
-            // 03 WIDGETS
-            Text("03 WIDGETS", style = Caliper.type.meta, color = c.ink60,
+            Text("WIDGETS", style = Caliper.type.meta, color = c.ink60,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
             Spacer(Modifier.height(6.dp))
             PanelCard(
@@ -233,16 +231,14 @@ fun SettingsScreen(
             Spacer(Modifier.height(20.dp))
             DoubleRule(Modifier.padding(horizontal = 16.dp))
 
-            // 05 SYSTEM
-            Text("05 SYSTEM", style = Caliper.type.meta, color = c.ink60,
+            Text("SYSTEM", style = Caliper.type.meta, color = c.ink60,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
             Spacer(Modifier.height(10.dp))
-            HardKey("06 ABOUT → COLOPHON", variant = HardKeyVariant.SECONDARY,
+            HardKey("ABOUT → COLOPHON", variant = HardKeyVariant.SECONDARY,
                 modifier = Modifier.padding(horizontal = 16.dp),
                 onClick = { showColophon = true })
         } else {
-            // № 06 — COLOPHON
-            ScreenHeader("№ 06 — COLOPHON", "Colophon.", "the making of the instrument")
+            ScreenHeader("About", "DeviceInsight")
             Text("Set in Instrument Serif & IBM Plex Mono.", style = Caliper.type.dataS, color = c.ink,
                 modifier = Modifier.padding(horizontal = 16.dp))
             Spacer(Modifier.height(4.dp))
@@ -250,14 +246,6 @@ fun SettingsScreen(
                 modifier = Modifier.padding(horizontal = 16.dp))
             Text("the making of this instrument.", style = Caliper.type.dataS, color = c.ink,
                 modifier = Modifier.padding(horizontal = 16.dp))
-            Spacer(Modifier.height(16.dp))
-            Text("REVISIONS", style = Caliper.type.meta, color = c.ink60,
-                modifier = Modifier.padding(horizontal = 16.dp))
-            Spacer(Modifier.height(6.dp))
-            SpecRow("1.0.3 · 4", "CALIPER calibration · camera & thermal integrity", Modifier.padding(horizontal = 16.dp))
-            SpecRow("REV A", "CALIPER design language adopted", Modifier.padding(horizontal = 16.dp))
-            SpecRow("v1", "Elegant Glassmorphism (retired)", Modifier.padding(horizontal = 16.dp))
-            SpecRow("v0", "first internal build", Modifier.padding(horizontal = 16.dp))
             Spacer(Modifier.height(16.dp))
             SpecRow("VERSION", "${com.ivarna.deviceinsight.BuildConfig.VERSION_NAME} · Build ${com.ivarna.deviceinsight.BuildConfig.VERSION_CODE}", Modifier.padding(horizontal = 16.dp))
             SpecRow("LICENSE", "GPL-3.0", Modifier.padding(horizontal = 16.dp))
