@@ -45,17 +45,17 @@ class CaliperA11yTest {
             }
         }
         rule.onAllNodes(
-            hasContentDescription("[1] OVERVIEW") or
-                hasContentDescription("[2] DEVICE") or
-                hasContentDescription("[3] OVERLAY") or
-                hasContentDescription("[4] PROCESSES")
+            hasContentDescription("OVERVIEW") or
+                hasContentDescription("DEVICE") or
+                hasContentDescription("OVERLAY") or
+                hasContentDescription("PROCESSES")
         ).assertCountEquals(4)
 
         val descriptions = mutableListOf<String>()
         collectContentDescriptions(rule.onRoot().fetchSemanticsNode(), descriptions)
         assertEquals(
             "TalkBack order must match visual rail order — Tasks last",
-            listOf("[1] OVERVIEW", "[2] DEVICE", "[3] OVERLAY", "[4] PROCESSES"),
+            listOf("OVERVIEW", "DEVICE", "OVERLAY", "PROCESSES"),
             descriptions
         )
     }

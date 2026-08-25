@@ -14,10 +14,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
+import com.ivarna.deviceinsight.ui.caliper.hud.HudScales
+import kotlin.math.roundToInt
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -217,10 +220,9 @@ fun OverlayScreen(
 }
 
 /**
- * Preview host — single source of truth for panel width (HudScales).
- * Preview frame owns padding/background; HudPanel owns fixed HUD width.
- * Uses BoxWithConstraints to stay inside page on narrow devices (scaled preview only).
- * clipToBounds at frame boundary ensures brackets/content never escape.
+ * Preview host — single source of truth for panel width via HudScales.
+ * Measures HUD at its real size and scales both visual and layout via custom Layout,
+ * avoiding graphicsLayer-only scaling which leaves incorrect vertical space.
  */
 @Composable
 private fun HudPreviewHost(
@@ -232,19 +234,14 @@ private fun HudPreviewHost(
         Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
         contentAlignment = Alignment.TopCenter
     ) {
-        val hudWidth = when (state.config.scale) {
-            HudScale.S -> 156.dp
-            HudScale.M -> 252.dp
-            HudScale.L -> 340.dp
-        }
-        // Also supports correct HudScales values if they change: read from HudScales directly
-        // Fallback uses the explicit mapping above for clarity; actual HudPanel uses same scale.
+        val hudWidth = HudScales.of(state.config.scale).widthDp.dp
         val desiredFrameWidth = hudWidth + previewPadding * 2
         val availableWidth = maxWidth
         val frameWidth = if (desiredFrameWidth > availableWidth) availableWidth else desiredFrameWidth
-        // If frame must shrink, scale preview representation only (not the service HUD size)
-        val scaleFactor = if (desiredFrameWidth > availableWidth) {
-            (availableWidth - previewPadding * 2) / hudWidth
+        val innerAvailable = frameWidth - previewPadding * 2
+        // preview-only scale (not the service HUD size)
+        val scaleFactor = if (hudWidth > innerAvailable) {
+            (innerAvailable / hudWidth).coerceIn(0.1f, 1f)
         } else 1f
 
         Box(
@@ -254,44 +251,65 @@ private fun HudPreviewHost(
                 .background(Caliper.colors.panel)
                 .clipToBounds()
                 .padding(previewPadding)
-                .clipToBounds()
+                .clipToBounds(),
+            contentAlignment = Alignment.TopCenter
         ) {
-            // Centered, clipped stage
-            Box(
-                Modifier.fillMaxWidth(),
-                contentAlignment = Alignment.TopCenter
-            ) {
-                // Apply scale only to preview representation when needed
-                val previewModifier = if (scaleFactor < 1f) {
-                    Modifier.graphicsLayer(scaleX = scaleFactor, scaleY = scaleFactor, transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, 0f))
-                } else Modifier
-
-                Box(modifier = previewModifier) {
-                    if (state.isServiceRunning) {
-                        val slow by viewModel.hudSlow.collectAsStateWithLifecycle()
-                        val fast by viewModel.hudFast.collectAsStateWithLifecycle()
-                        HudTheme(medium = state.config.medium, scale = state.config.scale) {
-                            HudPanel(
-                                config = state.config.copy(locked = false),
-                                slow = androidx.compose.runtime.rememberUpdatedState(slow),
-                                fast = androidx.compose.runtime.rememberUpdatedState(fast),
-                                effectiveOpacity = state.config.opacity,
-                                interactive = false
-                            )
-                        }
-                    } else {
-                        val (demoSlow, demoFast) = rememberHudDemo()
-                        HudTheme(medium = state.config.medium, scale = state.config.scale) {
-                            HudPanel(
-                                config = state.config,
-                                slow = demoSlow,
-                                fast = demoFast,
-                                effectiveOpacity = state.config.opacity,
-                                interactive = false
-                            )
-                        }
+            ScaledPreview(scale = scaleFactor) {
+                if (state.isServiceRunning) {
+                    val slow by viewModel.hudSlow.collectAsStateWithLifecycle()
+                    val fast by viewModel.hudFast.collectAsStateWithLifecycle()
+                    HudTheme(medium = state.config.medium, scale = state.config.scale) {
+                        HudPanel(
+                            config = state.config.copy(locked = false),
+                            slow = androidx.compose.runtime.rememberUpdatedState(slow),
+                            fast = androidx.compose.runtime.rememberUpdatedState(fast),
+                            effectiveOpacity = state.config.opacity,
+                            interactive = false
+                        )
+                    }
+                } else {
+                    val (demoSlow, demoFast) = rememberHudDemo()
+                    HudTheme(medium = state.config.medium, scale = state.config.scale) {
+                        HudPanel(
+                            config = state.config,
+                            slow = demoSlow,
+                            fast = demoFast,
+                            effectiveOpacity = state.config.opacity,
+                            interactive = false
+                        )
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ScaledPreview(
+    scale: Float,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit
+) {
+    if (scale >= 0.999f) {
+        Box(modifier = modifier, contentAlignment = Alignment.TopCenter) { content() }
+        return
+    }
+    Layout(content = content, modifier = modifier) { measurables, constraints ->
+        // Measure child at its natural (unconstrained) size to get true HUD dimensions.
+        // HudPanel's fixed width is hudWidth; height is wrapContent.
+        val placeable = measurables.first().measure(
+            Constraints(maxWidth = Constraints.Infinity, maxHeight = Constraints.Infinity)
+        )
+        val scaledWidth = (placeable.width * scale).roundToInt()
+        val scaledHeight = (placeable.height * scale).roundToInt()
+        // Respect incoming max constraints (should already fit after scaling)
+        val finalWidth = scaledWidth.coerceAtMost(constraints.maxWidth)
+        val finalHeight = scaledHeight.coerceAtMost(constraints.maxHeight)
+        layout(finalWidth, finalHeight) {
+            // Place with layer scaling so both visual and layout are scaled
+            placeable.placeWithLayer(0, 0) {
+                scaleX = scale
+                scaleY = scale
             }
         }
     }

@@ -89,7 +89,7 @@ fun NavController.navigateToTopLevel(route: String) {
             saveState = true
         }
         launchSingleTop = true
-        restoreState = true
+        restoreState = false
     }
 }
 
@@ -194,8 +194,23 @@ fun SystemStatsApp(initialRoute: String? = null) {
                 vertical = wide,
                 onSelect = { key ->
                     val route = railRoutes.first { it.number == key.number }
-                    if (selectedRail != route.number) {
-                        navController.navigateToTopLevel(route.route)
+                    val isAlreadyOnRoot = currentDestination?.hierarchy?.any { it.route == route.route } == true
+                    if (isAlreadyOnRoot) {
+                        // already on root, no-op
+                    } else {
+                        val isInSameGraph = currentDestination?.hierarchy?.any { it.route == route.graph } == true
+                        if (isInSameGraph) {
+                            // Reselecting current graph while on a child -> pop to its root
+                            val popped = navController.popBackStack(route.route, inclusive = false)
+                            if (!popped) {
+                                navController.navigate(route.route) {
+                                    popUpTo(route.route) { inclusive = false }
+                                    launchSingleTop = true
+                                }
+                            }
+                        } else {
+                            navController.navigateToTopLevel(route.route)
+                        }
                     }
                 }
             )

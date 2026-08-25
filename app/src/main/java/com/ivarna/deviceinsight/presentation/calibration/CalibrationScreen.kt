@@ -16,6 +16,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -36,12 +37,12 @@ fun CalibrationScreen(
     onMedium: (Medium) -> Unit,
     onFinish: () -> Unit
 ) {
-    var page by remember { mutableIntStateOf(0) }
+    var page by rememberSaveable { mutableIntStateOf(0) }
     LaunchedEffect(Unit) {
         onMedium(Medium.PAPER)
     }
     Column(
-        Modifier.fillMaxSize().caliperGrid().verticalScroll(rememberScrollState())
+        Modifier.fillMaxSize().caliperGrid()
     ) {
         when (page) {
             0 -> WelcomePage(onContinue = { page = 1 })
@@ -54,7 +55,7 @@ fun CalibrationScreen(
 private fun WelcomePage(onContinue: () -> Unit) {
     val c = Caliper.colors
     Column(
-        Modifier.fillMaxWidth().padding(24.dp),
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Spacer(Modifier.height(16.dp))
@@ -167,10 +168,10 @@ private fun SetupPage(onFinish: () -> Unit) {
         onDispose { lifecycleOwner.lifecycle.removeObserver(obs) }
     }
 
-    Column(Modifier.fillMaxWidth().padding(16.dp)) {
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) {
         Text("Set up DeviceInsight", style = Caliper.type.display1, color = c.ink)
         Spacer(Modifier.height(8.dp))
-        Text("Grant access for the features you want. You can skip and enable later in Settings.", style = Caliper.type.meta, color = c.ink60)
+        Text("Grant access for the features you want. You can skip and enable them later in the app.", style = Caliper.type.meta, color = c.ink60)
         Spacer(Modifier.height(16.dp))
 
         // Usage access
@@ -184,7 +185,7 @@ private fun SetupPage(onFinish: () -> Unit) {
             Text("Helps DeviceInsight show per-app activity and more accurate process information.", style = Caliper.type.dataS, color = c.ink60)
             Spacer(Modifier.height(12.dp))
             if (hasUsage) {
-                Text("Usage access granted · per-app CPU / memory live", style = Caliper.type.meta, color = c.ink60)
+                Text("Usage access granted · app activity and usage history available", style = Caliper.type.meta, color = c.ink60)
             } else {
                 HardKey("ALLOW USAGE ACCESS", variant = HardKeyVariant.PRIMARY, modifier = Modifier.fillMaxWidth(), onClick = {
                     try {
@@ -270,7 +271,7 @@ private fun SetupPage(onFinish: () -> Unit) {
         Text("OPTIONAL CAPABILITIES", style = Caliper.type.meta, color = c.ink60)
         Spacer(Modifier.height(8.dp))
         PanelCard(title = "ROOT / SHIZUKU") {
-            Text("Optional advanced features if your device supports them. DeviceInsight works fully without them. You can configure these later from Settings.", style = Caliper.type.dataS, color = c.ink60)
+            Text("Optional. Core monitoring works without Root or Shizuku, but some advanced FPS data may be unavailable.", style = Caliper.type.dataS, color = c.ink60)
         }
         Spacer(Modifier.height(16.dp))
 

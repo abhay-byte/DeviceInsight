@@ -1,9 +1,11 @@
 package com.ivarna.deviceinsight.presentation.settings
 
 import android.Manifest
+import android.app.AppOpsManager
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Process
 import android.provider.Settings
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -50,12 +52,13 @@ fun SettingsScreen(
     val scope = rememberCoroutineScope()
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     val showGrid by context.showGridFlow.collectAsStateWithLifecycle(initialValue = true)
-    // CALIPER §5.14 — camera permission is gated; check once at top so state survives sheet switches
     var cameraGranted by remember {
         mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED)
     }
     var showPermRationale by remember { mutableStateOf(false) }
     var permPermanentlyDenied by remember { mutableStateOf(false) }
+    var hasUsage by remember { mutableStateOf(hasUsageAccess(context)) }
+    var hasOverlay by remember { mutableStateOf(Settings.canDrawOverlays(context)) }
     val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         cameraGranted = granted
         if (granted) {
@@ -73,15 +76,18 @@ fun SettingsScreen(
             haptics.tick()
         }
     }
-    // re-check when returning from system Settings (Settings card + DevicesTab both need this)
     DisposableEffect(lifecycleOwner) {
         val obs2 = LifecycleEventObserver { _, ev ->
             if (ev == Lifecycle.Event.ON_RESUME) {
-                val now = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
-                if (now != cameraGranted) {
-                    cameraGranted = now
-                    if (now) { showPermRationale = false; permPermanentlyDenied = false }
+                val nowCamera = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+                if (nowCamera != cameraGranted) {
+                    cameraGranted = nowCamera
+                    if (nowCamera) { showPermRationale = false; permPermanentlyDenied = false }
                 }
+                val nowUsage = hasUsageAccess(context)
+                if (nowUsage != hasUsage) hasUsage = nowUsage
+                val nowOverlay = Settings.canDrawOverlays(context)
+                if (nowOverlay != hasOverlay) hasOverlay = nowOverlay
             }
         }
         lifecycleOwner.lifecycle.addObserver(obs2)
@@ -159,15 +165,34 @@ fun SettingsScreen(
             )
             Spacer(Modifier.height(10.dp))
 
-            if (!cameraGranted) {
-                Text("PERMISSIONS", style = Caliper.type.meta, color = c.ink60,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
-                Spacer(Modifier.height(6.dp))
-                PanelCard(
-                    title = "CAMERA · ROSTER",
-                    status = { Text("LOCKED", style = Caliper.type.meta, color = c.fault) },
-                    modifier = Modifier.padding(horizontal = 16.dp)
-                ) {
+            Text("PERMISSIONS", style = Caliper.type.meta, color = c.ink60,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+            Spacer(Modifier.height(6.dp))
+            PanelCard(
+                title = "PERMISSIONS",
+                status = {
+                    val allGranted = hasUsage && hasOverlay && cameraGranted
+                    Text(if (allGranted) "ALL GRANTED" else "REQUIRED", style = Caliper.type.meta, color = if (allGranted) c.ink60 else c.fault)
+                },
+                modifier = Modifier.padding(horizontal = 16.dp)
+            ) {
+                SpecRow("usage", if (hasUsage) "GRANTED" else "REQUIRED")
+                SpecRow("overlay", if (hasOverlay) "GRANTED" else "REQUIRED")
+                SpecRow("camera", if (cameraGranted) "GRANTED" else "REQUIRED")
+                Spacer(Modifier.height(10.dp))
+                if (!hasUsage) {
+                    HardKey("GRANT USAGE ACCESS", variant = HardKeyVariant.PRIMARY, modifier = Modifier.fillMaxWidth(), onClick = {
+                        try { context.startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }) } catch (_: Exception) { try { context.startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)) } catch (_: Exception) {} }
+                    })
+                    Spacer(Modifier.height(8.dp))
+                }
+                if (!hasOverlay) {
+                    HardKey("GRANT OVERLAY", variant = HardKeyVariant.PRIMARY, modifier = Modifier.fillMaxWidth(), onClick = {
+                        try { context.startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${context.packageName}")).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }) } catch (_: Exception) { try { context.startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION)) } catch (_: Exception) {} }
+                    })
+                    Spacer(Modifier.height(8.dp))
+                }
+                if (!cameraGranted) {
                     Text(
                         "camera roster reads hardware only — no shutter, no preview. Without access the optics inventory stays hatched as CHANNEL LOCKED.",
                         style = Caliper.type.dataS, color = c.ink60
@@ -211,17 +236,19 @@ fun SettingsScreen(
                                 }
                             })
                     }
+                } else {
+                    Text("Camera roster will be available in Device details", style = Caliper.type.meta, color = c.ink60)
                 }
-                Spacer(Modifier.height(12.dp))
-                DoubleRule(Modifier.padding(horizontal = 16.dp))
-                Spacer(Modifier.height(10.dp))
             }
+            Spacer(Modifier.height(12.dp))
+            DoubleRule(Modifier.padding(horizontal = 16.dp))
+            Spacer(Modifier.height(10.dp))
 
             Text("WIDGETS", style = Caliper.type.meta, color = c.ink60,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
             Spacer(Modifier.height(6.dp))
             PanelCard(
-                title = "INSTRUMENTS",
+                title = "WIDGETS",
                 status = { Text(if (widgetCount == 0) "NOT PLACED" else "PLACED ×$widgetCount", style = Caliper.type.meta, color = c.ink40) },
                 onClick = { showWidgets = true },
                 modifier = Modifier.padding(horizontal = 16.dp)
@@ -234,7 +261,7 @@ fun SettingsScreen(
             Text("SYSTEM", style = Caliper.type.meta, color = c.ink60,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
             Spacer(Modifier.height(10.dp))
-            HardKey("ABOUT → COLOPHON", variant = HardKeyVariant.SECONDARY,
+            HardKey("ABOUT", variant = HardKeyVariant.SECONDARY,
                 modifier = Modifier.padding(horizontal = 16.dp),
                 onClick = { showColophon = true })
         } else {
@@ -244,7 +271,7 @@ fun SettingsScreen(
             Spacer(Modifier.height(4.dp))
             Text("Drawn on a 4pt grid. No gradients were used in", style = Caliper.type.dataS, color = c.ink,
                 modifier = Modifier.padding(horizontal = 16.dp))
-            Text("the making of this instrument.", style = Caliper.type.dataS, color = c.ink,
+            Text("the making of this application.", style = Caliper.type.dataS, color = c.ink,
                 modifier = Modifier.padding(horizontal = 16.dp))
             Spacer(Modifier.height(16.dp))
             SpecRow("VERSION", "${com.ivarna.deviceinsight.BuildConfig.VERSION_NAME} · Build ${com.ivarna.deviceinsight.BuildConfig.VERSION_CODE}", Modifier.padding(horizontal = 16.dp))
@@ -259,6 +286,14 @@ fun SettingsScreen(
             }
         }
     }
+}
+
+private fun hasUsageAccess(context: android.content.Context): Boolean {
+    return try {
+        val appOps = context.getSystemService(android.content.Context.APP_OPS_SERVICE) as AppOpsManager
+        val mode = appOps.checkOpNoThrow(AppOpsManager.OPSTR_GET_USAGE_STATS, Process.myUid(), context.packageName)
+        mode == AppOpsManager.MODE_ALLOWED
+    } catch (_: Exception) { false }
 }
 
 /** Three paper-sample swatches — real rendered mini-panels, not color dots. */
