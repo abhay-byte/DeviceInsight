@@ -43,9 +43,17 @@ object WidgetTargetRegistry {
         return entries.flatMap { (widget, kind) ->
             val ids = synchronized(this) { cache[widget::class.java].orEmpty() }
             ids.mapNotNull { id ->
-                runCatching {
-                    WidgetTarget(manager.getAppWidgetId(id), id, kind, BenchState.config(context, id))
-                }.getOrNull()
+                try {
+                    val appWidgetId = manager.getAppWidgetId(id)
+                    val config = BenchState.config(context, id)
+                    if (appWidgetId != android.appwidget.AppWidgetManager.INVALID_APPWIDGET_ID) {
+                        WidgetConfigStore.publish(appWidgetId, config)
+                    }
+                    WidgetTarget(appWidgetId, id, kind, config)
+                } catch (t: Throwable) {
+                    Log.e("DeviceInsightWidget", "TARGET_BUILD_FAIL kind=$kind glanceId=$id", t)
+                    null
+                }
             }
         }
     }

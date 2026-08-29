@@ -36,6 +36,7 @@ import com.ivarna.deviceinsight.service.overlay.RawOverlayWindowHost
 import com.ivarna.deviceinsight.ui.caliper.hud.HudConfig
 import com.ivarna.deviceinsight.ui.caliper.hud.HudRuntimeConfig
 import com.ivarna.deviceinsight.ui.caliper.hudRuntimeConfigFlow
+import com.ivarna.deviceinsight.ui.caliper.LauncherAlias
 import com.ivarna.deviceinsight.ui.caliper.setHudLocked
 import com.ivarna.deviceinsight.ui.caliper.setHudPosition
 import dagger.hilt.android.AndroidEntryPoint
@@ -57,7 +58,7 @@ import javax.inject.Inject
 class OverlayService : Service(), LifecycleOwner, androidx.savedstate.SavedStateRegistryOwner {
 
     companion object {
-        val isRunning = java.util.concurrent.atomic.AtomicBoolean(false)
+        val isRunning = OverlayRuntimeState.isRunning
         private const val CHANNEL_ID = "overlay_channel"
         private const val NOTIFICATION_ID = 1
         private const val BLUR_RADIUS_DP = 10
@@ -375,5 +376,7 @@ class OverlayService : Service(), LifecycleOwner, androidx.savedstate.SavedState
             lifecycleRegistry.currentState = Lifecycle.State.DESTROYED
         }
         super.onDestroy()
+        runCatching { LauncherAlias.retryPending(this) }
+            .onFailure { Log.e(TAG, "LAUNCHER_ALIAS_RETRY_FAILED", it) }
     }
 }

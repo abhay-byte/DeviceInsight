@@ -30,6 +30,9 @@ class BenchConfigActivity : ComponentActivity() {
 
     private var appWidgetId: Int = AppWidgetManager.INVALID_APPWIDGET_ID
 
+    private fun widgetResultIntent() =
+        Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -37,7 +40,7 @@ class BenchConfigActivity : ComponentActivity() {
             ?: AppWidgetManager.INVALID_APPWIDGET_ID
 
         if (appWidgetId == AppWidgetManager.INVALID_APPWIDGET_ID) {
-            setResult(RESULT_CANCELED, Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId))
+            setResult(RESULT_CANCELED, widgetResultIntent())
             finish()
             return
         }
@@ -45,7 +48,7 @@ class BenchConfigActivity : ComponentActivity() {
         val kind = resolveKind()
 
         // official contract: the activity ALWAYS answers with the id attached — even on cancel/back
-        setResult(RESULT_CANCELED, Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId))
+        setResult(RESULT_CANCELED, widgetResultIntent())
 
         lifecycleScope.launch {
             // load system medium AND the widget's saved prefs before first frame — no PAPER-first lie
@@ -61,7 +64,7 @@ class BenchConfigActivity : ComponentActivity() {
                         appWidgetId = appWidgetId,
                         onSave = { cfg -> saveConfig(cfg) },
                         onSkip = { saveConfig(BenchConfig()) },
-                        onCancel = { setResult(RESULT_CANCELED); finish() }
+                        onCancel = { setResult(RESULT_CANCELED, widgetResultIntent()); finish() }
                     )
                 }
             }
@@ -89,6 +92,7 @@ class BenchConfigActivity : ComponentActivity() {
                 val mgr = GlanceAppWidgetManager(this@BenchConfigActivity)
                 val glanceId = mgr.getGlanceIdBy(appWidgetId)
                 BenchState.save(this@BenchConfigActivity, glanceId, cfg)
+                WidgetConfigStore.publish(appWidgetId, cfg)
                 WidgetTargetRegistry.invalidate()
                 val sample = WidgetSnapshotCoordinator.resolveInitial(this@BenchConfigActivity).snapshot
                 BenchUpdater.publishAndForceUpdate(
@@ -98,7 +102,7 @@ class BenchConfigActivity : ComponentActivity() {
                 )
             } catch (t: Throwable) {
                 Log.e("DeviceInsightWidget", "CONFIG_SAVE_FAIL appWidgetId=$appWidgetId", t)
-                setResult(RESULT_CANCELED, Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId))
+                setResult(RESULT_CANCELED, widgetResultIntent())
                 finish()
                 return@launch
             }

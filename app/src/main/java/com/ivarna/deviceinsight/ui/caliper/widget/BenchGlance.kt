@@ -49,6 +49,7 @@ import com.ivarna.deviceinsight.MainActivity
 import com.ivarna.deviceinsight.ui.caliper.Fmt
 import com.ivarna.deviceinsight.ui.caliper.HatchPattern
 import com.ivarna.deviceinsight.ui.caliper.Medium
+import com.ivarna.deviceinsight.ui.caliper.mediumFlow
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -753,27 +754,32 @@ private suspend fun GlanceAppWidget.provideBenchWidget(
     kind: WidgetKind,
     showCalibration: Boolean
 ) {
-    val cfg = BenchState.config(context, id)
-    val medium = resolvedMedium(context, cfg)
+    val initialConfig = BenchState.config(context, id)
+    val initialMedium = resolvedMedium(context, initialConfig)
     val initial = WidgetSnapshotCoordinator.resolveInitial(context)
+    val awId = runCatching { GlanceAppWidgetManager(context).getAppWidgetId(id) }
+        .getOrDefault(AppWidgetManager.INVALID_APPWIDGET_ID)
+    WidgetConfigStore.seedIfEmpty(awId, initialConfig)
+    WidgetPresentationStore.seedIfEmpty(awId, initial)
     val placedAt = if (showCalibration) {
         runCatching { BenchState.placedAt(context, id) }.getOrDefault(0L)
     } else 0L
     val calibrating = showCalibration &&
         (initial.snapshot.timestamp == 0L || (placedAt != 0L && System.currentTimeMillis() - placedAt < 6_000L))
-    val awId = runCatching { GlanceAppWidgetManager(context).getAppWidgetId(id) }
-        .getOrDefault(AppWidgetManager.INVALID_APPWIDGET_ID)
-
     provideContent {
-        val published by WidgetSnapshotCoordinator.latest.collectAsState(initial = initial)
-        val current = published ?: initial
+        val observedConfig by WidgetConfigStore.stateFor(awId).collectAsState()
+        val currentConfig = observedConfig ?: initialConfig
+        val systemMedium by LocalContext.current.mediumFlow.collectAsState(initial = initialMedium)
+        val currentMedium = if (currentConfig.followSystem) systemMedium ?: initialMedium else currentConfig.medium
+        val presented by WidgetPresentationStore.stateFor(awId).collectAsState()
+        val current = presented ?: initial
         val size = LocalSize.current
         val render = buildWidgetRenderState(
             kind = kind,
             appWidgetId = awId,
             exactSize = size,
-            medium = medium,
-            config = cfg,
+            medium = currentMedium,
+            config = currentConfig,
             snapshot = current.snapshot,
             calibrating = calibrating,
             snapshotSource = current.source

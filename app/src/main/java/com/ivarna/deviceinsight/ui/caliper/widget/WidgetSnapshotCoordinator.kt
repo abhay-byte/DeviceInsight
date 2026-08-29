@@ -67,8 +67,21 @@ fun chooseFreshest(
     now: Long,
     candidates: Iterable<PublishedWidgetSnapshot>
 ): PublishedWidgetSnapshot? = candidates
-    .filter { it.snapshot.timestamp in 1L..(now + 5_000L) }
+    .filter { isCandidateFresh(now, it) }
     .maxWithOrNull(compareBy<PublishedWidgetSnapshot> { it.snapshot.timestamp }.thenBy { it.publishedAt })
+
+fun isCandidateFresh(now: Long, candidate: PublishedWidgetSnapshot): Boolean {
+    val timestamp = candidate.snapshot.timestamp
+    if (timestamp <= 0L || timestamp > now + 5_000L) return false
+    val age = now - timestamp
+    return when (candidate.source) {
+        WidgetSnapshotSource.APP_MONITOR,
+        WidgetSnapshotSource.FOREGROUND_SERVICE,
+        WidgetSnapshotSource.ON_DEMAND -> age <= 10_000L
+        // Budget is the durable background floor; allow its two-cadence lifetime.
+        WidgetSnapshotSource.BUDGET -> age <= 30 * 60_000L
+    }
+}
 
 enum class WidgetEngineState {
     LIVE_ACTIVE,

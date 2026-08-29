@@ -6,6 +6,8 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.util.Log
+import com.ivarna.deviceinsight.service.OverlayRuntimeState
 
 /**
  * Launcher icon = in-app media (activity-alias swap). Enable the new alias FIRST, then
@@ -90,38 +92,30 @@ object LauncherAlias {
         if (isOverlayRunning()) {
             return
         }
-        pending = null
-        runCatching { apply(ctx, medium) }
+        try {
+            apply(ctx, medium)
+            pending = null
+        } catch (t: Throwable) {
+            Log.e("DeviceInsightAlias", "ALIAS_APPLY_FAILED medium=$medium", t)
+        }
     }
 
-    private fun isOverlayRunning(): Boolean {
-        return try {
-            Class.forName("com.ivarna.deviceinsight.service.OverlayService")
-                .getDeclaredField("isRunning")
-                .get(null)
-                .let { it as java.util.concurrent.atomic.AtomicBoolean }
-                .get()
-        } catch (_: Exception) { false }
-    }
+    private fun isOverlayRunning(): Boolean = OverlayRuntimeState.isRunning.get()
 
     fun apply(ctx: Context, medium: Medium) {
         val pm = ctx.packageManager
         val target = aliasFor(medium)
-        runCatching {
+        pm.setComponentEnabledSetting(
+            ComponentName(ctx, ctx.packageName + target),
+            PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
+            PackageManager.DONT_KILL_APP
+        )
+        ALL.filter { it != target }.forEach { name ->
             pm.setComponentEnabledSetting(
-                ComponentName(ctx, ctx.packageName + target),
-                PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
+                ComponentName(ctx, ctx.packageName + name),
+                PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
                 PackageManager.DONT_KILL_APP
             )
-        }
-        ALL.filter { it != target }.forEach { name ->
-            runCatching {
-                pm.setComponentEnabledSetting(
-                    ComponentName(ctx, ctx.packageName + name),
-                    PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
-                    PackageManager.DONT_KILL_APP
-                )
-            }
         }
     }
 }

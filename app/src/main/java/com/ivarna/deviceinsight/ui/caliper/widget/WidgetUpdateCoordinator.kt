@@ -48,6 +48,8 @@ object WidgetUpdateCoordinator {
 
     fun evict(appWidgetId: Int) {
         lastUpdateAt.remove(appWidgetId)
+        WidgetPresentationStore.remove(appWidgetId)
+        WidgetConfigStore.remove(appWidgetId)
         WidgetTargetRegistry.invalidate()
     }
 
@@ -59,13 +61,14 @@ object WidgetUpdateCoordinator {
         val targets = WidgetTargetRegistry.targets(request.context, widgets)
         Log.d(TAG, "UPDATE_BEGIN source=${published.source} age=${now - published.snapshot.timestamp} targets=${targets.size} force=${request.force}")
         for (target in targets) {
+            WidgetConfigStore.publish(target.appWidgetId, target.config)
             val effective = effectiveCadence(target.config, published)
             val previous = lastUpdateAt[target.appWidgetId] ?: 0L
-            val due = effective.intervalMs == null || now - previous >= effective.intervalMs
-            if (!request.force && !due) continue
+            if (!isUpdateDue(now, previous, effective, request.force)) continue
             val widget = widgets.firstOrNull { it.second == target.kind }?.first ?: continue
             val start = System.currentTimeMillis()
             try {
+                WidgetPresentationStore.present(target.appWidgetId, published)
                 widget.update(request.context, target.glanceId)
                 lastUpdateAt[target.appWidgetId] = System.currentTimeMillis()
                 Log.d(TAG, "UPDATE_END appWidgetId=${target.appWidgetId} source=${published.source} state=${effective.state} durationMs=${System.currentTimeMillis() - start}")
@@ -77,3 +80,10 @@ object WidgetUpdateCoordinator {
 
     private data class Request(val context: Context, val force: Boolean)
 }
+
+internal fun isUpdateDue(
+    now: Long,
+    lastPresentedAt: Long,
+    effective: EffectiveCadence,
+    force: Boolean = false
+): Boolean = force || effective.intervalMs == null || now - lastPresentedAt >= effective.intervalMs
