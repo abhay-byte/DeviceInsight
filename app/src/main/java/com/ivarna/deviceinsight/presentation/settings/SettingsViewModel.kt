@@ -10,9 +10,15 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+
+sealed interface MediumState {
+    data object Loading : MediumState
+    data class Ready(val medium: Medium) : MediumState
+}
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
@@ -25,6 +31,22 @@ class SettingsViewModel @Inject constructor(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = null
+        )
+
+    val mediumState: StateFlow<MediumState> = medium
+        .map { MediumState.Ready(it ?: Medium.PAPER) }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = MediumState.Loading
+        )
+
+    val resolvedMedium: StateFlow<Medium> = mediumState
+        .map { state -> (state as? MediumState.Ready)?.medium ?: Medium.PAPER }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = Medium.PAPER
         )
 
     fun setMedium(medium: Medium) {

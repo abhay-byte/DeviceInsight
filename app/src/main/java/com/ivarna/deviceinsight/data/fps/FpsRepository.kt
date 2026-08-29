@@ -32,7 +32,7 @@ class FpsRepositoryImpl @Inject constructor(
 
     override suspend fun getFps(): FpsSnapshot {
         // Keep gateway mode in sync with current setting (fixes AUTO chain on every sample)
-        shellGateway.setModeFromString(hudSettingsCache.fpsMode)
+        shellGateway.setMode(hudSettingsCache.fpsMode)
 
         val foreground = foregroundAppResolver.resolve()
         val pkg = foreground?.packageName

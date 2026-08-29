@@ -3,30 +3,82 @@ package com.ivarna.deviceinsight.ui.caliper.hud
 import com.ivarna.deviceinsight.data.monitor.CoreStat
 import com.ivarna.deviceinsight.data.monitor.HudFast
 import com.ivarna.deviceinsight.data.monitor.HudSlow
+import androidx.datastore.preferences.core.Preferences
+import com.ivarna.deviceinsight.data.fps.model.FpsMode
+import com.ivarna.deviceinsight.ui.caliper.CaliperKeys
 
 enum class HudModule { FPS, CPU, MEMORY, POWER, GPU, NETWORK, TRACE }
 
 enum class HudScale { S, M, L }
 
+object HudDefaults {
+    val medium = HudMedium.CARBON
+    val scale = HudScale.M
+    const val opacity = 0.75f
+    const val backgroundBlurEnabled = true
+    const val locked = false
+    val modules = setOf(HudModule.FPS, HudModule.CPU, HudModule.MEMORY, HudModule.POWER, HudModule.NETWORK)
+    const val showCoreBank = true
+    const val x = 100
+    const val y = 100
+    val fpsMode = FpsMode.AUTO
+
+    fun modulesCsv(): String = modules.joinToString(",") { it.name }
+}
+
 data class HudConfig(
-    val medium: HudMedium = HudMedium.CARBON,
-    val scale: HudScale = HudScale.M,
-    val opacity: Float = 0.75f, // 0.4–0.9
-    val blurBehind: Boolean = true,
-    val locked: Boolean = false,
-    val modules: Set<HudModule> = setOf(HudModule.FPS, HudModule.CPU, HudModule.MEMORY, HudModule.POWER),
-    val showCoreBank: Boolean = true,
-    val x: Int = 100,
-    val y: Int = 100,
-    val fpsMode: String = "AUTO" // AUTO / ROOT / SHIZUKU
+    val medium: HudMedium = HudDefaults.medium,
+    val scale: HudScale = HudDefaults.scale,
+    val opacity: Float = HudDefaults.opacity, // 0.4–0.9
+    val backgroundBlurEnabled: Boolean = HudDefaults.backgroundBlurEnabled,
+    val locked: Boolean = HudDefaults.locked,
+    val modules: Set<HudModule> = HudDefaults.modules,
+    val showCoreBank: Boolean = HudDefaults.showCoreBank
 ) {
     fun modulesCsv(): String = modules.joinToString(",") { it.name }
     companion object {
         fun fromCsv(csv: String): Set<HudModule> = csv.split(",").mapNotNull {
-            try { HudModule.valueOf(it.trim()) } catch (_: Exception) { null }
-        }.toSet().ifEmpty { setOf(HudModule.FPS, HudModule.CPU, HudModule.MEMORY, HudModule.POWER) }
+            runCatching { HudModule.valueOf(it.trim().uppercase()) }.getOrNull()
+        }.toSet().ifEmpty { HudDefaults.modules }
     }
 }
+
+data class HudRuntimeConfig(
+    val panel: HudConfig = HudConfig(),
+    val x: Int = HudDefaults.x,
+    val y: Int = HudDefaults.y,
+    val fpsMode: FpsMode = HudDefaults.fpsMode
+)
+
+object HudConfigCodec {
+    fun fromPreferences(prefs: Preferences): HudRuntimeConfig {
+        val opacity = prefs[CaliperKeys.hudOpacity]
+            ?.takeIf { it.isFinite() }
+            ?.coerceIn(0.4f, 0.9f)
+            ?: HudDefaults.opacity
+        val panel = HudConfig(
+            medium = hudMediumFromString(prefs[CaliperKeys.hudMedium]),
+            scale = prefs[CaliperKeys.hudScale].let { value ->
+                runCatching { value?.let(HudScale::valueOf) ?: HudDefaults.scale }
+                    .getOrDefault(HudDefaults.scale)
+            },
+            opacity = opacity,
+            backgroundBlurEnabled = prefs[CaliperKeys.hudBlur] ?: HudDefaults.backgroundBlurEnabled,
+            locked = prefs[CaliperKeys.hudLocked] ?: HudDefaults.locked,
+            modules = HudConfig.fromCsv(prefs[CaliperKeys.hudModules] ?: HudDefaults.modulesCsv()),
+            showCoreBank = prefs[CaliperKeys.hudShowCoreBank] ?: HudDefaults.showCoreBank
+        )
+        return HudRuntimeConfig(
+            panel = panel,
+            x = prefs[CaliperKeys.hudX] ?: HudDefaults.x,
+            y = prefs[CaliperKeys.hudY] ?: HudDefaults.y,
+            fpsMode = FpsMode.fromPersisted(prefs[CaliperKeys.fpsMode])
+        )
+    }
+}
+
+fun FpsMode.Companion.fromPersisted(value: String?): FpsMode =
+    FpsMode.entries.firstOrNull { it.name.equals(value, ignoreCase = true) } ?: HudDefaults.fpsMode
 
 // Re-export HudSlow/HudFast for HUD UI to import from single place
 typealias HudSlowModel = HudSlow

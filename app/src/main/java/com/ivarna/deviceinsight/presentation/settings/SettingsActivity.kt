@@ -6,12 +6,14 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ivarna.deviceinsight.presentation.theme.SystemStatsTheme
+import com.ivarna.deviceinsight.presentation.settings.MediumState
 import dagger.hilt.android.AndroidEntryPoint
 
 /**
@@ -29,18 +31,21 @@ class SettingsActivity : ComponentActivity() {
         enableHighRefreshRate()
 
         setContent {
-            val currentMedium by viewModel.medium.collectAsStateWithLifecycle()
+            val mediumState by viewModel.mediumState.collectAsStateWithLifecycle()
 
-            SystemStatsTheme(medium = currentMedium) {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
-                ) {
-                    SettingsScreen(
-                        currentMedium = currentMedium,
-                        onMediumSelected = { newMedium -> viewModel.setMedium(newMedium) },
-                        onBack = { finish() }
-                    )
+            when (val state = mediumState) {
+                MediumState.Loading -> Box(Modifier.fillMaxSize())
+                is MediumState.Ready -> SystemStatsTheme(medium = state.medium) {
+                    Surface(
+                        modifier = Modifier.fillMaxSize(),
+                        color = MaterialTheme.colorScheme.background
+                    ) {
+                        SettingsScreen(
+                            currentMedium = state.medium,
+                            onMediumSelected = { newMedium -> viewModel.setMedium(newMedium) },
+                            onBack = { finish() }
+                        )
+                    }
                 }
             }
         }

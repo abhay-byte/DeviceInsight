@@ -2,6 +2,7 @@ package com.ivarna.deviceinsight.data.fps.privilege
 
 import com.ivarna.deviceinsight.data.fps.util.ShellExecutor
 import com.ivarna.deviceinsight.data.fps.util.ShellResult
+import com.ivarna.deviceinsight.data.fps.model.FpsMode
 import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -22,8 +23,24 @@ class ShellGateway @Inject constructor(
         }
     }
 
+    fun setMode(mode: FpsMode) {
+        setMode(
+            when (mode) {
+                FpsMode.AUTO -> PrivilegeMode.AUTO
+                FpsMode.ROOT -> PrivilegeMode.ROOT
+                FpsMode.SHIZUKU -> PrivilegeMode.SHIZUKU
+            }
+        )
+    }
+
     fun setModeFromString(modeStr: String?) {
-        setMode(PrivilegeMode.fromString(modeStr))
+        setMode(
+            when (modeStr?.uppercase()) {
+                FpsMode.ROOT.name -> FpsMode.ROOT
+                FpsMode.SHIZUKU.name -> FpsMode.SHIZUKU
+                else -> FpsMode.AUTO
+            }
+        )
     }
 
     fun currentPolicy(): PrivilegePolicy = PrivilegePolicy(currentMode)

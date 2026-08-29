@@ -32,8 +32,8 @@ import com.ivarna.deviceinsight.ui.caliper.components.*
 import com.ivarna.deviceinsight.ui.caliper.hud.HudModule
 import com.ivarna.deviceinsight.ui.caliper.hud.HudPanel
 import com.ivarna.deviceinsight.ui.caliper.hud.HudScale
-import com.ivarna.deviceinsight.ui.caliper.hud.HudTheme
 import com.ivarna.deviceinsight.ui.caliper.hud.rememberHudDemo
+import com.ivarna.deviceinsight.data.fps.model.FpsMode
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -136,10 +136,10 @@ fun OverlayScreen(
             )
             Spacer(Modifier.height(8.dp))
             DipSwitch(
-                checked = state.config.blurBehind,
+                checked = state.config.backgroundBlurEnabled,
                 onCheckedChange = { viewModel.setBlurBehind(it) },
                 enabled = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S,
-                label = "blur behind" + if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) "" else " · needs android 12"
+                label = "background blur" + if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) "" else " · needs android 12"
             )
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
                 MarginNote(message = "window blur is unavailable below android 12 — scrim opacity compensates (+10 pt)", title = "NOTE")
@@ -211,7 +211,13 @@ fun OverlayScreen(
                         } else {
                             context.startService(intent)
                         }
-                        viewModel.setServiceRunning(true)
+                        scope.launch {
+                            repeat(10) {
+                                delay(100)
+                                viewModel.refreshServiceState()
+                                if (OverlayService.isRunning.get()) return@launch
+                            }
+                        }
                     })
                 else -> {} // zero START keys while permission denied
             }
@@ -259,26 +265,22 @@ private fun HudPreviewHost(
                 if (state.isServiceRunning) {
                     val slow by viewModel.hudSlow.collectAsStateWithLifecycle()
                     val fast by viewModel.hudFast.collectAsStateWithLifecycle()
-                    HudTheme(medium = state.config.medium, scale = state.config.scale) {
-                        HudPanel(
-                            config = state.config.copy(locked = false),
-                            slow = androidx.compose.runtime.rememberUpdatedState(slow),
-                            fast = androidx.compose.runtime.rememberUpdatedState(fast),
-                            effectiveOpacity = state.config.opacity,
-                            interactive = false
-                        )
-                    }
+                    HudPanel(
+                        config = state.config.copy(locked = false),
+                        slow = androidx.compose.runtime.rememberUpdatedState(slow),
+                        fast = androidx.compose.runtime.rememberUpdatedState(fast),
+                        effectiveOpacity = state.config.opacity,
+                        interactive = false
+                    )
                 } else {
                     val (demoSlow, demoFast) = rememberHudDemo()
-                    HudTheme(medium = state.config.medium, scale = state.config.scale) {
-                        HudPanel(
-                            config = state.config,
-                            slow = demoSlow,
-                            fast = demoFast,
-                            effectiveOpacity = state.config.opacity,
-                            interactive = false
-                        )
-                    }
+                    HudPanel(
+                        config = state.config,
+                        slow = demoSlow,
+                        fast = demoFast,
+                        effectiveOpacity = state.config.opacity,
+                        interactive = false
+                    )
                 }
             }
         }

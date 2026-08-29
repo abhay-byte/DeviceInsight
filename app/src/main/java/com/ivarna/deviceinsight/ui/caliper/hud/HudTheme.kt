@@ -39,8 +39,8 @@ fun HudMedium.caliperColors(): CaliperColors = when (this) {
 }
 
 fun hudMediumFromString(s: String?): HudMedium = try {
-    s?.let { HudMedium.valueOf(it) } ?: HudMedium.CARBON
-} catch (_: Exception) { HudMedium.CARBON }
+    s?.let { HudMedium.valueOf(it) } ?: HudDefaults.medium
+} catch (_: Exception) { HudDefaults.medium }
 
 // ─────────────── DI-HD-001 §6 — palettes (hex copied from CaliperColors, no fork) ───────────────
 

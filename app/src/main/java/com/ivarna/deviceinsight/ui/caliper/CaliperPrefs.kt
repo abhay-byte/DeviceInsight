@@ -12,6 +12,10 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import com.ivarna.deviceinsight.ui.caliper.hud.HudConfigCodec
+import com.ivarna.deviceinsight.ui.caliper.hud.HudDefaults
+import com.ivarna.deviceinsight.ui.caliper.hud.HudRuntimeConfig
+import com.ivarna.deviceinsight.data.fps.model.FpsMode
 
 // Single accessor — never create a second delegate on this file (crash otherwise).
 val Context.caliperDataStore by preferencesDataStore(name = "caliper")
@@ -68,35 +72,38 @@ suspend fun Context.markCaliperMigrated() {
 
 // ── HUD flows (caliper single source) ──
 
+val Context.hudRuntimeConfigFlow: Flow<HudRuntimeConfig>
+    get() = caliperDataStore.data.map(HudConfigCodec::fromPreferences)
+
 val Context.hudMediumFlow: Flow<String>
-    get() = caliperDataStore.data.map { it[CaliperKeys.hudMedium] ?: "CARBON" }
+    get() = hudRuntimeConfigFlow.map { it.panel.medium.name }
 
 val Context.hudScaleFlow: Flow<String>
-    get() = caliperDataStore.data.map { it[CaliperKeys.hudScale] ?: "M" }
+    get() = hudRuntimeConfigFlow.map { it.panel.scale.name }
 
 val Context.hudOpacityFlow: Flow<Float>
-    get() = caliperDataStore.data.map { it[CaliperKeys.hudOpacity] ?: 0.75f }
+    get() = hudRuntimeConfigFlow.map { it.panel.opacity }
 
 val Context.hudBlurFlow: Flow<Boolean>
-    get() = caliperDataStore.data.map { it[CaliperKeys.hudBlur] ?: true }
+    get() = hudRuntimeConfigFlow.map { it.panel.backgroundBlurEnabled }
 
 val Context.hudLockedFlow: Flow<Boolean>
-    get() = caliperDataStore.data.map { it[CaliperKeys.hudLocked] ?: false }
+    get() = hudRuntimeConfigFlow.map { it.panel.locked }
 
 val Context.hudModulesFlow: Flow<String>
-    get() = caliperDataStore.data.map { it[CaliperKeys.hudModules] ?: "FPS,CPU,MEMORY,POWER,NETWORK" }
+    get() = hudRuntimeConfigFlow.map { it.panel.modulesCsv() }
 
 val Context.hudShowCoreBankFlow: Flow<Boolean>
-    get() = caliperDataStore.data.map { it[CaliperKeys.hudShowCoreBank] ?: true }
+    get() = hudRuntimeConfigFlow.map { it.panel.showCoreBank }
 
 val Context.hudXFlow: Flow<Int>
-    get() = caliperDataStore.data.map { it[CaliperKeys.hudX] ?: 100 }
+    get() = hudRuntimeConfigFlow.map { it.x }
 
 val Context.hudYFlow: Flow<Int>
-    get() = caliperDataStore.data.map { it[CaliperKeys.hudY] ?: 100 }
+    get() = hudRuntimeConfigFlow.map { it.y }
 
 val Context.hudFpsModeFlow: Flow<String>
-    get() = caliperDataStore.data.map { it[CaliperKeys.fpsMode] ?: "AUTO" }
+    get() = hudRuntimeConfigFlow.map { it.fpsMode.name }
 
 val Context.hudMigratedFlow: Flow<Boolean>
     get() = caliperDataStore.data.map { it[CaliperKeys.hudMigrated] ?: false }
@@ -110,5 +117,12 @@ suspend fun Context.setHudModules(v: String) { caliperDataStore.edit { it[Calipe
 suspend fun Context.setHudShowCoreBank(v: Boolean) { caliperDataStore.edit { it[CaliperKeys.hudShowCoreBank] = v } }
 suspend fun Context.setHudX(v: Int) { caliperDataStore.edit { it[CaliperKeys.hudX] = v } }
 suspend fun Context.setHudY(v: Int) { caliperDataStore.edit { it[CaliperKeys.hudY] = v } }
+suspend fun Context.setHudPosition(x: Int, y: Int) {
+    caliperDataStore.edit {
+        it[CaliperKeys.hudX] = x
+        it[CaliperKeys.hudY] = y
+    }
+}
 suspend fun Context.setFpsMode(v: String) { caliperDataStore.edit { it[CaliperKeys.fpsMode] = v } }
+suspend fun Context.setFpsMode(v: FpsMode) { caliperDataStore.edit { it[CaliperKeys.fpsMode] = v.name } }
 suspend fun Context.setHudMigrated(v: Boolean) { caliperDataStore.edit { it[CaliperKeys.hudMigrated] = v } }

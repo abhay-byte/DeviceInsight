@@ -129,7 +129,7 @@ fun SystemStatsApp(initialRoute: String? = null) {
     var showSettings by rememberSaveable { mutableStateOf(false) }
     val onSettings = { showSettings = true }
     val settingsViewModel: SettingsViewModel = hiltViewModel()
-    val currentMedium by settingsViewModel.medium.collectAsStateWithLifecycle()
+    val currentMedium by settingsViewModel.resolvedMedium.collectAsStateWithLifecycle()
     var hardwareTab by remember { mutableStateOf<Int?>(null) }
     LaunchedEffect(initialRoute) {
         when (initialRoute) {

@@ -6,6 +6,7 @@ import com.ivarna.deviceinsight.ui.caliper.Medium
 import com.ivarna.deviceinsight.ui.caliper.hud.HudConfig
 import com.ivarna.deviceinsight.ui.caliper.hud.HudMedium
 import com.ivarna.deviceinsight.ui.caliper.hud.HudModule
+import com.ivarna.deviceinsight.ui.caliper.hud.HudDefaults
 import com.ivarna.deviceinsight.ui.caliper.hud.toCaliperMedium
 import com.ivarna.deviceinsight.ui.caliper.hud.toHudMedium
 import org.junit.Assert.*
@@ -285,7 +286,7 @@ class BenchSelfCheckTest {
         assertEquals(cfg.modules, parsed)
         // empty csv defaults
         val empty = HudConfig.fromCsv("")
-        assertEquals(setOf(HudModule.FPS, HudModule.CPU, HudModule.MEMORY, HudModule.POWER), empty)
+        assertEquals(HudDefaults.modules, empty)
     }
 
     @Test

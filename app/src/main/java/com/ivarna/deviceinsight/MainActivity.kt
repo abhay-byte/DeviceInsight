@@ -9,6 +9,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import android.content.Intent
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -18,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ivarna.deviceinsight.presentation.SystemStatsApp
 import com.ivarna.deviceinsight.presentation.settings.SettingsViewModel
+import com.ivarna.deviceinsight.presentation.settings.MediumState
 import com.ivarna.deviceinsight.presentation.theme.SystemStatsTheme
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -34,14 +36,17 @@ class MainActivity : ComponentActivity() {
         enableHighRefreshRate()
 
         setContent {
-            val currentMedium by settingsViewModel.medium.collectAsStateWithLifecycle()
+            val mediumState by settingsViewModel.mediumState.collectAsStateWithLifecycle()
 
-            SystemStatsTheme(medium = currentMedium) {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
-                ) {
-                    SystemStatsApp(initialRoute = diRoute)
+            when (val state = mediumState) {
+                MediumState.Loading -> Box(Modifier.fillMaxSize())
+                is MediumState.Ready -> SystemStatsTheme(medium = state.medium) {
+                    Surface(
+                        modifier = Modifier.fillMaxSize(),
+                        color = MaterialTheme.colorScheme.background
+                    ) {
+                        SystemStatsApp(initialRoute = diRoute)
+                    }
                 }
             }
         }

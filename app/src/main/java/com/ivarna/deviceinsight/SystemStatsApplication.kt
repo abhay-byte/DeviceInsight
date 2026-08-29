@@ -12,6 +12,7 @@ import com.ivarna.deviceinsight.ui.caliper.CaliperKeys
 import com.ivarna.deviceinsight.ui.caliper.LauncherAlias
 import com.ivarna.deviceinsight.ui.caliper.Medium
 import com.ivarna.deviceinsight.ui.caliper.caliperDataStore
+import com.ivarna.deviceinsight.ui.caliper.hud.HudDefaults
 import com.ivarna.deviceinsight.ui.caliper.mediumFlow
 import com.ivarna.deviceinsight.ui.caliper.widget.BenchBudget
 import dagger.hilt.android.HiltAndroidApp
@@ -26,12 +27,15 @@ import okhttp3.OkHttpClient
 class SystemStatsApplication : Application(), ImageLoaderFactory {
 
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val hudMigrationReady = kotlinx.coroutines.CompletableDeferred<Unit>()
 
     override fun onCreate() {
         super.onCreate()
         // HUD migration (single source caliper DataStore) + WM enqueue
         applicationScope.launch {
-            runCatching { migrateOverlayPrefs() }
+            try { migrateOverlayPrefs() }
+            catch (t: Throwable) { android.util.Log.e("DeviceInsightOverlay", "HUD_MIGRATION_FAILED", t) }
+            finally { hudMigrationReady.complete(Unit) }
             runCatching { BenchBudget.enqueue(this@SystemStatsApplication) }
         }
         // launcher alias sync: stage DataStore medium, drain on first background —
@@ -44,6 +48,8 @@ class SystemStatsApplication : Application(), ImageLoaderFactory {
             }
         }
     }
+
+    suspend fun awaitHudMigration() = hudMigrationReady.await()
 
     private suspend fun migrateOverlayPrefs() {
         val prefs = caliperDataStore.data.first()
@@ -70,16 +76,16 @@ class SystemStatsApplication : Application(), ImageLoaderFactory {
             if (showCpuGraph || showPowerGraph) modules.add("TRACE")
             // Gpu is not in legacy — add GPU if vendor known? default omit until fitted
             // Use defaults for other hud keys if legacy didn't have them
-            val modulesCsv = if (modules.isEmpty()) "FPS,CPU,MEMORY,POWER" else modules.joinToString(",")
+            val modulesCsv = if (modules.isEmpty()) HudDefaults.modulesCsv() else modules.joinToString(",")
             caliperDataStore.edit { e ->
                 fpsModeLegacy?.let { e[CaliperKeys.fpsMode] = it }
                 e[CaliperKeys.hudModules] = modulesCsv
-                if (!e.contains(CaliperKeys.hudMedium)) e[CaliperKeys.hudMedium] = "CARBON"
-                if (!e.contains(CaliperKeys.hudScale)) e[CaliperKeys.hudScale] = "M"
-                if (!e.contains(CaliperKeys.hudOpacity)) e[CaliperKeys.hudOpacity] = 0.75f
-                if (!e.contains(CaliperKeys.hudBlur)) e[CaliperKeys.hudBlur] = true
-                if (!e.contains(CaliperKeys.hudLocked)) e[CaliperKeys.hudLocked] = false
-                if (!e.contains(CaliperKeys.hudShowCoreBank)) e[CaliperKeys.hudShowCoreBank] = true
+                if (!e.contains(CaliperKeys.hudMedium)) e[CaliperKeys.hudMedium] = HudDefaults.medium.name
+                if (!e.contains(CaliperKeys.hudScale)) e[CaliperKeys.hudScale] = HudDefaults.scale.name
+                if (!e.contains(CaliperKeys.hudOpacity)) e[CaliperKeys.hudOpacity] = HudDefaults.opacity
+                if (!e.contains(CaliperKeys.hudBlur)) e[CaliperKeys.hudBlur] = HudDefaults.backgroundBlurEnabled
+                if (!e.contains(CaliperKeys.hudLocked)) e[CaliperKeys.hudLocked] = HudDefaults.locked
+                if (!e.contains(CaliperKeys.hudShowCoreBank)) e[CaliperKeys.hudShowCoreBank] = HudDefaults.showCoreBank
                 e[CaliperKeys.hudMigrated] = true
             }
             // clear legacy prefs after successful migration

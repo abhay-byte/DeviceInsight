@@ -1,6 +1,7 @@
 package com.ivarna.deviceinsight.data.fps
 
 import com.ivarna.deviceinsight.data.fps.model.FpsMethod
+import com.ivarna.deviceinsight.data.fps.model.FpsMode
 import com.ivarna.deviceinsight.data.fps.model.FpsSnapshot
 import com.ivarna.deviceinsight.data.fps.privilege.PrivilegeTier
 import com.ivarna.deviceinsight.data.fps.privilege.ShellGateway
@@ -34,7 +35,7 @@ class FpsRepositoryTest {
         resolver = mockk()
         gateway = mockk(relaxed = true)
         cache = mockk(relaxed = true)
-        every { cache.fpsMode } returns "AUTO"
+        every { cache.fpsMode } returns FpsMode.AUTO
         repo = FpsRepositoryImpl(surfaceSource, gfxSource, resolver, gateway, cache)
     }
 

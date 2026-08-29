@@ -10,11 +10,11 @@ import com.ivarna.deviceinsight.ui.caliper.Medium
  */
 @Composable
 fun SystemStatsTheme(
-    medium: Medium? = null,
+    medium: Medium = Medium.PAPER,
     content: @Composable () -> Unit
 ) {
     CaliperTheme(
-        medium = medium ?: if (androidx.compose.foundation.isSystemInDarkTheme()) Medium.CARBON else Medium.PAPER,
+        medium = medium,
         content = content
     )
 }

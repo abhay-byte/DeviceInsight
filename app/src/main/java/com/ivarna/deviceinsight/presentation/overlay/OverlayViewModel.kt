@@ -18,8 +18,9 @@ import com.ivarna.deviceinsight.ui.caliper.hud.HudConfig
 import com.ivarna.deviceinsight.ui.caliper.hud.HudMedium
 import com.ivarna.deviceinsight.ui.caliper.hud.HudModule
 import com.ivarna.deviceinsight.ui.caliper.hud.HudScale
-import com.ivarna.deviceinsight.ui.caliper.hud.hudMediumFromString
-import com.ivarna.deviceinsight.ui.caliper.CaliperKeys
+import com.ivarna.deviceinsight.ui.caliper.hud.HudConfigCodec
+import com.ivarna.deviceinsight.ui.caliper.hud.HudDefaults
+import com.ivarna.deviceinsight.data.fps.model.FpsMode
 import com.ivarna.deviceinsight.ui.caliper.setHudBlur
 import com.ivarna.deviceinsight.ui.caliper.setHudLocked
 import com.ivarna.deviceinsight.ui.caliper.setHudMedium
@@ -29,6 +30,7 @@ import com.ivarna.deviceinsight.ui.caliper.setHudScale
 import com.ivarna.deviceinsight.ui.caliper.setHudShowCoreBank
 import com.ivarna.deviceinsight.ui.caliper.setHudX
 import com.ivarna.deviceinsight.ui.caliper.setHudY
+import com.ivarna.deviceinsight.ui.caliper.setHudPosition
 import com.ivarna.deviceinsight.ui.caliper.setFpsMode
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -40,8 +42,6 @@ import kotlinx.coroutines.launch
 import rikka.shizuku.Shizuku
 import javax.inject.Inject
 
-enum class FpsMode { AUTO, ROOT, SHIZUKU }
-
 data class OverlayPermissions(
     val hasOverlay: Boolean = false,
     val hasUsageStats: Boolean = false,
@@ -52,15 +52,12 @@ data class OverlayPermissions(
 
 data class OverlayUiState(
     val permissions: OverlayPermissions = OverlayPermissions(),
-    val fpsMode: FpsMode = FpsMode.AUTO,
+    val fpsMode: FpsMode = HudDefaults.fpsMode,
     val config: HudConfig = HudConfig(),
     val isServiceRunning: Boolean = false
 )
 
 /** HUD position reset default (matches CaliperPrefs hudX/hudY fallbacks). */
-private const val DEFAULT_X = 100
-private const val DEFAULT_Y = 100
-
 @HiltViewModel
 class OverlayViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -83,20 +80,14 @@ class OverlayViewModel @Inject constructor(
     fun refreshPermissions() = checkPermissions()
 
     private suspend fun loadInitialState() {
-        val data = try { context.caliperDataStore.data.first() } catch (_: Exception) { null } ?: return
-        val modulesCsv = data[CaliperKeys.hudModules] ?: "FPS,CPU,MEMORY,POWER"
-        val cfg = HudConfig(
-            medium = hudMediumFromString(data[CaliperKeys.hudMedium]),
-            scale = runCatching { HudScale.valueOf(data[CaliperKeys.hudScale] ?: "M") }.getOrDefault(HudScale.M),
-            opacity = (data[CaliperKeys.hudOpacity] ?: 0.75f).coerceIn(0.4f, 0.9f),
-            blurBehind = data[CaliperKeys.hudBlur] ?: true,
-            locked = data[CaliperKeys.hudLocked] ?: false,
-            modules = HudConfig.fromCsv(modulesCsv),
-            showCoreBank = data[CaliperKeys.hudShowCoreBank] ?: true
-        )
+        val data = try { context.caliperDataStore.data.first() } catch (t: Throwable) {
+            android.util.Log.e("DeviceInsightOverlay", "OVERLAY_CONFIG_LOAD_FAILED", t)
+            return
+        }
+        val runtime = HudConfigCodec.fromPreferences(data)
         _uiState.value = _uiState.value.copy(
-            config = cfg,
-            fpsMode = runCatching { FpsMode.valueOf(data[CaliperKeys.fpsMode] ?: "AUTO") }.getOrDefault(FpsMode.AUTO),
+            config = runtime.panel,
+            fpsMode = runtime.fpsMode,
             isServiceRunning = OverlayService.isRunning.get()
         )
     }
@@ -126,7 +117,7 @@ class OverlayViewModel @Inject constructor(
     }
 
     fun setBlurBehind(enabled: Boolean) {
-        _uiState.value = _uiState.value.copy(config = _uiState.value.config.copy(blurBehind = enabled))
+        _uiState.value = _uiState.value.copy(config = _uiState.value.config.copy(backgroundBlurEnabled = enabled))
         persist { context.setHudBlur(enabled) }
     }
 
@@ -148,12 +139,12 @@ class OverlayViewModel @Inject constructor(
     }
 
     fun resetPosition() {
-        persist { context.setHudX(DEFAULT_X); context.setHudY(DEFAULT_Y) }
+        persist { context.setHudPosition(HudDefaults.x, HudDefaults.y) }
     }
 
     fun setFpsMode(mode: FpsMode) {
         _uiState.value = _uiState.value.copy(fpsMode = mode)
-        persist { context.setFpsMode(mode.name) }
+        persist { context.setFpsMode(mode) }
     }
 
     private fun persist(block: suspend () -> Unit) {
@@ -167,6 +158,10 @@ class OverlayViewModel @Inject constructor(
 
     fun setServiceRunning(running: Boolean) {
         _uiState.value = _uiState.value.copy(isServiceRunning = running)
+    }
+
+    fun refreshServiceState() {
+        _uiState.value = _uiState.value.copy(isServiceRunning = OverlayService.isRunning.get())
     }
 
     // ─────────────── permissions ───────────────

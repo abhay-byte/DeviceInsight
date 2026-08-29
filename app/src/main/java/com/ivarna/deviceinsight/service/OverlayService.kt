@@ -1,23 +1,19 @@
 package com.ivarna.deviceinsight.service
 
-import android.annotation.SuppressLint
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
 import android.content.Intent
-import android.graphics.PixelFormat
+import android.content.res.Configuration
 import android.os.Build
 import android.os.IBinder
 import android.provider.Settings
-import android.view.Gravity
-import android.view.View
-import android.view.WindowManager
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.DisposableEffect
+import android.util.Log
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
@@ -34,23 +30,14 @@ import com.ivarna.deviceinsight.R
 import com.ivarna.deviceinsight.data.fps.FpsMonitor
 import com.ivarna.deviceinsight.data.monitor.HudFast
 import com.ivarna.deviceinsight.data.monitor.MonitorBus
+import com.ivarna.deviceinsight.service.overlay.DialogOverlayWindowHost
+import com.ivarna.deviceinsight.service.overlay.OverlayWindowHost
+import com.ivarna.deviceinsight.service.overlay.RawOverlayWindowHost
 import com.ivarna.deviceinsight.ui.caliper.hud.HudConfig
-import com.ivarna.deviceinsight.ui.caliper.hud.HudPanel
-import com.ivarna.deviceinsight.ui.caliper.hud.HudScale
-import com.ivarna.deviceinsight.ui.caliper.hud.HudTheme
-import com.ivarna.deviceinsight.ui.caliper.hud.hudMediumFromString
-import com.ivarna.deviceinsight.ui.caliper.hudMediumFlow
-import com.ivarna.deviceinsight.ui.caliper.hudOpacityFlow
-import com.ivarna.deviceinsight.ui.caliper.hudBlurFlow
-import com.ivarna.deviceinsight.ui.caliper.hudLockedFlow
-import com.ivarna.deviceinsight.ui.caliper.hudModulesFlow
-import com.ivarna.deviceinsight.ui.caliper.hudScaleFlow
-import com.ivarna.deviceinsight.ui.caliper.hudShowCoreBankFlow
-import com.ivarna.deviceinsight.ui.caliper.hudXFlow
-import com.ivarna.deviceinsight.ui.caliper.hudYFlow
+import com.ivarna.deviceinsight.ui.caliper.hud.HudRuntimeConfig
+import com.ivarna.deviceinsight.ui.caliper.hudRuntimeConfigFlow
 import com.ivarna.deviceinsight.ui.caliper.setHudLocked
-import com.ivarna.deviceinsight.ui.caliper.setHudX
-import com.ivarna.deviceinsight.ui.caliper.setHudY
+import com.ivarna.deviceinsight.ui.caliper.setHudPosition
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -58,21 +45,14 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
-/**
- * Scope Probe host (DI-HD-001). Keeps the FQCN + foreground contract of the old overlay
- * service; internals are a WRAP_CONTENT ComposeView hosting [HudPanel]. Config lives only
- * in the `caliper` DataStore — no intent extras.
- */
 @AndroidEntryPoint
 class OverlayService : Service(), LifecycleOwner, androidx.savedstate.SavedStateRegistryOwner {
 
@@ -81,6 +61,7 @@ class OverlayService : Service(), LifecycleOwner, androidx.savedstate.SavedState
         private const val CHANNEL_ID = "overlay_channel"
         private const val NOTIFICATION_ID = 1
         private const val BLUR_RADIUS_DP = 10
+        private const val TAG = "DeviceInsightOverlay"
     }
 
     @Inject lateinit var monitorBus: MonitorBus
@@ -88,245 +69,281 @@ class OverlayService : Service(), LifecycleOwner, androidx.savedstate.SavedState
 
     private val lifecycleRegistry = LifecycleRegistry(this)
     override val lifecycle: Lifecycle get() = lifecycleRegistry
-
     private val savedStateRegistryController = SavedStateRegistryController.create(this)
     override val savedStateRegistry: SavedStateRegistry get() = savedStateRegistryController.savedStateRegistry
 
-    private lateinit var windowManager: WindowManager
-    private var view: ComposeView? = null
-    private lateinit var params: WindowManager.LayoutParams
+    private lateinit var windowManager: android.view.WindowManager
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private var startupJob: Job? = null
     private var positionPersistJob: Job? = null
-    private var dragX: Int = 100
-    private var dragY: Int = 100
-
-    // Panel state holders — slow at 2 Hz (repository), fast at ~10 Hz (own ticker)
+    private var host: OverlayWindowHost? = null
+    private var observersStarted = false
+    private var isDestroyed = false
+    private var runtimeConfig = HudRuntimeConfig()
     private val slowState = mutableStateOf(com.ivarna.deviceinsight.data.monitor.HudSlow())
     private val fastState = mutableStateOf(HudFast())
     private val configState = mutableStateOf(HudConfig())
+    private val blurAvailableState = mutableStateOf(false)
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
         super.onCreate()
-        isRunning.set(true)
-        savedStateRegistryController.performRestore(null)
-        lifecycleRegistry.currentState = Lifecycle.State.RESUMED
-        windowManager = getSystemService(WindowManager::class.java)
-
-        // FGS contract first — never stopSelf without it on API 26+
-        startForegroundNotification()
-
-        // F2 defense-in-depth: UI gates START, service refuses to draw without special-app-access.
-        // startForeground has already run, so stopSelf here is legal.
-        if (!Settings.canDrawOverlays(this)) {
+        Log.d(TAG, "SERVICE_CREATE api=${Build.VERSION.SDK_INT} manufacturer=${Build.MANUFACTURER} model=${Build.MODEL}")
+        try {
+            savedStateRegistryController.performAttach()
+            savedStateRegistryController.performRestore(null)
+            lifecycleRegistry.currentState = Lifecycle.State.CREATED
+            windowManager = getSystemService(android.view.WindowManager::class.java)
+            startForegroundNotification()
+            Log.d(TAG, "FGS_STARTED")
+        } catch (t: Throwable) {
+            Log.e(TAG, "FGS_START_FAILED (${t::class.java.simpleName}: ${t.message})", t)
+            isRunning.set(false)
             stopSelf()
             return
         }
 
-        params = buildParams()
-        applyBlurBehind()
+        if (!Settings.canDrawOverlays(this)) {
+            Log.w(TAG, "PERMISSION_DENIED")
+            isRunning.set(false)
+            stopSelf()
+            return
+        }
+        startStartupIfNeeded()
+    }
 
-        val composeView = ComposeView(this).apply {
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        Log.d(TAG, "SERVICE_START_COMMAND startId=$startId attached=${host?.isAttached == true}")
+        if (!Settings.canDrawOverlays(this)) {
+            Log.w(TAG, "PERMISSION_DENIED_ON_START")
+            isRunning.set(false)
+            stopSelf(startId)
+            return START_NOT_STICKY
+        }
+        startStartupIfNeeded()
+        return START_STICKY
+    }
+
+    private fun startStartupIfNeeded() {
+        if (host?.isAttached == true || startupJob?.isActive == true) {
+            Log.d(TAG, "START_IGNORED state=${if (host?.isAttached == true) "RUNNING" else "STARTING"}")
+            return
+        }
+        startupJob = scope.launch {
+            Log.d(TAG, "CONFIG_LOAD_BEGIN")
+            val initial = withContext(Dispatchers.IO) {
+                try {
+                    (applicationContext as? com.ivarna.deviceinsight.SystemStatsApplication)?.awaitHudMigration()
+                    applicationContext.hudRuntimeConfigFlow.first()
+                        .also { Log.d(TAG, "CONFIG_LOAD_OK config=$it") }
+                } catch (t: Throwable) {
+                    Log.e(TAG, "CONFIG_LOAD_FAILED (${t::class.java.simpleName}: ${t.message})", t)
+                    HudRuntimeConfig()
+                }
+            }
+            if (!isActive || isDestroyed) return@launch
+            runtimeConfig = initial
+            configState.value = initial.panel
+            attachOverlay(initial)
+        }
+    }
+
+    private fun attachOverlay(initial: HudRuntimeConfig) {
+        if (!Settings.canDrawOverlays(this)) {
+            Log.w(TAG, "PERMISSION_DENIED_BEFORE_ATTACH")
+            isRunning.set(false)
+            stopSelf()
+            return
+        }
+
+        fun newComposeView() = ComposeView(this).apply {
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
             setViewTreeLifecycleOwner(this@OverlayService)
             setViewTreeSavedStateRegistryOwner(this@OverlayService)
             setContent { HudContent() }
         }
-        view = composeView
+        var composeView = newComposeView()
+        val preferred: OverlayWindowHost = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            DialogOverlayWindowHost(this, windowManager, ::onBlurAvailabilityChanged)
+        } else {
+            RawOverlayWindowHost(this, windowManager, ::onBlurAvailabilityChanged)
+        }
+        var selected = preferred
+        Log.d(TAG, "HOST_ATTACH_BEGIN preferred=${preferred::class.java.simpleName} initial=$initial")
         try {
-            windowManager.addView(composeView, params)
-        } catch (_: Exception) {
-            // OEM revoked the permission mid-flight (BadTokenException et al.)
-            view = null
-            stopSelf()
-            return
+            preferred.attach(composeView, initial)
+        } catch (t: Throwable) {
+            Log.e(TAG, "HOST_ATTACH_FAIL host=${preferred::class.java.simpleName} (${t::class.java.simpleName}: ${t.message})", t)
+            try { preferred.detach() } catch (cleanup: Throwable) {
+                Log.e(TAG, "HOST_ATTACH_CLEANUP_FAIL", cleanup)
+            }
+            if (preferred is DialogOverlayWindowHost) {
+                Log.w(TAG, "HOST_FALLBACK_BEGIN host=RawOverlayWindowHost")
+                selected = RawOverlayWindowHost(this, windowManager, ::onBlurAvailabilityChanged)
+                // A Dialog may have attached the original ComposeView before failing during
+                // initial layout. Always give the raw host a fresh unattached view.
+                composeView = newComposeView()
+                try {
+                    selected.attach(composeView, initial)
+                } catch (fallback: Throwable) {
+                    Log.e(TAG, "HOST_FALLBACK_FAIL (${fallback::class.java.simpleName}: ${fallback.message})", fallback)
+                    isRunning.set(false)
+                    try { selected.detach() } catch (cleanup: Throwable) { Log.e(TAG, "HOST_FALLBACK_CLEANUP_FAIL", cleanup) }
+                    stopSelf()
+                    return
+                }
+            } else {
+                isRunning.set(false)
+                stopSelf()
+                return
+            }
         }
 
+        host = selected
+        selected.updateLocked(initial.panel.locked)
+        selected.updateBackgroundBlur(
+            initial.panel.backgroundBlurEnabled,
+            (resources.displayMetrics.density * BLUR_RADIUS_DP).toInt().coerceAtLeast(1)
+        )
+        blurAvailableState.value = selected.blurAvailable
+        if (selected.position.x != initial.x || selected.position.y != initial.y) {
+            persistPosition(selected.position.x, selected.position.y)
+        }
+        lifecycleRegistry.currentState = Lifecycle.State.RESUMED
+        isRunning.set(true)
+        Log.d(TAG, "HOST_ATTACH_OK host=${selected::class.java.simpleName} position=${selected.position.x},${selected.position.y}")
         observeConfigAndFeeds()
         startFastTicker()
     }
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        // Config is DataStore-owned; extras are ignored by design (process-death safe).
-        if (!Settings.canDrawOverlays(this)) stopSelf()
-        return START_STICKY
-    }
-
-    // ─────────────── window plumbing ───────────────
-
-    @SuppressLint("RtlHardcoded")
-    private fun buildParams(): WindowManager.LayoutParams {
-        return WindowManager.LayoutParams(
-            WindowManager.LayoutParams.WRAP_CONTENT,
-            WindowManager.LayoutParams.WRAP_CONTENT,
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
-            PixelFormat.TRANSLUCENT
-        ).apply {
-            gravity = Gravity.TOP or Gravity.START
-            x = dragX
-            y = dragY
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        Log.d(TAG, "CONFIGURATION_CHANGED orientation=${newConfig.orientation} density=${newConfig.densityDpi}")
+        host?.let {
+            it.updateContentLayout()
+            it.updateLocked(configState.value.locked)
+            it.updateBackgroundBlur(
+                configState.value.backgroundBlurEnabled,
+                (resources.displayMetrics.density * BLUR_RADIUS_DP).toInt().coerceAtLeast(1)
+            )
         }
     }
 
-    private fun touchFlags(base: Int, locked: Boolean): Int =
-        if (locked) base or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE   // full passthrough
-        else base and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()   // drag + tap
-
-    private fun applyBlurBehind() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && configState.value.blurBehind) {
-            params.flags = params.flags or WindowManager.LayoutParams.FLAG_BLUR_BEHIND
-            params.blurBehindRadius = (BLUR_RADIUS_DP * resources.displayMetrics.density).toInt()
-        } else {
-            params.flags = params.flags and WindowManager.LayoutParams.FLAG_BLUR_BEHIND.inv()
-        }
-    }
-
-    private fun relayout() {
-        val v = view ?: return
-        try {
-            windowManager.updateViewLayout(v, params)
-        } catch (_: Exception) {
-            stopSelf()
-        }
-    }
-
-    // ─────────────── feeds ───────────────
-
-    private fun hudConfigFlow(): Flow<HudConfig> {
-        val core = combine(
-            hudMediumFlow.map(::hudMediumFromString),
-            hudScaleFlow.map { s -> runCatching { HudScale.valueOf(s) }.getOrDefault(HudScale.M) },
-            hudOpacityFlow,
-            hudBlurFlow,
-            hudLockedFlow
-        ) { medium, scale, opacity, blur, locked ->
-            HudConfig(medium = medium, scale = scale, opacity = opacity, blurBehind = blur, locked = locked)
-        }
-        return combine(
-            core,
-            hudModulesFlow.map { HudConfig.fromCsv(it) },
-            hudShowCoreBankFlow
-        ) { cfg, modules, coreBank ->
-            cfg.copy(modules = modules, showCoreBank = coreBank)
-        }
+    private fun onBlurAvailabilityChanged(available: Boolean) {
+        blurAvailableState.value = available
+        Log.d(TAG, "BLUR_CAPABILITY available=$available")
+        host?.updateBackgroundBlur(
+            configState.value.backgroundBlurEnabled,
+            (resources.displayMetrics.density * BLUR_RADIUS_DP).toInt().coerceAtLeast(1)
+        )
     }
 
     private fun observeConfigAndFeeds() {
+        if (observersStarted) return
+        observersStarted = true
         scope.launch {
-            // initial position from store (never runBlocking on main)
-            dragX = try { withContext(Dispatchers.IO) { hudXFlow.first() } } catch (_: Exception) { 100 }
-            dragY = try { withContext(Dispatchers.IO) { hudYFlow.first() } } catch (_: Exception) { 100 }
-            params.x = dragX; params.y = dragY
-            relayout()
-        }
-        scope.launch {
-            hudConfigFlow().collectLatest { cfg ->
-                val lockChanged = configState.value.locked != cfg.locked
-                val blurChanged = configState.value.blurBehind != cfg.blurBehind
-                configState.value = cfg
-                if (lockChanged || blurChanged) {
-                    applyBlurBehind()
-                    params.flags = touchFlags(params.flags, cfg.locked)
-                    relayout()
+            applicationContext.hudRuntimeConfigFlow
+                .distinctUntilChanged()
+                .collectLatest { next ->
+                    val previous = runtimeConfig
+                    runtimeConfig = next
+                    configState.value = next.panel
+                    val currentHost = host ?: return@collectLatest
+                    if (previous.panel.locked != next.panel.locked) currentHost.updateLocked(next.panel.locked)
+                    if (previous.panel.backgroundBlurEnabled != next.panel.backgroundBlurEnabled) {
+                        currentHost.updateBackgroundBlur(
+                            next.panel.backgroundBlurEnabled,
+                            (resources.displayMetrics.density * BLUR_RADIUS_DP).toInt().coerceAtLeast(1)
+                        )
+                    }
+                    if (previous.panel.scale != next.panel.scale) currentHost.updateContentLayout()
+                    if (previous.x != next.x || previous.y != next.y) {
+                        currentHost.updatePosition(next.x, next.y)
+                        if (currentHost.position.x != next.x || currentHost.position.y != next.y) {
+                            persistPosition(currentHost.position.x, currentHost.position.y)
+                        }
+                    }
+                    Log.d(TAG, "CONFIG_UPDATE medium=${next.panel.medium} scale=${next.panel.scale} opacity=${next.panel.opacity} blur=${next.panel.backgroundBlurEnabled} locked=${next.panel.locked} position=${next.x},${next.y}")
                 }
-            }
         }
         scope.launch { monitorBus.slow.collect { slowState.value = it } }
         scope.launch { monitorBus.fast.collect { fastState.value = it } }
     }
 
-    /** 1 Hz measurement window — one real FPS sample per second, shell work on IO. */
     private fun startFastTicker() {
         scope.launch(Dispatchers.IO) {
             while (isActive && isRunning.get()) {
-                val start = System.currentTimeMillis()
-                val sample = try { fpsMonitor.getCurrentFpsWithSource() } catch (_: Exception) { null }
+                val startedAt = System.currentTimeMillis()
+                val sample = try {
+                    fpsMonitor.getCurrentFpsWithSource()
+                } catch (t: Throwable) {
+                    Log.e(TAG, "FPS_SAMPLE_FAILED", t)
+                    null
+                }
                 monitorBus.pushFast(HudFast(sample?.fps ?: 0, sample?.source ?: "—"))
-                // Keep roughly 1 Hz sample rate (measurement window ~1s). Recent median smoothing handles visual jitter.
-                val elapsed = System.currentTimeMillis() - start
-                delay((1000L - elapsed).coerceAtLeast(200L))
+                delay((1000L - (System.currentTimeMillis() - startedAt)).coerceAtLeast(200L))
             }
         }
     }
 
-    // ─────────────── panel callbacks ───────────────
-
     private fun onDrag(dxPx: Int, dyPx: Int) {
-        dragX += dxPx
-        dragY += dyPx
-        params.x = dragX
-        params.y = dragY
-        relayout()
+        val currentHost = host ?: return
+        val before = currentHost.position
+        currentHost.updatePosition(before.x + dxPx, before.y + dyPx)
+        val after = currentHost.position
         positionPersistJob?.cancel()
         positionPersistJob = scope.launch(Dispatchers.IO) {
             delay(500)
-            runCatching { setHudX(dragX); setHudY(dragY) }
+            try { setHudPosition(after.x, after.y) }
+            catch (t: Throwable) { Log.e(TAG, "POSITION_PERSIST_FAILED", t) }
+        }
+    }
+
+    private fun persistPosition(x: Int, y: Int) {
+        positionPersistJob?.cancel()
+        positionPersistJob = scope.launch(Dispatchers.IO) {
+            try { setHudPosition(x, y) }
+            catch (t: Throwable) { Log.e(TAG, "POSITION_CLAMP_PERSIST_FAILED", t) }
         }
     }
 
     private fun onLock() {
-        scope.launch(Dispatchers.IO) { runCatching { setHudLocked(true) } }
+        scope.launch(Dispatchers.IO) {
+            try { setHudLocked(true) }
+            catch (t: Throwable) { Log.e(TAG, "LOCK_PERSIST_FAILED", t) }
+        }
     }
 
     private fun onOpenConfig() {
-        val intent = Intent(this, MainActivity::class.java).apply {
+        startActivity(Intent(this, MainActivity::class.java).apply {
             putExtra("di_route", "hud-config")
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        }
-        startActivity(intent)
+        })
     }
 
-    // ─────────────── composition ───────────────
-
-    @androidx.compose.runtime.Composable
+    @Composable
     private fun HudContent() {
-        var blurSupported by remember { mutableStateOf(true) }
-        DisposableEffect(Unit) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                val listener = java.util.function.Consumer<Boolean> { enabled ->
-                    blurSupported = enabled
-                    applyBlurBehind()
-                    relayout()
-                }
-                windowManager.addCrossWindowBlurEnabledListener(listener)
-                onDispose {
-                    windowManager.removeCrossWindowBlurEnabledListener(listener)
-                }
-            } else {
-                onDispose { }
-            }
-        }
-
         val cfg = configState.value
-        val effectiveOpacity =
-            if (cfg.blurBehind && blurSupported && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) cfg.opacity
-            else (cfg.opacity + 0.10f).coerceAtMost(0.97f)   // scrim compensates for missing blur
-
-        HudTheme(medium = cfg.medium, scale = cfg.scale) {
-            HudPanel(
-                config = cfg,
-                slow = slowState,
-                fast = fastState,
-                effectiveOpacity = effectiveOpacity,
-                interactive = true,
-                onDrag = ::onDrag,
-                onLock = ::onLock,
-                onOpenConfig = ::onOpenConfig
-            )
-        }
+        val blurSupported = blurAvailableState.value
+        val effectiveOpacity = if (cfg.backgroundBlurEnabled && !blurSupported) {
+            (cfg.opacity + 0.10f).coerceAtMost(0.97f)
+        } else cfg.opacity
+        com.ivarna.deviceinsight.ui.caliper.hud.HudPanel(
+            config = cfg,
+            slow = slowState,
+            fast = fastState,
+            effectiveOpacity = effectiveOpacity,
+            interactive = true,
+            onDrag = ::onDrag,
+            onLock = ::onLock,
+            onOpenConfig = ::onOpenConfig
+        )
     }
-
-    // ─────────────── notification ───────────────
 
     private fun startForegroundNotification() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                CHANNEL_ID,
-                "DeviceInsight HUD",
-                NotificationManager.IMPORTANCE_LOW
-            )
+            val channel = NotificationChannel(CHANNEL_ID, "DeviceInsight HUD", NotificationManager.IMPORTANCE_LOW)
             getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
         }
         val notification: Notification = NotificationCompat.Builder(this, CHANNEL_ID)
@@ -339,13 +356,18 @@ class OverlayService : Service(), LifecycleOwner, androidx.savedstate.SavedState
     }
 
     override fun onDestroy() {
-        lifecycleRegistry.currentState = Lifecycle.State.DESTROYED
+        if (isDestroyed) return
+        isDestroyed = true
+        Log.d(TAG, "SERVICE_DESTROY")
         isRunning.set(false)
+        startupJob?.cancel()
+        positionPersistJob?.cancel()
         scope.cancel()
-        view?.let {
-            try { windowManager.removeView(it) } catch (_: Exception) {}
+        try { host?.detach() } catch (t: Throwable) { Log.e(TAG, "HOST_DETACH_FAILED", t) }
+        host = null
+        if (lifecycleRegistry.currentState.isAtLeast(Lifecycle.State.CREATED)) {
+            lifecycleRegistry.currentState = Lifecycle.State.DESTROYED
         }
-        view = null
         super.onDestroy()
     }
 }

@@ -33,15 +33,42 @@ fun HudPanel(
     config: HudConfig,
     slow: State<HudSlow>,
     fast: State<HudFast>,
-    effectiveOpacity: Float,                 // service raises this if blur-behind is unavailable
+    effectiveOpacity: Float,                 // service raises this if background blur is unavailable
     modifier: Modifier = Modifier,
     interactive: Boolean = true,
     onDrag: (dxPx: Int, dyPx: Int) -> Unit = { _, _ -> },
     onLock: () -> Unit = {},
     onOpenConfig: () -> Unit = {}
 ) {
-    val c = HudPalettes.of(config.medium)
-    val m = HudScales.of(config.scale)
+    HudTheme(config.medium, config.scale) {
+        HudPanelContent(
+            config = config,
+            slow = slow,
+            fast = fast,
+            effectiveOpacity = effectiveOpacity,
+            modifier = modifier,
+            interactive = interactive,
+            onDrag = onDrag,
+            onLock = onLock,
+            onOpenConfig = onOpenConfig
+        )
+    }
+}
+
+@Composable
+private fun HudPanelContent(
+    config: HudConfig,
+    slow: State<HudSlow>,
+    fast: State<HudFast>,
+    effectiveOpacity: Float,
+    modifier: Modifier = Modifier,
+    interactive: Boolean = true,
+    onDrag: (dxPx: Int, dyPx: Int) -> Unit = { _, _ -> },
+    onLock: () -> Unit = {},
+    onOpenConfig: () -> Unit = {}
+) {
+    val c = LocalHudColors.current
+    val m = LocalHudMetrics.current
 
     val dragModifier = if (config.locked || !interactive) Modifier
     else Modifier
