@@ -1,8 +1,7 @@
 package com.ivarna.deviceinsight.ui.caliper.widget
 
 import android.content.Context
-import androidx.glance.appwidget.GlanceAppWidget
-import androidx.glance.appwidget.GlanceAppWidgetManager
+import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.ivarna.deviceinsight.data.monitor.MemInfoParser
@@ -27,39 +26,17 @@ class BenchBudgetWorker(
                 } else snap
             } catch (_: Exception) { snap }
 
-            // Push to widgets directly
-            val mgr = GlanceAppWidgetManager(applicationContext)
-            val widgets: List<GlanceAppWidget> = listOf(
-                ScopeWidget(), StackWidget(), FuelWidget(), RasterWidget(), BenchWidgetAll()
+            // Publish the exact BUDGET sample through the same coordinator as APP_MONITOR.
+            // There is no temporary holder to clear and race with a newer live value.
+            BenchUpdater.publishAndForceUpdate(
+                applicationContext,
+                enriched,
+                WidgetSnapshotSource.BUDGET
             )
-            // BUDGET uses direct sampler; widgets read via GlobalSnapshot or fallback sampler.
-            // To avoid double sampling drift, store in holder for provideGlance to reuse.
-            // Foreground vs BUDGET histories intentionally differ (lossy BUDGET per plan).
-            BenchBudgetSnapshot.last = enriched
-
-            widgets.forEach { w ->
-                try {
-                    val ids = mgr.getGlanceIds(w::class.java)
-                    ids.forEach { id ->
-                        try { w.update(applicationContext, id) } catch (_: Exception) {}
-                    }
-                } catch (_: Exception) {}
-            }
             Result.success()
         } catch (e: Exception) {
+            Log.e("DeviceInsightWidget", "BUDGET_SAMPLE_FAIL", e)
             Result.retry()
-        } finally {
-            // clear bypass after short delay to avoid stale
-            kotlinx.coroutines.delay(2000)
-            BenchBudgetSnapshot.last = null
         }
     }
-}
-
-/**
- * Temporary holder for BUDGET snapshot so provideGlance can reuse the same sample
- * without double-sampling. Foreground path uses MonitorBus, not this.
- */
-object BenchBudgetSnapshot {
-    @Volatile var last: BenchSnapshot? = null
 }

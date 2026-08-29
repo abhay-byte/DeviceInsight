@@ -79,11 +79,13 @@ fun CpuTab(info: HardwareInfo) {
             InfoRow("Utilization", "${(info.cpuUtilization * 100).toInt()}%", monospace = true)
 
             if (info.coreClocks.isNotEmpty()) {
+                val maxClock = (info.coreClocks.maxOrNull()?.toFloat() ?: 0f).coerceAtLeast(1f)
                 Spacer(modifier = Modifier.height(8.dp))
                 info.coreClocks.take(8).forEachIndexed { index, clock ->
+                    val ratio = if (clock > 0) (clock.toFloat() / maxClock).coerceIn(0f, 1f) else 0f
                     UsageBar(
                         label = "Core ${index + 1}",
-                        value = (clock.toFloat() / (info.coreClocks.maxOrNull()?.toFloat() ?: 1f)).coerceIn(0f, 1f),
+                        value = ratio,
                         color = cpuColor
                     )
                     Spacer(modifier = Modifier.height(6.dp))

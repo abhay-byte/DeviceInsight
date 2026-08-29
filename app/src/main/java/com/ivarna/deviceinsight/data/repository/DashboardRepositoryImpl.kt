@@ -23,6 +23,7 @@ import com.ivarna.deviceinsight.data.monitor.MonitorBus
 import com.ivarna.deviceinsight.data.monitor.TopConsumersProvider
 import com.ivarna.deviceinsight.service.OverlayService
 import com.ivarna.deviceinsight.ui.caliper.widget.BenchUpdater
+import com.ivarna.deviceinsight.ui.caliper.widget.WidgetSnapshotSource
 import com.ivarna.deviceinsight.ui.caliper.widget.toBenchSnapshot
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
@@ -353,7 +354,9 @@ class DashboardRepositoryImpl @Inject constructor(
                 timestamp = snap.timestamp
             )
             monitorBus.pushSlow(snap, hudSlow)
-            BenchUpdater.nudge(context)
+            // Publish the exact sample that fed the dashboard. Widgets must not re-read
+            // process globals or start a second hardware sampler for the same tick.
+            BenchUpdater.publish(context, snap, WidgetSnapshotSource.APP_MONITOR)
         } catch (_: Exception) { }
         return metrics
     }

@@ -16,9 +16,9 @@ import com.ivarna.deviceinsight.ui.caliper.components.CoreReading
 import java.io.File
 import java.io.FileOutputStream
 
-// DI-WF-001 §6: captures widget previews from the REAL Glance-to-RemoteViews pipeline at 3x
-// density (480dpi) and fontScale 1.0, so the launcher picker preview is pixel-identical to the
-// placed widget. Pure function object - safe in release; only PreviewStudioActivity is debug-gated.
+// DI-WF-001 §6: captures canonical reference previews from the REAL Glance-to-RemoteViews
+// pipeline at 3x density (480dpi) and fontScale 1.0. They share the renderer with placed widgets,
+// but launcher-owned padding/corners and the placed footprint can still differ.
 object BenchPreviewGenerator {
 
     const val CAPTURE_DENSITY_DPI = 480 // density 3.0 -> tier dp x 3 px
@@ -79,14 +79,22 @@ object BenchPreviewGenerator {
             ctx,
             DpSize(shot.tier.wDp.dp, shot.tier.hDp.dp)
         ) {
-            InstrumentBody(
+            val render = buildWidgetRenderState(
                 kind = shot.kind,
-                tier = Tier.of(shot.tier.wDp, shot.tier.hDp),
+                appWidgetId = -1,
+                exactSize = DpSize(shot.tier.wDp.dp, shot.tier.hDp.dp),
                 medium = shot.medium,
-                cfg = BenchConfig(medium = shot.medium),
-                snap = BenchDemo.previewSnapshot().copy(timestamp = System.currentTimeMillis()),
-                calibrating = false,
-                awId = -1
+                config = BenchConfig(medium = shot.medium),
+                snapshot = BenchDemo.previewSnapshot()
+            )
+            InstrumentBody(
+                render.kind,
+                render.tier,
+                render.medium,
+                render.config,
+                render.snapshot,
+                render.calibrating,
+                render.appWidgetId
             )
         }
         host.removeAllViews()

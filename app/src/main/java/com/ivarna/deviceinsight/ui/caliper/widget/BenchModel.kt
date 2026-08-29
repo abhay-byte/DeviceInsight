@@ -447,10 +447,21 @@ object BenchState {
     }
 }
 
-// LIVE is a flat 1s tick — BenchUpdater's screen-on loop guarantees fresh samples while the
-// screen is on, so no charging/service condition is needed (idle fallback caused "not real-time")
+// Requested cadence remains a model-level compatibility helper. The update engine uses
+// effectiveCadenceMs/effectiveCadence so LIVE is only claimed while a real app monitor or
+// foreground producer is publishing samples.
 fun cadenceMs(cfg: BenchConfig, snap: BenchSnapshot): Long = when (cfg.cadence) {
     Cadence.LIVE -> 1_000L
+    Cadence.AMBIENT -> 30_000L
+    Cadence.BUDGET -> 15 * 60_000L
+}
+
+fun effectiveCadenceMs(cfg: BenchConfig, source: WidgetSnapshotSource): Long = when (cfg.cadence) {
+    Cadence.LIVE -> if (source == WidgetSnapshotSource.APP_MONITOR || source == WidgetSnapshotSource.FOREGROUND_SERVICE) {
+        1_000L
+    } else {
+        15 * 60_000L
+    }
     Cadence.AMBIENT -> 30_000L
     Cadence.BUDGET -> 15 * 60_000L
 }

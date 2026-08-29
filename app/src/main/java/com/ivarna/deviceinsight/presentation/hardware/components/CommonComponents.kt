@@ -153,13 +153,14 @@ fun UsageBar(
     val c = Caliper.colors
     // §4.2: accent is interactive-only — bars carry channel color when passed, ink by default.
     val resolvedColor = color ?: c.ink
+    val safeValue = if (value.isNaN() || value.isInfinite()) 0f else value.coerceIn(0f, 1f)
     var animTarget by remember { mutableFloatStateOf(0f) }
     val animatedWidth by animateFloatAsState(
         targetValue = animTarget,
         animationSpec = tween(800),
         label = "usageBar"
     )
-    LaunchedEffect(value) { animTarget = value }
+    LaunchedEffect(safeValue) { animTarget = safeValue }
 
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(

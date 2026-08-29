@@ -1,12 +1,12 @@
 package com.ivarna.deviceinsight.ui.caliper.widget
 
 import android.appwidget.AppWidgetManager
-import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.graphics.Canvas
-import android.util.Log
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -52,12 +52,6 @@ import com.ivarna.deviceinsight.ui.caliper.Medium
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import com.ivarna.deviceinsight.data.monitor.GlobalSnapshot
-import java.util.concurrent.ConcurrentHashMap
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 val ROUTE = ActionParameters.Key<String>("di_route")
@@ -91,52 +85,9 @@ private fun wSp(base: Int): TextUnit {
     return (base / (1f + (fs - 1f) * 0.35f)).sp
 }
 
-// ─────────────── BenchUpdater (full) ───────────────
+// ─────────────── BenchUpdater compatibility facade ───────────────
 
 object BenchUpdater {
-    private val widgets: List<GlanceAppWidget> = listOf(ScopeWidget(), StackWidget(), FuelWidget(), RasterWidget(), BenchWidgetAll())
-    internal val lastPush = ConcurrentHashMap<String, Long>()
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-    @Volatile private var cachedIds: Map<String, List<GlanceId>> = emptyMap()
-    @Volatile private var lastIdFetch: Long = 0L
-
-    // ── efficient 1s LIVE refresh ──
-    // While the screen is ON, self-drive 1s ticks (sysfs sample → snapshot → nudge) so LIVE
-    // widgets update in real time even without the foreground service. Screen off → loop
-    // cancels (zero background cost); AMBIENT/BUDGET cadences are untouched.
-    @Volatile private var appContext: Context? = null
-    @Volatile private var screenOn: Boolean = true
-    @Volatile private var liveJob: kotlinx.coroutines.Job? = null
-
-    private val powerScreenReceiver = object : android.content.BroadcastReceiver() {
-        override fun onReceive(c: Context?, i: Intent?) {
-            when (i?.action) {
-                Intent.ACTION_SCREEN_ON -> screenOn = true
-                Intent.ACTION_SCREEN_OFF -> screenOn = false
-            }
-            syncLiveLoop()
-        }
-    }
-
-    fun trackPowerScreen(context: Context) {
-        val app = context.applicationContext
-        if (appContext != null) { syncLiveLoop(); return }
-        appContext = app
-        screenOn = try {
-            (app.getSystemService(Context.POWER_SERVICE) as android.os.PowerManager).isInteractive
-        } catch (_: Exception) { true }
-        val filter = android.content.IntentFilter().apply {
-            addAction(Intent.ACTION_SCREEN_ON)
-            addAction(Intent.ACTION_SCREEN_OFF)
-            addAction(Intent.ACTION_POWER_CONNECTED)
-            addAction(Intent.ACTION_POWER_DISCONNECTED)
-        }
-        try {
-            androidx.core.content.ContextCompat.registerReceiver(app, powerScreenReceiver, filter, androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED)
-        } catch (_: Exception) { }
-        syncLiveLoop()
-    }
-
     // rolling history for the sampler fallback — widgets need traces, but BenchSampler
     // returns single-point snapshots with empty hist. Without the foreground service the
     // trace stays on NO SIGNAL forever.
@@ -160,80 +111,26 @@ object BenchUpdater {
         )
     }
 
-    private fun syncLiveLoop() {
-        val ctx = appContext ?: return
-        val should = screenOn
-        if (should && liveJob == null) {
-            liveJob = scope.launch {
-                try {
-                    while (true) {
-                        val raw = BenchSampler.sample(ctx)
-                        BenchBudgetSnapshot.last = enrichWithHistory(raw, BenchBudgetSnapshot.last)
-                        try { nudge(ctx) } catch (_: Exception) { }
-                        delay(1_000)
-                        if (!screenOn) break
-                    }
-                } finally {
-                    liveJob = null
-                }
-            }
-        } else if (!should && liveJob != null) {
-            liveJob?.cancel()
-            liveJob = null
-        }
+    fun publish(context: Context, snapshot: BenchSnapshot, source: WidgetSnapshotSource, force: Boolean = false) {
+        WidgetUpdateCoordinator.publish(context, snapshot, source, force)
     }
 
-    fun nudge(context: Context) {
-        trackPowerScreen(context)
-        val snap = GlobalSnapshot.current() ?: BenchBudgetSnapshot.last ?: return
-        // Also consider fallback sampling? Global is authoritative when alive
-        val now = System.currentTimeMillis()
-        val last = lastPush["nudge"] ?: 0L
-        if (now - last < 900) return
-        lastPush["nudge"] = now
-        scope.launch {
-            val mgr = GlanceAppWidgetManager(context)
-            // ponytail: cache ids — binder at most ~1Hz overall, skip mgr call unless widget due
-            val needFetch = now - lastIdFetch > 30_000 || cachedIds.isEmpty()
-            val idsMap: Map<String, List<GlanceId>> = if (needFetch) {
-                val m = mutableMapOf<String, List<GlanceId>>()
-                widgets.forEach { w ->
-                    try {
-                        val ids = mgr.getGlanceIds(w::class.java)
-                        m[w::class.java.name] = ids
-                    } catch (e: Exception) {
-                        // binder hiccup — keep the previous id list instead of caching an empty (30 s widget freeze)
-                        cachedIds[w::class.java.name]?.takeIf { it.isNotEmpty() }?.let { m[w::class.java.name] = it }
-                        Log.w("BenchUpdater", "getGlanceIds failed for ${w::class.java.simpleName}", e)
-                    }
-                }
-                cachedIds = m; lastIdFetch = now; m
-            } else cachedIds
+    fun publishAndForceUpdate(context: Context, snapshot: BenchSnapshot, source: WidgetSnapshotSource) =
+        publish(context, snapshot, source, force = true)
 
-            widgets.forEach { w ->
-                val ids = idsMap[w::class.java.name] ?: emptyList()
-                ids.forEach { id ->
-                    try {
-                        val cfg = BenchState.config(context, id)
-                        val due = cadenceMs(cfg, snap)
-                        val key = id.toString()
-                        val lp = lastPush[key] ?: 0L
-                        val pulse = (snap.charging || snap.warning()) && now - lp > 1_000
-                        if (now - lp >= due || pulse) {
-                            w.update(context, id)
-                            lastPush[key] = now
-                        }
-                    } catch (e: Exception) {
-                        Log.w("BenchUpdater", "update failed id=$id", e)
-                    }
-                }
-            }
-        }
+    fun nudgeAsync(context: Context) = WidgetUpdateCoordinator.requestRefresh(context)
+
+    suspend fun nudge(context: Context) {
+        val initial = WidgetSnapshotCoordinator.resolveInitial(context)
+        publishAndForceUpdate(context, initial.snapshot, WidgetSnapshotSource.ON_DEMAND)
     }
 
-    fun evict(appWidgetId: Int) {
-        lastPush.remove(appWidgetId.toString())
+    fun trackPowerScreen(context: Context) {
+        // Track A: LIVE is driven by the app monitor, not by a second sampler or a hidden timer.
+        WidgetUpdateCoordinator.invalidateTargets()
     }
+
+    fun evict(appWidgetId: Int) = WidgetUpdateCoordinator.evict(appWidgetId)
 }
 
 // ─────────────── BandBitmap (SYNC) ───────────────
@@ -332,9 +229,10 @@ private fun Footer(
     pal: WidgetPalette,
     snap: BenchSnapshot,
     cfg: BenchConfig,
-    windowLabel: String
+    windowLabel: String,
+    source: WidgetSnapshotSource
 ) {
-    val stale = snap.stale(cadenceMs(cfg, snap))
+    val stale = snap.stale(effectiveCadenceMs(cfg, source))
     val updText = if (stale) "SIGNAL LOST" else "upd ${updString(snap.timestamp)}"
     val updColor = if (stale) pal.fault else pal.ink40
     Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.Vertical.CenterVertically) {
@@ -450,14 +348,15 @@ fun InstrumentBody(
     cfg: BenchConfig,
     snap: BenchSnapshot,
     calibrating: Boolean,
-    awId: Int
+    awId: Int,
+    source: WidgetSnapshotSource = WidgetSnapshotSource.ON_DEMAND
 ) {
     when (kind) {
-        WidgetKind.SCOPE -> ScopeBody(tier, medium, cfg, snap, calibrating, awId)
-        WidgetKind.STACK -> StackBody(tier, medium, cfg, snap, calibrating, awId)
-        WidgetKind.FUEL -> FuelBody(tier, medium, cfg, snap, calibrating, awId)
-        WidgetKind.RASTER -> RasterBody(tier, medium, cfg, snap, calibrating, awId)
-        WidgetKind.BENCH -> BenchBody(tier, medium, cfg, snap, calibrating, awId)
+        WidgetKind.SCOPE -> ScopeBody(tier, medium, cfg, snap, calibrating, awId, source)
+        WidgetKind.STACK -> StackBody(tier, medium, cfg, snap, calibrating, awId, source)
+        WidgetKind.FUEL -> FuelBody(tier, medium, cfg, snap, calibrating, awId, source)
+        WidgetKind.RASTER -> RasterBody(tier, medium, cfg, snap, calibrating, awId, source)
+        WidgetKind.BENCH -> BenchBody(tier, medium, cfg, snap, calibrating, awId, source)
     }
 }
 
@@ -468,11 +367,12 @@ private fun ScopeBody(
     cfg: BenchConfig,
     snap: BenchSnapshot,
     calibrating: Boolean,
-    awId: Int
+    awId: Int,
+    source: WidgetSnapshotSource
 ) {
     val context = LocalContext.current
     val pal = WidgetPalettes.of(medium)
-    val stale = snap.stale(cadenceMs(cfg, snap))
+    val stale = snap.stale(effectiveCadenceMs(cfg, source))
     val desc = "Scope. CPU ${snap.cpuPct.toInt()} percent. Updated ${updString(snap.timestamp)}."
     BenchPanel(pal, desc, openConfig(awId)) {
         Header(pal, "CH-01", "CPU", if (calibrating) "CALIBRATING…" else if (stale) "SIGNAL LOST" else "LIVE", ledOn = !stale && !calibrating)
@@ -525,7 +425,7 @@ private fun ScopeBody(
             }
         }
         Spacer(GlanceModifier.defaultWeight())
-        Footer(pal, snap, cfg, "${cfg.traceWindowS}s window")
+        Footer(pal, snap, cfg, "${cfg.traceWindowS}s window", source)
     }
 }
 
@@ -536,11 +436,12 @@ private fun StackBody(
     cfg: BenchConfig,
     snap: BenchSnapshot,
     calibrating: Boolean,
-    awId: Int
+    awId: Int,
+    source: WidgetSnapshotSource
 ) {
     val context = LocalContext.current
     val pal = WidgetPalettes.of(medium)
-    val stale = snap.stale(cadenceMs(cfg, snap))
+    val stale = snap.stale(effectiveCadenceMs(cfg, source))
     val desc = "Stack. Memory ${snap.memUsedGb.toInt()} of ${snap.memTotalGb.toInt()} gigabytes. Updated ${updString(snap.timestamp)}."
     BenchPanel(pal, desc, openConfig(awId)) {
         // trailing header status is the used % when live; CALIBRATING / SIGNAL LOST win otherwise
@@ -602,7 +503,7 @@ private fun StackBody(
         }
         Subline(sub, pal)
         Spacer(GlanceModifier.defaultWeight())
-        Footer(pal, snap, cfg, "${cfg.traceWindowS}s window")
+        Footer(pal, snap, cfg, "${cfg.traceWindowS}s window", source)
     }
 }
 
@@ -613,11 +514,12 @@ private fun FuelBody(
     cfg: BenchConfig,
     snap: BenchSnapshot,
     calibrating: Boolean,
-    awId: Int
+    awId: Int,
+    source: WidgetSnapshotSource
 ) {
     val context = LocalContext.current
     val pal = WidgetPalettes.of(medium)
-    val stale = snap.stale(cadenceMs(cfg, snap))
+    val stale = snap.stale(effectiveCadenceMs(cfg, source))
     if (!snap.batteryPresent) {
         val desc = "Fuel. Not fitted."
         BenchPanel(pal, desc, openConfig(awId)) {
@@ -625,7 +527,7 @@ private fun FuelBody(
             Spacer(GlanceModifier.height(12.dp))
             Text("NOT FITTED", style = TextStyle(color = ColorProvider(pal.ink40), fontSize = wSp(22), fontWeight = FontWeight.Medium, fontFamily = FontFamily.Monospace), maxLines = 1)
             Spacer(GlanceModifier.defaultWeight())
-            Footer(pal, snap, cfg, "${cfg.traceWindowS}s window")
+            Footer(pal, snap, cfg, "${cfg.traceWindowS}s window", source)
         }
         return
     }
@@ -682,7 +584,7 @@ private fun FuelBody(
             }
         }
         Spacer(GlanceModifier.defaultWeight())
-        Footer(pal, snap, cfg, "${cfg.traceWindowS}s window")
+        Footer(pal, snap, cfg, "${cfg.traceWindowS}s window", source)
     }
 }
 
@@ -693,11 +595,12 @@ private fun RasterBody(
     cfg: BenchConfig,
     snap: BenchSnapshot,
     calibrating: Boolean,
-    awId: Int
+    awId: Int,
+    source: WidgetSnapshotSource
 ) {
     val context = LocalContext.current
     val pal = WidgetPalettes.of(medium)
-    val stale = snap.stale(cadenceMs(cfg, snap))
+    val stale = snap.stale(effectiveCadenceMs(cfg, source))
     if (!snap.gpuFitted) {
         val desc = "Raster. Not fitted."
         BenchPanel(pal, desc, openConfig(awId)) {
@@ -713,7 +616,7 @@ private fun RasterBody(
                 c.lockedField(context, pal, w, h)
             }
             Spacer(GlanceModifier.defaultWeight())
-            Footer(pal, snap, cfg, "${cfg.traceWindowS}s window")
+            Footer(pal, snap, cfg, "${cfg.traceWindowS}s window", source)
         }
         return
     }
@@ -740,7 +643,7 @@ private fun RasterBody(
                 Text("[ GRANT IN APP ]", style = TextStyle(color = ColorProvider(pal.accent), fontSize = wSp(11), fontWeight = FontWeight.Medium, fontFamily = FontFamily.Monospace), maxLines = 1)
             }
             Spacer(GlanceModifier.defaultWeight())
-            Footer(pal, snap, cfg, "${cfg.traceWindowS}s window")
+            Footer(pal, snap, cfg, "${cfg.traceWindowS}s window", source)
         }
         return
     }
@@ -762,7 +665,7 @@ private fun RasterBody(
             Subline(datasheet, pal)
         }
         Spacer(GlanceModifier.defaultWeight())
-        Footer(pal, snap, cfg, "${cfg.traceWindowS}s window")
+        Footer(pal, snap, cfg, "${cfg.traceWindowS}s window", source)
     }
 }
 
@@ -773,11 +676,12 @@ private fun BenchBody(
     cfg: BenchConfig,
     snap: BenchSnapshot,
     calibrating: Boolean,
-    awId: Int
+    awId: Int,
+    source: WidgetSnapshotSource
 ) {
     val context = LocalContext.current
     val pal = WidgetPalettes.of(medium)
-    val stale = snap.stale(cadenceMs(cfg, snap))
+    val stale = snap.stale(effectiveCadenceMs(cfg, source))
     val isLedger = tier <= Tier.T2
 
     if (isLedger) {
@@ -843,87 +747,83 @@ private fun BenchBody(
 
 // ─────────────── Widgets ───────────────
 
+private suspend fun GlanceAppWidget.provideBenchWidget(
+    context: Context,
+    id: GlanceId,
+    kind: WidgetKind,
+    showCalibration: Boolean
+) {
+    val cfg = BenchState.config(context, id)
+    val medium = resolvedMedium(context, cfg)
+    val initial = WidgetSnapshotCoordinator.resolveInitial(context)
+    val placedAt = if (showCalibration) {
+        runCatching { BenchState.placedAt(context, id) }.getOrDefault(0L)
+    } else 0L
+    val calibrating = showCalibration &&
+        (initial.snapshot.timestamp == 0L || (placedAt != 0L && System.currentTimeMillis() - placedAt < 6_000L))
+    val awId = runCatching { GlanceAppWidgetManager(context).getAppWidgetId(id) }
+        .getOrDefault(AppWidgetManager.INVALID_APPWIDGET_ID)
+
+    provideContent {
+        val published by WidgetSnapshotCoordinator.latest.collectAsState(initial = initial)
+        val current = published ?: initial
+        val size = LocalSize.current
+        val render = buildWidgetRenderState(
+            kind = kind,
+            appWidgetId = awId,
+            exactSize = size,
+            medium = medium,
+            config = cfg,
+            snapshot = current.snapshot,
+            calibrating = calibrating,
+            snapshotSource = current.source
+        )
+        InstrumentBody(
+            render.kind,
+            render.tier,
+            render.medium,
+            render.config,
+            render.snapshot,
+            render.calibrating,
+            render.appWidgetId,
+            render.snapshotSource
+        )
+    }
+}
+
 class ScopeWidget : GlanceAppWidget() {
     override val sizeMode: SizeMode = SizeMode.Exact
     override val stateDefinition = PreferencesGlanceStateDefinition
-    override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val cfg = BenchState.config(context, id)
-        val medium = resolvedMedium(context, cfg)
-        val snap = GlobalSnapshot.current() ?: BenchBudgetSnapshot.last ?: BenchSampler.sample(context)
-        val placedAt = try { BenchState.placedAt(context, id) } catch (_: Exception) { 0L }
-        val calibrating = snap.timestamp == 0L || (placedAt != 0L && System.currentTimeMillis() - placedAt < 6000)
-        val awId = try { GlanceAppWidgetManager(context).getAppWidgetId(id) } catch (_: Exception) { AppWidgetManager.INVALID_APPWIDGET_ID }
-        provideContent {
-            val size = LocalSize.current
-            InstrumentBody(WidgetKind.SCOPE, Tier.of(size.width.value.toInt(), size.height.value.toInt()), medium, cfg, snap, calibrating, awId)
-        }
-    }
+    override suspend fun provideGlance(context: Context, id: GlanceId) =
+        provideBenchWidget(context, id, WidgetKind.SCOPE, showCalibration = true)
 }
 
 class StackWidget : GlanceAppWidget() {
     override val sizeMode: SizeMode = SizeMode.Exact
     override val stateDefinition = PreferencesGlanceStateDefinition
-    override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val cfg = BenchState.config(context, id)
-        val medium = resolvedMedium(context, cfg)
-        val snap = GlobalSnapshot.current() ?: BenchBudgetSnapshot.last ?: BenchSampler.sample(context)
-        val placedAt = try { BenchState.placedAt(context, id) } catch (_: Exception) { 0L }
-        val calibrating = snap.timestamp == 0L || (placedAt != 0L && System.currentTimeMillis() - placedAt < 6000)
-        val awId = try { GlanceAppWidgetManager(context).getAppWidgetId(id) } catch (_: Exception) { AppWidgetManager.INVALID_APPWIDGET_ID }
-        provideContent {
-            val size = LocalSize.current
-            InstrumentBody(WidgetKind.STACK, Tier.of(size.width.value.toInt(), size.height.value.toInt()), medium, cfg, snap, calibrating, awId)
-        }
-    }
+    override suspend fun provideGlance(context: Context, id: GlanceId) =
+        provideBenchWidget(context, id, WidgetKind.STACK, showCalibration = true)
 }
 
 class FuelWidget : GlanceAppWidget() {
     override val sizeMode: SizeMode = SizeMode.Exact
     override val stateDefinition = PreferencesGlanceStateDefinition
-    override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val cfg = BenchState.config(context, id)
-        val medium = resolvedMedium(context, cfg)
-        val snap = GlobalSnapshot.current() ?: BenchBudgetSnapshot.last ?: BenchSampler.sample(context)
-        val placedAt = try { BenchState.placedAt(context, id) } catch (_: Exception) { 0L }
-        val calibrating = snap.timestamp == 0L || (placedAt != 0L && System.currentTimeMillis() - placedAt < 6000)
-        val awId = try { GlanceAppWidgetManager(context).getAppWidgetId(id) } catch (_: Exception) { AppWidgetManager.INVALID_APPWIDGET_ID }
-        provideContent {
-            val size = LocalSize.current
-            InstrumentBody(WidgetKind.FUEL, Tier.of(size.width.value.toInt(), size.height.value.toInt()), medium, cfg, snap, calibrating, awId)
-        }
-    }
+    override suspend fun provideGlance(context: Context, id: GlanceId) =
+        provideBenchWidget(context, id, WidgetKind.FUEL, showCalibration = true)
 }
 
 class RasterWidget : GlanceAppWidget() {
     override val sizeMode: SizeMode = SizeMode.Exact
     override val stateDefinition = PreferencesGlanceStateDefinition
-    override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val cfg = BenchState.config(context, id)
-        val medium = resolvedMedium(context, cfg)
-        val snap = GlobalSnapshot.current() ?: BenchBudgetSnapshot.last ?: BenchSampler.sample(context)
-        val awId = try { GlanceAppWidgetManager(context).getAppWidgetId(id) } catch (_: Exception) { AppWidgetManager.INVALID_APPWIDGET_ID }
-        provideContent {
-            val size = LocalSize.current
-            InstrumentBody(WidgetKind.RASTER, Tier.of(size.width.value.toInt(), size.height.value.toInt()), medium, cfg, snap, calibrating = false, awId = awId)
-        }
-    }
+    override suspend fun provideGlance(context: Context, id: GlanceId) =
+        provideBenchWidget(context, id, WidgetKind.RASTER, showCalibration = false)
 }
 
 class BenchWidgetAll : GlanceAppWidget() {
     override val sizeMode: SizeMode = SizeMode.Exact
     override val stateDefinition = PreferencesGlanceStateDefinition
-    override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val cfg = BenchState.config(context, id)
-        val medium = resolvedMedium(context, cfg)
-        val snap = GlobalSnapshot.current() ?: BenchBudgetSnapshot.last ?: BenchSampler.sample(context)
-        val placedAt = try { BenchState.placedAt(context, id) } catch (_: Exception) { 0L }
-        val calibrating = snap.timestamp == 0L || (placedAt != 0L && System.currentTimeMillis() - placedAt < 6000)
-        val awId = try { GlanceAppWidgetManager(context).getAppWidgetId(id) } catch (_: Exception) { AppWidgetManager.INVALID_APPWIDGET_ID }
-        provideContent {
-            val size = LocalSize.current
-            InstrumentBody(WidgetKind.BENCH, Tier.of(size.width.value.toInt(), size.height.value.toInt()), medium, cfg, snap, calibrating, awId)
-        }
-    }
+    override suspend fun provideGlance(context: Context, id: GlanceId) =
+        provideBenchWidget(context, id, WidgetKind.BENCH, showCalibration = true)
 }
 
 private fun channelRowData(chId: String, snap: BenchSnapshot, cfg: BenchConfig): Triple<String, String, String?> {
@@ -945,7 +845,7 @@ private fun channelRowData(chId: String, snap: BenchSnapshot, cfg: BenchConfig):
 
 class SingleChannelWidgetReceiver : GlanceAppWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = ScopeWidget()
-    override fun onEnabled(context: Context) { super.onEnabled(context); BenchBudget.enqueue(context); BenchUpdater.trackPowerScreen(context) }
+    override fun onEnabled(context: Context) { super.onEnabled(context); WidgetTargetRegistry.invalidate(); BenchBudget.enqueue(context) }
     override fun onDisabled(context: Context) {
         super.onDisabled(context)
         kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch { BenchBudget.cancelIfNone(context) }
@@ -958,7 +858,7 @@ class SingleChannelWidgetReceiver : GlanceAppWidgetReceiver() {
 
 class DualChannelWidgetReceiver : GlanceAppWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = StackWidget()
-    override fun onEnabled(context: Context) { super.onEnabled(context); BenchBudget.enqueue(context); BenchUpdater.trackPowerScreen(context) }
+    override fun onEnabled(context: Context) { super.onEnabled(context); WidgetTargetRegistry.invalidate(); BenchBudget.enqueue(context) }
     override fun onDisabled(context: Context) {
         super.onDisabled(context)
         kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch { BenchBudget.cancelIfNone(context) }
@@ -971,7 +871,7 @@ class DualChannelWidgetReceiver : GlanceAppWidgetReceiver() {
 
 class BenchWidgetReceiver : GlanceAppWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = BenchWidgetAll()
-    override fun onEnabled(context: Context) { super.onEnabled(context); BenchBudget.enqueue(context); BenchUpdater.trackPowerScreen(context) }
+    override fun onEnabled(context: Context) { super.onEnabled(context); WidgetTargetRegistry.invalidate(); BenchBudget.enqueue(context) }
     override fun onDisabled(context: Context) {
         super.onDisabled(context)
         kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch { BenchBudget.cancelIfNone(context) }
@@ -984,7 +884,7 @@ class BenchWidgetReceiver : GlanceAppWidgetReceiver() {
 
 class FuelWidgetReceiver : GlanceAppWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = FuelWidget()
-    override fun onEnabled(context: Context) { super.onEnabled(context); BenchBudget.enqueue(context); BenchUpdater.trackPowerScreen(context) }
+    override fun onEnabled(context: Context) { super.onEnabled(context); WidgetTargetRegistry.invalidate(); BenchBudget.enqueue(context) }
     override fun onDisabled(context: Context) {
         super.onDisabled(context)
         kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch { BenchBudget.cancelIfNone(context) }
@@ -997,7 +897,7 @@ class FuelWidgetReceiver : GlanceAppWidgetReceiver() {
 
 class RasterWidgetReceiver : GlanceAppWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = RasterWidget()
-    override fun onEnabled(context: Context) { super.onEnabled(context); BenchBudget.enqueue(context); BenchUpdater.trackPowerScreen(context) }
+    override fun onEnabled(context: Context) { super.onEnabled(context); WidgetTargetRegistry.invalidate(); BenchBudget.enqueue(context) }
     override fun onDisabled(context: Context) {
         super.onDisabled(context)
         kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch { BenchBudget.cancelIfNone(context) }

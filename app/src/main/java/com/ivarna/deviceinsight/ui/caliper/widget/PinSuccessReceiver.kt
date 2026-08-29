@@ -10,5 +10,7 @@ import android.util.Log
 class PinSuccessReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         Log.i("PinSuccessReceiver", "widget pinned")
+        WidgetTargetRegistry.invalidate()
+        BenchUpdater.nudgeAsync(context)
     }
 }

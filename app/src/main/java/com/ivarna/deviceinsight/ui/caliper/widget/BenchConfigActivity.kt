@@ -3,6 +3,7 @@ package com.ivarna.deviceinsight.ui.caliper.widget
 import android.appwidget.AppWidgetManager
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
@@ -14,20 +15,14 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.viewinterop.AndroidView
-import androidx.glance.appwidget.ExperimentalGlanceRemoteViewsApi
 import androidx.glance.appwidget.GlanceAppWidgetManager
-import androidx.glance.appwidget.GlanceRemoteViews
 import androidx.lifecycle.lifecycleScope
-import com.ivarna.deviceinsight.data.monitor.GlobalSnapshot
 import com.ivarna.deviceinsight.ui.caliper.Caliper
 import com.ivarna.deviceinsight.ui.caliper.CaliperTheme
 import com.ivarna.deviceinsight.ui.caliper.mediumFlow
 import com.ivarna.deviceinsight.ui.caliper.Medium
 import com.ivarna.deviceinsight.ui.caliper.components.*
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
@@ -94,15 +89,19 @@ class BenchConfigActivity : ComponentActivity() {
                 val mgr = GlanceAppWidgetManager(this@BenchConfigActivity)
                 val glanceId = mgr.getGlanceIdBy(appWidgetId)
                 BenchState.save(this@BenchConfigActivity, glanceId, cfg)
-                val widget: androidx.glance.appwidget.GlanceAppWidget = when (resolveKind()) {
-                    WidgetKind.SCOPE -> ScopeWidget()
-                    WidgetKind.STACK -> StackWidget()
-                    WidgetKind.FUEL -> FuelWidget()
-                    WidgetKind.RASTER -> RasterWidget()
-                    WidgetKind.BENCH -> BenchWidgetAll()
-                }
-                widget.update(this@BenchConfigActivity, glanceId)
-            } catch (_: Exception) { }
+                WidgetTargetRegistry.invalidate()
+                val sample = WidgetSnapshotCoordinator.resolveInitial(this@BenchConfigActivity).snapshot
+                BenchUpdater.publishAndForceUpdate(
+                    this@BenchConfigActivity,
+                    sample,
+                    WidgetSnapshotSource.ON_DEMAND
+                )
+            } catch (t: Throwable) {
+                Log.e("DeviceInsightWidget", "CONFIG_SAVE_FAIL appWidgetId=$appWidgetId", t)
+                setResult(RESULT_CANCELED, Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId))
+                finish()
+                return@launch
+            }
             val result = Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
             setResult(RESULT_OK, result)
             finish()
@@ -135,20 +134,13 @@ private fun BenchConfigScreen(
     val medium = if (pick == MediaPick.FOLLOW) systemMedium else Medium.valueOf(pick.name)
 
     val cfg = BenchConfig(medium, followSystem, cadence, traceWindow, wattHero, compact)
-    // real-time preview: re-sample every second while the page is visible — fresh live data
-    // when the monitor bus is warm, deterministic demo otherwise (never an empty BUDGET panel)
-    var snap by remember {
-        mutableStateOf(BenchDemo.previewSnapshot().copy(timestamp = System.currentTimeMillis()))
-    }
+    val published by WidgetSnapshotCoordinator.latest.collectAsState(initial = null)
+    var snap by remember { mutableStateOf(BenchDemo.previewSnapshot()) }
+    val context = LocalContext.current
     LaunchedEffect(Unit) {
-        while (true) {
-            val now = System.currentTimeMillis()
-            val live = GlobalSnapshot.current()
-            snap = if (live != null && now - live.timestamp in 0 until 5_000L) live
-                   else BenchDemo.previewSnapshot().copy(timestamp = now)
-            delay(1_000)
-        }
+        snap = WidgetSnapshotCoordinator.resolveInitial(context).snapshot
     }
+    LaunchedEffect(published) { published?.snapshot?.let { snap = it } }
 
     // page chrome follows the APP theme — the widget's media pick only affects the preview render
     CaliperTheme(medium = systemMedium) {
@@ -158,7 +150,7 @@ private fun BenchConfigScreen(
             ScreenHeader("Calibrate", "${kind.name} instrument")
             Spacer(Modifier.height(12.dp))
 
-            PreviewPanel(kind, cfg, snap, appWidgetId)
+            PreviewPanel(kind, cfg, snap, appWidgetId, published?.source ?: WidgetSnapshotSource.ON_DEMAND)
             Text(
                 "home screen · glance",
                 style = Caliper.type.meta,
@@ -223,52 +215,37 @@ private fun BenchConfigScreen(
 // Renders the exact InstrumentBody the launcher ships - no Compose facsimile, no drift.
 // Honors live cfg edits (media pick, cadence, watt hero, window, compact channels).
 
-@OptIn(ExperimentalGlanceRemoteViewsApi::class)
 @Composable
-private fun PreviewPanel(kind: WidgetKind, cfg: BenchConfig, snap: BenchSnapshot, appWidgetId: Int) {
+private fun PreviewPanel(
+    kind: WidgetKind,
+    cfg: BenchConfig,
+    snap: BenchSnapshot,
+    appWidgetId: Int,
+    snapshotSource: WidgetSnapshotSource
+) {
     val context = LocalContext.current
-    // preview at the widget's ACTUAL placed footprint (launcher options) — same tier the
-    // Exact-mode widget renders, so bands (thermal/rail) match what the user placed
-    val placed = remember(appWidgetId) {
-        val opts = if (appWidgetId != AppWidgetManager.INVALID_APPWIDGET_ID)
-            AppWidgetManager.getInstance(context).getAppWidgetOptions(appWidgetId) else null
-        val wDp = opts?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH)?.takeIf { it > 0 } ?: 280
-        val hDp = opts?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT)?.takeIf { it > 0 } ?: 140
-        Tier.of(wDp, hDp)
+    var exactSize by remember(appWidgetId) {
+        mutableStateOf(WidgetSizeResolver.fromOptions(
+            if (appWidgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
+                AppWidgetManager.getInstance(context).getAppWidgetOptions(appWidgetId)
+            } else null
+        ))
     }
-    var rv by remember { mutableStateOf<android.widget.RemoteViews?>(null) }
-    LaunchedEffect(kind, placed, cfg, snap) {
-        val medium = try { resolvedMedium(context, cfg) } catch (_: Exception) { Medium.PAPER }
-        rv = try {
-            GlanceRemoteViews().compose(context, DpSize(placed.wDp.dp, placed.hDp.dp)) {
-                InstrumentBody(kind, placed, medium, cfg, snap, calibrating = false, awId = -1)
-            }.remoteViews
-        } catch (_: Exception) { null }
+    LaunchedEffect(appWidgetId) {
+        exactSize = WidgetSizeResolver.resolve(context, appWidgetId)
     }
+    val tier = Tier.of(exactSize.width.value.toInt(), exactSize.height.value.toInt())
     PanelCard(title = "PREVIEW", status = {
-        Text("${kind.name} · T${placed.ordinal + 1}", style = Caliper.type.meta, color = Caliper.colors.ink40)
+            Text("${kind.name} · T${tier.ordinal + 1} · ${exactSize.width.value.toInt()}×${exactSize.height.value.toInt()}dp", style = Caliper.type.meta, color = Caliper.colors.ink40)
     }) {
-        val preview = rv
-        if (preview == null) {
-            Text("RENDERING...", style = Caliper.type.meta, color = Caliper.colors.ink40)
-        } else {
-            AndroidView(
-                factory = { c -> android.widget.FrameLayout(c) },
-                update = { host ->
-                    host.removeAllViews()
-                    runCatching {
-                        val v = preview.apply(host.context, host)
-                        host.addView(
-                            v,
-                            android.widget.FrameLayout.LayoutParams(
-                                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
-                                android.view.ViewGroup.LayoutParams.MATCH_PARENT
-                            )
-                        )
-                    }
-                },
-                modifier = Modifier.fillMaxWidth().aspectRatio(placed.wDp.toFloat() / placed.hDp.toFloat())
-            )
-        }
+        LiveWidgetPreview(
+            kind = kind,
+            config = cfg,
+            snapshot = snap,
+            exactSize = exactSize,
+            appWidgetId = appWidgetId,
+            snapshotSource = snapshotSource,
+            modifier = Modifier.fillMaxWidth().aspectRatio(exactSize.width / exactSize.height)
+        )
     }
 }

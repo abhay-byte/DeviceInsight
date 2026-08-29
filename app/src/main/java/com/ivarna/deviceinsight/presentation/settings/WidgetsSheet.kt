@@ -8,6 +8,7 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.os.Bundle
+import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -25,11 +26,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
-import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.ivarna.deviceinsight.R
-import com.ivarna.deviceinsight.data.monitor.GlobalSnapshot
 import com.ivarna.deviceinsight.ui.caliper.Caliper
 import com.ivarna.deviceinsight.ui.caliper.components.*
 import com.ivarna.deviceinsight.ui.caliper.widget.*
@@ -47,6 +46,7 @@ fun WidgetsSheet(
     var instruments by remember { mutableStateOf<List<InstrumentInfo>>(emptyList()) }
     var pinSupported by remember { mutableStateOf(true) }
     var selected by remember { mutableStateOf(WidgetKind.SCOPE) }
+    val published by WidgetSnapshotCoordinator.latest.collectAsState(initial = null)
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -98,7 +98,7 @@ fun WidgetsSheet(
                 ) {
                     Image(
                         painter = painterResource(previewResFor(kind)),
-                        contentDescription = "${kind.name} preview",
+                        contentDescription = "${kind.name} reference preview",
                         modifier = Modifier.fillMaxWidth().height(72.dp).alpha(if (sel) 1f else 0.7f),
                         contentScale = ContentScale.FillWidth
                     )
@@ -144,7 +144,17 @@ fun WidgetsSheet(
                 PanelCard(title = info.medium.name, status = {
                     Text(info.cadence.name, style = Caliper.type.meta, color = Caliper.colors.ink40)
                 }) {
+                    LiveWidgetPreview(
+                        kind = info.kind,
+                        config = info.config,
+                        snapshot = published?.snapshot ?: info.snapshot,
+                        exactSize = info.exactSize,
+                        appWidgetId = info.appWidgetId,
+                        snapshotSource = published?.source ?: WidgetSnapshotSource.ON_DEMAND,
+                        modifier = Modifier.fillMaxWidth().aspectRatio(info.exactSize.width / info.exactSize.height)
+                    )
                     Text("upd ${info.upd}", style = Caliper.type.meta, color = Caliper.colors.ink40)
+                    Text("${info.exactSize.width.value.toInt()}×${info.exactSize.height.value.toInt()}dp · T${info.tier.ordinal + 1}", style = Caliper.type.meta, color = Caliper.colors.ink40)
                     Spacer(Modifier.height(6.dp))
                     HardKey("CALIBRATE", variant = HardKeyVariant.SECONDARY, onClick = {
                         val intent = Intent(ctx, BenchConfigActivity::class.java).apply {
@@ -186,35 +196,39 @@ private data class InstrumentInfo(
     val medium: com.ivarna.deviceinsight.ui.caliper.Medium,
     val cadence: Cadence,
     val upd: String,
-    val appWidgetId: Int
+    val appWidgetId: Int,
+    val config: BenchConfig,
+    val exactSize: androidx.compose.ui.unit.DpSize,
+    val tier: Tier,
+    val snapshot: BenchSnapshot
 )
 
 private suspend fun refreshInstruments(ctx: Context, onResult: (Int, List<InstrumentInfo>) -> Unit) {
     try {
-        val mgr = GlanceAppWidgetManager(ctx)
-        val snap = GlobalSnapshot.current() ?: BenchBudgetSnapshot.last
-        val upd = if (snap != null) {
+        val snap = WidgetSnapshotCoordinator.resolveInitial(ctx).snapshot
+        val upd = if (snap.timestamp > 0L) {
             val fmt = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.US)
             fmt.format(java.util.Date(snap.timestamp))
         } else "—"
-        val pairs: List<Pair<Class<out androidx.glance.appwidget.GlanceAppWidget>, WidgetKind>> = listOf(
-            ScopeWidget::class.java to WidgetKind.SCOPE,
-            StackWidget::class.java to WidgetKind.STACK,
-            FuelWidget::class.java to WidgetKind.FUEL,
-            RasterWidget::class.java to WidgetKind.RASTER,
-            BenchWidgetAll::class.java to WidgetKind.BENCH
-        )
         val list = mutableListOf<InstrumentInfo>()
-        for ((cls, kind) in pairs) {
-            val ids = try { mgr.getGlanceIds(cls) } catch (_: Exception) { emptyList() }
-            for (id in ids) {
-                val cfg = try { BenchState.config(ctx, id) } catch (_: Exception) { BenchConfig() }
-                val awId = try { mgr.getAppWidgetId(id) } catch (_: Exception) { 0 }
-                list.add(InstrumentInfo(kind, cfg.medium, cfg.cadence, upd, awId))
-            }
+        val entries = listOf(
+            ScopeWidget() to WidgetKind.SCOPE,
+            StackWidget() to WidgetKind.STACK,
+            FuelWidget() to WidgetKind.FUEL,
+            RasterWidget() to WidgetKind.RASTER,
+            BenchWidgetAll() to WidgetKind.BENCH
+        )
+        for (target in WidgetTargetRegistry.targets(ctx, entries)) {
+            val exactSize = WidgetSizeResolver.resolve(ctx, target.appWidgetId)
+            val medium = resolvedMedium(ctx, target.config)
+            list.add(InstrumentInfo(target.kind, medium, target.config.cadence, upd, target.appWidgetId, target.config, exactSize,
+                Tier.of(exactSize.width.value.toInt(), exactSize.height.value.toInt()), snap))
         }
         onResult(list.size, list)
-    } catch (_: Exception) { onResult(0, emptyList()) }
+    } catch (t: Throwable) {
+        Log.e("DeviceInsightWidget", "ACTIVE_TARGETS_LOAD_FAIL", t)
+        onResult(0, emptyList())
+    }
 }
 
 internal fun Context.findActivity(): android.app.Activity? {

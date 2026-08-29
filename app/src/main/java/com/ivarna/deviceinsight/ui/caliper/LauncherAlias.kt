@@ -51,6 +51,11 @@ object LauncherAlias {
         if (startedActivities <= 0) drain(ctx)
     }
 
+    /** Retry any pending alias swap — called after overlay stops or config stabilises. */
+    fun retryPending(ctx: Context) {
+        if (pending != null && startedActivities <= 0) drain(ctx)
+    }
+
     fun attach(app: Application) {
         val callbacks = object : Application.ActivityLifecycleCallbacks {
             override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {}
@@ -77,8 +82,26 @@ object LauncherAlias {
 
     private fun drain(ctx: Context) {
         val medium = pending ?: return
+        // Defer alias swap while the HUD overlay window is attached — the overlay's
+        // WindowManager token survives theme switches, but swapping the LAUNCHER
+        // alias while TYPE_APPLICATION_OVERLAY is on-screen triggers an OEM
+        // BadToken/window-leak on some devices. Keep the pending value and retry
+        // after the overlay stops (OverlayService.onDestroy calls retryPending).
+        if (isOverlayRunning()) {
+            return
+        }
         pending = null
         runCatching { apply(ctx, medium) }
+    }
+
+    private fun isOverlayRunning(): Boolean {
+        return try {
+            Class.forName("com.ivarna.deviceinsight.service.OverlayService")
+                .getDeclaredField("isRunning")
+                .get(null)
+                .let { it as java.util.concurrent.atomic.AtomicBoolean }
+                .get()
+        } catch (_: Exception) { false }
     }
 
     fun apply(ctx: Context, medium: Medium) {
