@@ -8,8 +8,10 @@ import android.os.Build
 import android.util.Log
 import android.view.Gravity
 import android.view.View
+import android.view.ViewGroup
 import android.view.Window
 import android.view.WindowManager
+import android.view.WindowInsets
 import androidx.annotation.RequiresApi
 import androidx.compose.ui.platform.ComposeView
 import com.ivarna.deviceinsight.R
@@ -17,27 +19,41 @@ import com.ivarna.deviceinsight.ui.caliper.hud.HudRuntimeConfig
 import java.util.function.Consumer
 
 private const val TAG = "DeviceInsightOverlay"
+private const val EDGE_MARGIN_DP = 8
 
 interface OverlayWindowHost {
     val isAttached: Boolean
     val position: OverlayPosition
+    val size: OverlaySize
     val blurAvailable: Boolean
 
     fun attach(content: ComposeView, initial: HudRuntimeConfig)
     fun updatePosition(x: Int, y: Int)
     fun updateLocked(locked: Boolean)
     fun updateBackgroundBlur(enabled: Boolean, radiusPx: Int)
-    fun updateContentLayout()
+    fun requestContentLayout()
     fun detach()
 }
 
 data class OverlayPosition(val x: Int, val y: Int)
+data class OverlaySize(val width: Int, val height: Int)
 data class OverlayBounds(val left: Int, val top: Int, val right: Int, val bottom: Int) {
     val width: Int get() = right - left
     val height: Int get() = bottom - top
 }
 
+data class OverlayInsets(val left: Int = 0, val top: Int = 0, val right: Int = 0, val bottom: Int = 0)
+
 object OverlayGeometry {
+    fun safeFrame(display: OverlayBounds, insets: OverlayInsets, edgeMarginPx: Int): OverlayBounds {
+        val margin = edgeMarginPx.coerceAtLeast(0)
+        val left = display.left + insets.left + margin
+        val top = display.top + insets.top + margin
+        val right = (display.right - insets.right - margin).coerceAtLeast(left)
+        val bottom = (display.bottom - insets.bottom - margin).coerceAtLeast(top)
+        return OverlayBounds(left, top, right, bottom)
+    }
+
     fun clampPosition(requestedX: Int, requestedY: Int, usable: OverlayBounds, width: Int, height: Int): OverlayPosition {
         val maxX = (usable.right - width).coerceAtLeast(usable.left)
         val maxY = (usable.bottom - height).coerceAtLeast(usable.top)
@@ -71,58 +87,148 @@ private fun copyAttributes(
 abstract class BaseOverlayWindowHost(
     protected val context: Context,
     protected val windowManager: WindowManager,
-    private val onBlurAvailabilityChanged: (Boolean) -> Unit
+    private val onBlurAvailabilityChanged: (Boolean) -> Unit,
+    private val onPositionAdjusted: (OverlayPosition) -> Unit
 ) : OverlayWindowHost {
     protected var content: ComposeView? = null
     protected var attached = false
     protected var currentPosition = OverlayPosition(0, 0)
+    protected var currentSize = OverlaySize(0, 0)
+    private var insetsView: View? = null
+    private var firstLayoutComplete = false
+    private var lastSafeFrame: OverlayBounds? = null
 
     override val isAttached: Boolean get() = attached
     override val position: OverlayPosition get() = currentPosition.copy()
+    override val size: OverlaySize get() = currentSize.copy()
 
     protected fun reportBlurAvailability(available: Boolean) {
         onBlurAvailabilityChanged(available)
     }
 
-    protected fun usableFrame(decor: View? = null): OverlayBounds {
+    protected fun usableFrame(decor: View? = insetsView): OverlayBounds {
         val rawBounds = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             windowManager.currentWindowMetrics.bounds
         } else {
             @Suppress("DEPRECATION")
             android.graphics.Rect().also { windowManager.defaultDisplay.getRectSize(it) }
         }
-        val bounds = OverlayBounds(rawBounds.left, rawBounds.top, rawBounds.right, rawBounds.bottom)
-        if (decor == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return bounds
-        val insets = decor.rootWindowInsets?.getInsets(android.view.WindowInsets.Type.systemBars())
-            ?: return bounds
-        return OverlayBounds(
-            bounds.left + insets.left,
-            bounds.top + insets.top,
-            bounds.right - insets.right,
-            bounds.bottom - insets.bottom
-        ).also { if (it.right <= it.left || it.bottom <= it.top) return bounds }
+        val display = OverlayBounds(rawBounds.left, rawBounds.top, rawBounds.right, rawBounds.bottom)
+        val insets = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val windowInsets = windowManager.currentWindowMetrics.windowInsets
+            @Suppress("NewApi")
+            val systemInsets = windowInsets.getInsetsIgnoringVisibility(
+                WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout()
+            )
+            OverlayInsets(systemInsets.left, systemInsets.top, systemInsets.right, systemInsets.bottom)
+        } else {
+            @Suppress("DEPRECATION")
+            val rootInsets = decor?.rootWindowInsets
+            if (rootInsets == null) {
+                OverlayInsets()
+            } else {
+                @Suppress("DEPRECATION")
+                OverlayInsets(
+                    rootInsets.systemWindowInsetLeft,
+                    rootInsets.systemWindowInsetTop,
+                    rootInsets.systemWindowInsetRight,
+                    rootInsets.systemWindowInsetBottom
+                )
+            }
+        }
+        val marginPx = (context.resources.displayMetrics.density * EDGE_MARGIN_DP).toInt().coerceAtLeast(1)
+        val safe = OverlayGeometry.safeFrame(display, insets, marginPx)
+        if (safe != lastSafeFrame) {
+            Log.d(TAG, "INSETS_CHANGED display=${display.left},${display.top},${display.right},${display.bottom} " +
+                "insets=${insets.left},${insets.top},${insets.right},${insets.bottom} " +
+                "edgeMarginPx=$marginPx frame=${safe.left},${safe.top},${safe.right},${safe.bottom}")
+            lastSafeFrame = safe
+        }
+        return safe
     }
 
-    protected fun measureContent(decor: View? = null): Pair<Int, Int> {
-        val view = requireNotNull(content)
-        val frame = usableFrame(decor)
-        view.measure(
-            View.MeasureSpec.makeMeasureSpec(frame.width.coerceAtLeast(1), View.MeasureSpec.AT_MOST),
-            View.MeasureSpec.makeMeasureSpec(frame.height.coerceAtLeast(1), View.MeasureSpec.AT_MOST)
-        )
-        val width = view.measuredWidth.coerceAtLeast(1)
-        val height = view.measuredHeight.coerceAtLeast(1)
-        view.layout(0, 0, width, height)
-        return width to height
+    protected fun observeContent(view: ComposeView, decor: View? = null) {
+        content = view
+        insetsView = decor
+        currentSize = OverlaySize(0, 0)
+        firstLayoutComplete = false
+        view.addOnLayoutChangeListener(contentLayoutListener)
+        decor?.addOnLayoutChangeListener(decorLayoutListener)
+        decor?.setOnApplyWindowInsetsListener { _, insets ->
+            if (attached) {
+                Log.d(TAG, "INSETS_CHANGED delivered=${insets.systemWindowInsetLeft},${insets.systemWindowInsetTop}," +
+                    "${insets.systemWindowInsetRight},${insets.systemWindowInsetBottom}")
+                reclampCurrentPosition("insets")
+            }
+            insets
+        }
     }
 
-    protected fun clampToContent(x: Int, y: Int, decor: View? = null): OverlayPosition {
-        val view = requireNotNull(content)
-        val frame = usableFrame(decor)
-        return OverlayGeometry.clampPosition(
-            x, y, frame, view.measuredWidth.coerceAtLeast(1), view.measuredHeight.coerceAtLeast(1)
-        )
+    protected fun stopObservingContent(decor: View? = insetsView) {
+        content?.removeOnLayoutChangeListener(contentLayoutListener)
+        decor?.removeOnLayoutChangeListener(decorLayoutListener)
+        decor?.setOnApplyWindowInsetsListener(null)
+        insetsView = null
     }
+
+    protected fun onActualContentSizeChanged(width: Int, height: Int) {
+        val newSize = OverlaySize(width.coerceAtLeast(1), height.coerceAtLeast(1))
+        if (newSize == currentSize) return
+        val oldSize = currentSize
+        currentSize = newSize
+        val frame = usableFrame()
+        Log.d(TAG, "CONTENT_SIZE_CHANGED old=${oldSize.width}x${oldSize.height} " +
+            "new=${newSize.width}x${newSize.height}")
+        onContentSizeChanged(newSize)
+        reclampCurrentPosition("content-size", frame)
+        Log.d(TAG, "GEOMETRY_STABLE size=${newSize.width}x${newSize.height} " +
+            "position=${currentPosition.x},${currentPosition.y} frame=${frame.left},${frame.top},${frame.right},${frame.bottom}")
+        if (!firstLayoutComplete) {
+            firstLayoutComplete = true
+            onFirstLayoutComplete()
+        }
+    }
+
+    protected fun reclampCurrentPosition(reason: String, frame: OverlayBounds = usableFrame()) {
+        if (currentSize.width <= 0 || currentSize.height <= 0) return
+        val requested = currentPosition
+        val actual = OverlayGeometry.clampPosition(
+            requested.x, requested.y, frame, currentSize.width, currentSize.height
+        )
+        Log.d(TAG, "POSITION_CLAMP reason=$reason requested=${requested.x},${requested.y} " +
+            "actual=${actual.x},${actual.y} size=${currentSize.width}x${currentSize.height} " +
+            "frame=${frame.left},${frame.top},${frame.right},${frame.bottom}")
+        if (actual == requested) return
+        try {
+            applyPosition(actual)
+            currentPosition = actual
+            onPositionAdjusted(actual)
+        } catch (t: Throwable) {
+            logUpdateFailure("POSITION_CLAMP_UPDATE", t)
+        }
+    }
+
+    private val contentLayoutListener = View.OnLayoutChangeListener { _, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom ->
+        val width = right - left
+        val height = bottom - top
+        val oldWidth = oldRight - oldLeft
+        val oldHeight = oldBottom - oldTop
+        if (width > 0 && height > 0 && (width != oldWidth || height != oldHeight)) {
+            onActualContentSizeChanged(width, height)
+        }
+    }
+
+    private val decorLayoutListener = View.OnLayoutChangeListener { _, _, _, _, _, oldLeft, oldTop, oldRight, oldBottom ->
+        if (attached && (oldRight - oldLeft > 0 || oldBottom - oldTop > 0)) {
+            reclampCurrentPosition("window-layout")
+        }
+    }
+
+    protected open fun onContentSizeChanged(size: OverlaySize) = Unit
+
+    protected open fun onFirstLayoutComplete() = Unit
+
+    protected abstract fun applyPosition(position: OverlayPosition)
 
     protected fun logUpdateFailure(operation: String, throwable: Throwable) {
         Log.e(TAG, "$operation failed (${throwable::class.java.simpleName}: ${throwable.message})", throwable)
@@ -134,8 +240,9 @@ abstract class BaseOverlayWindowHost(
 class DialogOverlayWindowHost(
     context: Context,
     windowManager: WindowManager,
-    onBlurAvailabilityChanged: (Boolean) -> Unit
-) : BaseOverlayWindowHost(context, windowManager, onBlurAvailabilityChanged) {
+    onBlurAvailabilityChanged: (Boolean) -> Unit,
+    onPositionAdjusted: (OverlayPosition) -> Unit = {}
+) : BaseOverlayWindowHost(context, windowManager, onBlurAvailabilityChanged, onPositionAdjusted) {
     private var dialog: Dialog? = null
     private var blurListener: Consumer<Boolean>? = null
     private var crossWindowBlurEnabled = false
@@ -166,33 +273,39 @@ class DialogOverlayWindowHost(
         )
         overlayDialog.setCanceledOnTouchOutside(false)
         overlayDialog.setCancelable(false)
+        content.layoutParams = ViewGroup.LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT
+        )
         content.visibility = View.INVISIBLE
         currentPosition = OverlayPosition(initial.x, initial.y)
-        overlayDialog.setContentView(content)
-        overlayDialog.show()
-
+        overlayDialog.setContentView(content, content.layoutParams)
         val shownWindow = requireNotNull(overlayDialog.window) { "dialog window disappeared" }
         shownWindow.decorView.visibility = View.INVISIBLE
-        attached = true
-        this.content = content
         dialog = overlayDialog
+        attached = true
+        observeContent(content, shownWindow.decorView)
         registerBlurListener()
-        // Compose resolves its parent WindowRecomposer during measurement. The dialog has
-        // to be attached first; measuring here would fail before the ViewRoot exists.
-        shownWindow.decorView.post {
-            if (!attached) return@post
-            try {
-                measureAndApply(initial.x, initial.y)
-                shownWindow.decorView.visibility = View.VISIBLE
-                content.visibility = View.VISIBLE
-                Log.d(TAG, "HOST_LAYOUT_OK host=dialog position=${currentPosition.x},${currentPosition.y} size=${content.measuredWidth}x${content.measuredHeight}")
-            } catch (t: Throwable) {
-                logUpdateFailure("HOST_INITIAL_LAYOUT", t)
-                shownWindow.decorView.visibility = View.VISIBLE
-                content.visibility = View.VISIBLE
-            }
-        }
+        Log.d(TAG, "WINDOW_LAYOUT_REQUEST width=WRAP_CONTENT height=WRAP_CONTENT")
+        overlayDialog.show()
         Log.d(TAG, "HOST_ATTACH_OK host=dialog position=${currentPosition.x},${currentPosition.y}")
+    }
+
+    override fun onContentSizeChanged(size: OverlaySize) {
+        val window = dialog?.window ?: return
+        try {
+            Log.d(TAG, "WINDOW_LAYOUT_REQUEST width=WRAP_CONTENT height=WRAP_CONTENT size=${size.width}x${size.height}")
+            window.setLayout(WindowManager.LayoutParams.WRAP_CONTENT, WindowManager.LayoutParams.WRAP_CONTENT)
+        } catch (t: Throwable) {
+            logUpdateFailure("CONTENT_LAYOUT_REQUEST", t)
+        }
+    }
+
+    override fun onFirstLayoutComplete() {
+        val window = dialog?.window ?: return
+        window.decorView.visibility = View.VISIBLE
+        content?.visibility = View.VISIBLE
+        Log.d(TAG, "HOST_LAYOUT_OK host=dialog position=${currentPosition.x},${currentPosition.y} size=${size.width}x${size.height}")
     }
 
     private fun registerBlurListener() {
@@ -227,37 +340,28 @@ class DialogOverlayWindowHost(
         }
     }
 
-    private fun measureAndApply(requestedX: Int, requestedY: Int) {
-        val d = requireNotNull(dialog)
-        val window = requireNotNull(d.window)
-        val (width, height) = measureContent(window.decorView)
-        currentPosition = clampToContent(requestedX, requestedY, window.decorView)
-        val attrs = copyAttributes(
-            window.attributes,
-            width = width,
-            height = height,
-            gravity = Gravity.TOP or Gravity.START,
-            x = currentPosition.x,
-            y = currentPosition.y
-        )
-        window.attributes = attrs
-        window.setLayout(width, height)
-    }
-
     override fun updatePosition(x: Int, y: Int) {
         if (!attached) return
-        val window = dialog?.window ?: return
-        try {
-            currentPosition = clampToContent(x, y, window.decorView)
-            window.attributes = copyAttributes(
-                window.attributes,
-                gravity = Gravity.TOP or Gravity.START,
-                x = currentPosition.x,
-                y = currentPosition.y
+        try { applyPosition(OverlayPosition(x, y)) }
+        catch (t: Throwable) { logUpdateFailure("POSITION_UPDATE", t) }
+    }
+
+    override fun applyPosition(position: OverlayPosition) {
+        val window = requireNotNull(dialog?.window)
+        val actual = if (currentSize.width > 0 && currentSize.height > 0) {
+            OverlayGeometry.clampPosition(
+                position.x, position.y, usableFrame(window.decorView), currentSize.width, currentSize.height
             )
-        } catch (t: Throwable) {
-            logUpdateFailure("POSITION_UPDATE", t)
-        }
+        } else position
+        currentPosition = actual
+        window.attributes = copyAttributes(
+            window.attributes,
+            width = WindowManager.LayoutParams.WRAP_CONTENT,
+            height = WindowManager.LayoutParams.WRAP_CONTENT,
+            gravity = Gravity.TOP or Gravity.START,
+            x = actual.x,
+            y = actual.y
+        )
     }
 
     override fun updateLocked(locked: Boolean) {
@@ -289,20 +393,18 @@ class DialogOverlayWindowHost(
         }
     }
 
-    override fun updateContentLayout() {
+    override fun requestContentLayout() {
         if (!attached) return
-        val d = dialog ?: return
-        d.window?.decorView?.post {
-            if (attached) {
-                try { measureAndApply(currentPosition.x, currentPosition.y) }
-                catch (t: Throwable) { logUpdateFailure("CONTENT_RELAYOUT", t) }
-            }
-        }
+        try {
+            reclampCurrentPosition("layout-request")
+            content?.requestLayout()
+        } catch (t: Throwable) { logUpdateFailure("CONTENT_LAYOUT_REQUEST", t) }
     }
 
     override fun detach() {
         if (!attached && dialog == null) return
         attached = false
+        stopObservingContent(dialog?.window?.decorView)
         blurListener?.let {
             try { windowManager.removeCrossWindowBlurEnabledListener(it) }
             catch (t: Throwable) { logUpdateFailure("BLUR_LISTENER_REMOVE", t) }
@@ -321,8 +423,9 @@ class DialogOverlayWindowHost(
 class RawOverlayWindowHost(
     context: Context,
     windowManager: WindowManager,
-    onBlurAvailabilityChanged: (Boolean) -> Unit
-) : BaseOverlayWindowHost(context, windowManager, onBlurAvailabilityChanged) {
+    onBlurAvailabilityChanged: (Boolean) -> Unit,
+    onPositionAdjusted: (OverlayPosition) -> Unit = {}
+) : BaseOverlayWindowHost(context, windowManager, onBlurAvailabilityChanged, onPositionAdjusted) {
     private var params: WindowManager.LayoutParams? = null
 
     override val blurAvailable: Boolean get() = false
@@ -341,39 +444,55 @@ class RawOverlayWindowHost(
             x = initial.x
             y = initial.y
         }
+        content.layoutParams = p
         content.visibility = View.INVISIBLE
         currentPosition = OverlayPosition(initial.x, initial.y)
+        observeContent(content, content)
         windowManager.addView(content, p)
-        this.content = content
         this.params = p
         attached = true
         reportBlurAvailability(false)
-        content.post {
-            if (!attached) return@post
-            try {
-                measureContent()
-                applyLayout(initial.x, initial.y)
-                content.visibility = View.VISIBLE
-                Log.d(TAG, "HOST_ATTACH_OK host=raw position=${currentPosition.x},${currentPosition.y} size=${content.measuredWidth}x${content.measuredHeight}")
-            } catch (t: Throwable) {
-                logUpdateFailure("HOST_INITIAL_LAYOUT", t)
-                content.visibility = View.VISIBLE
-            }
-        }
+        Log.d(TAG, "WINDOW_LAYOUT_REQUEST width=WRAP_CONTENT height=WRAP_CONTENT")
+        Log.d(TAG, "HOST_ATTACH_OK host=raw position=${currentPosition.x},${currentPosition.y}")
     }
 
-    private fun applyLayout(x: Int, y: Int) {
+    override fun applyPosition(position: OverlayPosition) {
         val view = requireNotNull(content)
         val p = requireNotNull(params)
-        currentPosition = clampToContent(x, y)
+        val actual = if (currentSize.width > 0 && currentSize.height > 0) {
+            OverlayGeometry.clampPosition(
+                position.x, position.y, usableFrame(), currentSize.width, currentSize.height
+            )
+        } else position
+        currentPosition = actual
+        p.width = ViewGroup.LayoutParams.WRAP_CONTENT
+        p.height = ViewGroup.LayoutParams.WRAP_CONTENT
         p.x = currentPosition.x
         p.y = currentPosition.y
         windowManager.updateViewLayout(view, p)
     }
 
+    override fun onContentSizeChanged(size: OverlaySize) {
+        val view = content ?: return
+        val p = params ?: return
+        try {
+            p.width = ViewGroup.LayoutParams.WRAP_CONTENT
+            p.height = ViewGroup.LayoutParams.WRAP_CONTENT
+            Log.d(TAG, "WINDOW_LAYOUT_REQUEST width=WRAP_CONTENT height=WRAP_CONTENT size=${size.width}x${size.height}")
+            windowManager.updateViewLayout(view, p)
+        } catch (t: Throwable) {
+            logUpdateFailure("CONTENT_LAYOUT_REQUEST", t)
+        }
+    }
+
+    override fun onFirstLayoutComplete() {
+        content?.visibility = View.VISIBLE
+        Log.d(TAG, "HOST_LAYOUT_OK host=raw position=${currentPosition.x},${currentPosition.y} size=${size.width}x${size.height}")
+    }
+
     override fun updatePosition(x: Int, y: Int) {
         if (!attached) return
-        try { applyLayout(x, y) } catch (t: Throwable) { logUpdateFailure("POSITION_UPDATE", t) }
+        try { applyPosition(OverlayPosition(x, y)) } catch (t: Throwable) { logUpdateFailure("POSITION_UPDATE", t) }
     }
 
     override fun updateLocked(locked: Boolean) {
@@ -392,21 +511,18 @@ class RawOverlayWindowHost(
         reportBlurAvailability(false)
     }
 
-    override fun updateContentLayout() {
+    override fun requestContentLayout() {
         val view = content ?: return
-        view.post {
-            if (attached) {
-                try {
-                    measureContent()
-                    applyLayout(currentPosition.x, currentPosition.y)
-                } catch (t: Throwable) { logUpdateFailure("CONTENT_RELAYOUT", t) }
-            }
-        }
+        try {
+            reclampCurrentPosition("layout-request")
+            view.requestLayout()
+        } catch (t: Throwable) { logUpdateFailure("CONTENT_LAYOUT_REQUEST", t) }
     }
 
     override fun detach() {
         if (!attached && content == null) return
         attached = false
+        stopObservingContent(content)
         content?.let {
             try { windowManager.removeViewImmediate(it) }
             catch (t: Throwable) { logUpdateFailure("HOST_REMOVE", t) }

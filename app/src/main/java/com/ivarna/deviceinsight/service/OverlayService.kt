@@ -165,9 +165,9 @@ class OverlayService : Service(), LifecycleOwner, androidx.savedstate.SavedState
         }
         var composeView = newComposeView()
         val preferred: OverlayWindowHost = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            DialogOverlayWindowHost(this, windowManager, ::onBlurAvailabilityChanged)
+            DialogOverlayWindowHost(this, windowManager, ::onBlurAvailabilityChanged, ::onPositionAdjusted)
         } else {
-            RawOverlayWindowHost(this, windowManager, ::onBlurAvailabilityChanged)
+            RawOverlayWindowHost(this, windowManager, ::onBlurAvailabilityChanged, ::onPositionAdjusted)
         }
         var selected = preferred
         Log.d(TAG, "HOST_ATTACH_BEGIN preferred=${preferred::class.java.simpleName} initial=$initial")
@@ -180,7 +180,7 @@ class OverlayService : Service(), LifecycleOwner, androidx.savedstate.SavedState
             }
             if (preferred is DialogOverlayWindowHost) {
                 Log.w(TAG, "HOST_FALLBACK_BEGIN host=RawOverlayWindowHost")
-                selected = RawOverlayWindowHost(this, windowManager, ::onBlurAvailabilityChanged)
+                selected = RawOverlayWindowHost(this, windowManager, ::onBlurAvailabilityChanged, ::onPositionAdjusted)
                 // A Dialog may have attached the original ComposeView before failing during
                 // initial layout. Always give the raw host a fresh unattached view.
                 composeView = newComposeView()
@@ -221,7 +221,7 @@ class OverlayService : Service(), LifecycleOwner, androidx.savedstate.SavedState
         super.onConfigurationChanged(newConfig)
         Log.d(TAG, "CONFIGURATION_CHANGED orientation=${newConfig.orientation} density=${newConfig.densityDpi}")
         host?.let {
-            it.updateContentLayout()
+            it.requestContentLayout()
             it.updateLocked(configState.value.locked)
             it.updateBackgroundBlur(
                 configState.value.backgroundBlurEnabled,
@@ -257,7 +257,6 @@ class OverlayService : Service(), LifecycleOwner, androidx.savedstate.SavedState
                             (resources.displayMetrics.density * BLUR_RADIUS_DP).toInt().coerceAtLeast(1)
                         )
                     }
-                    if (previous.panel.scale != next.panel.scale) currentHost.updateContentLayout()
                     if (previous.x != next.x || previous.y != next.y) {
                         currentHost.updatePosition(next.x, next.y)
                         if (currentHost.position.x != next.x || currentHost.position.y != next.y) {
@@ -285,6 +284,13 @@ class OverlayService : Service(), LifecycleOwner, androidx.savedstate.SavedState
                 delay((1000L - (System.currentTimeMillis() - startedAt)).coerceAtLeast(200L))
             }
         }
+    }
+
+    private fun onPositionAdjusted(position: com.ivarna.deviceinsight.service.overlay.OverlayPosition) {
+        val current = runtimeConfig
+        if (current.x == position.x && current.y == position.y) return
+        Log.d(TAG, "POSITION_ADJUSTED actual=${position.x},${position.y} previous=${current.x},${current.y}")
+        persistPosition(position.x, position.y)
     }
 
     private fun onDrag(dxPx: Int, dyPx: Int) {
