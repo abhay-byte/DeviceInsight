@@ -1,0 +1,7 @@
+DeviceInsight 1.0.6 (Build 7) — Reliable Live Widgets & Preview Parity
+
+• LIVE, AMBIENT, and BUDGET widgets now use per-widget cadence-gated presentation updates.
+• Shared fresh telemetry snapshots prevent stale data and duplicate sampling races.
+• Widget configuration changes apply to active widgets without removing and re-adding them.
+• Home widgets and calibration previews share the same renderer, data, theme, and exact launcher size.
+• Widget lifecycle, cancellation results, stale startup data, and launcher alias switching are more reliable.

@@ -274,7 +274,7 @@ fun SettingsScreen(
             Text("the making of this application.", style = Caliper.type.dataS, color = c.ink,
                 modifier = Modifier.padding(horizontal = 16.dp))
             Spacer(Modifier.height(16.dp))
-            SpecRow("VERSION", "${com.ivarna.deviceinsight.BuildConfig.VERSION_NAME} · Build ${com.ivarna.deviceinsight.BuildConfig.VERSION_CODE}", Modifier.padding(horizontal = 16.dp))
+            SpecRow("VERSION", "v${com.ivarna.deviceinsight.BuildConfig.VERSION_NAME} · BUILD ${com.ivarna.deviceinsight.BuildConfig.VERSION_CODE}", Modifier.padding(horizontal = 16.dp))
             SpecRow("LICENSE", "GPL-3.0", Modifier.padding(horizontal = 16.dp))
             SpecRow("BUILT BY", "Ivarna", Modifier.padding(horizontal = 16.dp))
             Spacer(Modifier.height(20.dp))

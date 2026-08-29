@@ -1,0 +1,27 @@
+default_platform(:android)
+
+platform :android do
+  desc "Run the Android verification gates"
+  lane :verify do
+    gradle(
+      task: "testDebugUnitTest",
+      flags: "--no-daemon --console=plain"
+    )
+    gradle(
+      task: "assembleDebug",
+      flags: "--no-daemon --console=plain"
+    )
+    gradle(
+      task: "lintDebug",
+      flags: "--no-daemon --console=plain"
+    )
+  end
+
+  desc "Build the release Android App Bundle"
+  lane :build_release do
+    gradle(
+      task: "bundleRelease",
+      flags: "--no-daemon --console=plain"
+    )
+  end
+end

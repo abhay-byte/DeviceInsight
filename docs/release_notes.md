@@ -1,5 +1,26 @@
 # DeviceInsight Release Notes
 
+## Version 1.0.6 (Build 7) — Reliable Live Widgets & Preview Parity
+
+### 📡 Widget updates
+
+- **Cadence is enforced per widget** — LIVE, AMBIENT, and BUDGET widgets now receive presentation updates at their configured effective cadence instead of observing every raw dashboard sample.
+- **Fresh shared snapshots** — one telemetry sample is published to a shared coordinator and fanned out to due widget instances without stale APP_MONITOR data or LIVE/BUDGET holder races.
+- **Live configuration** — medium, cadence, trace window, watt hero, compact channels, and follow-system changes are reflected by active widgets without requiring removal and re-adding.
+- **Stable lifecycle** — target discovery, presentation state, and configuration state are scoped by app widget ID and cleaned up when widgets are deleted.
+
+### 🖼️ Home and preview parity
+
+- Active previews use the same `InstrumentBody`, snapshot, configuration, medium, tier, and exact launcher size as the home widget.
+- Exact-size preview rendering avoids arbitrary second-pass stretching and preserves the widget's real layout footprint.
+- LIVE/AMBIENT/BUDGET state and timestamp rules are shared between home rendering and calibration previews.
+
+### 🧭 Reliability
+
+- Widget configuration cancellation and failure results retain the app widget ID.
+- Stale initial monitor snapshots are rejected in favor of a fresh on-demand sample.
+- Launcher alias switching no longer relies on reflection and retries safely after the overlay detaches.
+
 ## Version 1.0.5 (Build 6) — Truthful FPS HUD & Correct Display Refresh
 
 ### 📊 FPS HUD — Truthful Signal, Not 0/—
